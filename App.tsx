@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { Session } from '@supabase/supabase-js';
+import { Session } from './src/services/supabase';
 import 'react-native-url-polyfill/auto';
 
 // Services
