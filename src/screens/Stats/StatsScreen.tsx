@@ -162,12 +162,12 @@ export default function StatsScreen() {
         const daysInMonth = lastDay.getDate();
         const totalCells = Math.ceil((daysInMonth + startingDayOfWeek) / 7) * 7;
 
-        const cells = [];
+        const cells: React.ReactElement[] = [];
 
         // Add empty cells for days before month starts
         for (let i = 0; i < startingDayOfWeek; i++) {
             cells.push(
-                <View style={styles.heatmapCell} />
+                <View key={`empty-start-${i}`} style={styles.heatmapCell} />
             );
         }
 
@@ -180,6 +180,7 @@ export default function StatsScreen() {
 
             cells.push(
                 <TouchableOpacity
+                    key={`day-${day}`}
                     style={[
                         styles.heatmapCell,
                         styles.heatmapDay,
@@ -200,7 +201,7 @@ export default function StatsScreen() {
         const remaining = totalCells - cells.length;
         for (let i = 0; i < remaining; i++) {
             cells.push(
-                <View style={styles.heatmapCell} />
+                <View key={`empty-end-${i}`} style={styles.heatmapCell} />
             );
         }
 
@@ -215,11 +216,7 @@ export default function StatsScreen() {
 
                 {/* Calendar grid */}
                 <View style={styles.calendarGrid}>
-                    {cells.map((cell, index) => (
-                        <View key={index}>
-                            {cell}
-                        </View>
-                    ))}
+                    {cells}
                 </View>
             </View>
         );
