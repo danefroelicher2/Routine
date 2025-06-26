@@ -12,14 +12,13 @@ import {
     ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { supabase } from '../../services/supabase';
 import { Note } from '../../types/database';
 
 interface NoteDetailScreenProps {
     navigation: any;
     route: {
-        params: {
+        params?: {
             note?: Note;
             isNew?: boolean;
             onSave?: () => void;
@@ -28,13 +27,14 @@ interface NoteDetailScreenProps {
 }
 
 export default function NoteDetailScreen({ navigation, route }: NoteDetailScreenProps) {
-    const { note, isNew = false, onSave } = route.params || {};
+    const params = route.params || {};
+    const { note, isNew = false, onSave } = params;
 
     const [title, setTitle] = useState(note?.title || '');
     const [content, setContent] = useState(note?.content || '');
     const [isLocked, setIsLocked] = useState(note?.is_locked || false);
     const [isPinned, setIsPinned] = useState(note?.is_pinned || false);
-    const [hasAuthenticated, setHasAuthenticated] = useState(!note?.is_locked);
+    const [hasAuthenticated, setHasAuthenticated] = useState(true); // Always authenticated for now
     const [saving, setSaving] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
 
@@ -92,60 +92,13 @@ export default function NoteDetailScreen({ navigation, route }: NoteDetailScreen
         return unsubscribe;
     }, [navigation, hasChanges]);
 
-    const checkBiometricAvailability = async () => {
-        const compatible = await LocalAuthentication.hasHardwareAsync();
-        const enrolled = await LocalAuthentication.isEnrolledAsync();
-        return compatible && enrolled;
-    };
-
-    const authenticateWithBiometrics = async () => {
-        try {
-            const biometricAvailable = await checkBiometricAvailability();
-
-            if (!biometricAvailable) {
-                Alert.alert(
-                    'Biometric Authentication Unavailable',
-                    'Please set up Face ID or Touch ID in your device settings to use this feature.'
-                );
-                return false;
-            }
-
-            const result = await LocalAuthentication.authenticateAsync({
-                promptMessage: 'Authenticate to access this note',
-                cancelLabel: 'Cancel',
-                fallbackLabel: 'Use Password',
-            });
-
-            return result.success;
-        } catch (error) {
-            console.error('Biometric authentication error:', error);
-            Alert.alert('Authentication Error', 'Unable to authenticate. Please try again.');
-            return false;
-        }
-    };
-
-    const handleLockToggle = async () => {
-        if (!isLocked) {
-            // Locking the note
-            const authenticated = await authenticateWithBiometrics();
-            if (authenticated) {
-                setIsLocked(true);
-            }
-        } else {
-            // Unlocking the note
-            const authenticated = await authenticateWithBiometrics();
-            if (authenticated) {
-                setIsLocked(false);
-                setHasAuthenticated(true);
-            }
-        }
-    };
-
-    const handleAccessLockedNote = async () => {
-        const authenticated = await authenticateWithBiometrics();
-        if (authenticated) {
-            setHasAuthenticated(true);
-        }
+    const handleLockToggle = () => {
+        // For now, just show an alert that biometric auth isn't available yet
+        Alert.alert(
+            'Biometric Authentication',
+            'Face ID/Touch ID feature will be available in a future update. For now, notes cannot be locked.',
+            [{ text: 'OK' }]
+        );
     };
 
     const handleSave = async (showAlert = true) => {
@@ -170,7 +123,7 @@ export default function NoteDetailScreen({ navigation, route }: NoteDetailScreen
                         title: title.trim() || 'Untitled',
                         content: content.trim(),
                         is_pinned: isPinned,
-                        is_locked: isLocked,
+                        is_locked: false, // Always false for now since we don't have biometric auth
                     });
 
                 if (error) throw error;
@@ -181,7 +134,7 @@ export default function NoteDetailScreen({ navigation, route }: NoteDetailScreen
                         title: title.trim() || 'Untitled',
                         content: content.trim(),
                         is_pinned: isPinned,
-                        is_locked: isLocked,
+                        is_locked: false, // Always false for now
                     })
                     .eq('id', note!.id);
 
@@ -208,7 +161,6 @@ export default function NoteDetailScreen({ navigation, route }: NoteDetailScreen
     };
 
     const handleShare = () => {
-        // Note: In a real app, you'd implement proper sharing
         Alert.alert('Share', 'Sharing functionality would be implemented here');
     };
 
@@ -245,38 +197,6 @@ export default function NoteDetailScreen({ navigation, route }: NoteDetailScreen
             ]
         );
     };
-
-    if (isLocked && !hasAuthenticated) {
-        return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.headerButton}
-                        onPress={() => navigation.goBack()}
-                    >
-                        <Ionicons name="arrow-back" size={24} color="#007AFF" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Locked Note</Text>
-                    <View style={styles.headerButton} />
-                </View>
-
-                <View style={styles.lockedContainer}>
-                    <Ionicons name="lock-closed" size={64} color="#666" />
-                    <Text style={styles.lockedTitle}>This note is locked</Text>
-                    <Text style={styles.lockedSubtitle}>
-                        Use Face ID or Touch ID to unlock
-                    </Text>
-                    <TouchableOpacity
-                        style={styles.unlockButton}
-                        onPress={handleAccessLockedNote}
-                    >
-                        <Ionicons name="finger-print" size={24} color="#fff" />
-                        <Text style={styles.unlockButtonText}>Unlock</Text>
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
-        );
-    }
 
     return (
         <SafeAreaView style={styles.container}>
@@ -395,11 +315,6 @@ const styles = StyleSheet.create({
         padding: 8,
         minWidth: 40,
     },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#333',
-    },
     headerActions: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -457,38 +372,5 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 14,
         fontWeight: '500',
-    },
-    lockedContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 40,
-    },
-    lockedTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#333',
-        marginTop: 20,
-        marginBottom: 8,
-    },
-    lockedSubtitle: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        marginBottom: 32,
-    },
-    unlockButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#007AFF',
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 24,
-    },
-    unlockButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-        marginLeft: 8,
     },
 });
