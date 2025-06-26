@@ -10,7 +10,6 @@ import {
     Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { RoutineCompletion } from '../../types/database';
 
@@ -27,11 +26,9 @@ export default function StatsScreen() {
     const [currentStreak, setCurrentStreak] = useState(0);
     const [loading, setLoading] = useState(true);
 
-    useFocusEffect(
-        useCallback(() => {
-            loadStatsData();
-        }, [currentDate])
-    );
+    useEffect(() => {
+        loadStatsData();
+    }, [currentDate]);
 
     const loadStatsData = async () => {
         try {
@@ -170,7 +167,7 @@ export default function StatsScreen() {
         // Add empty cells for days before month starts
         for (let i = 0; i < startingDayOfWeek; i++) {
             cells.push(
-                <View key={`empty-${i}`} style={styles.heatmapCell} />
+                <View style={styles.heatmapCell} />
             );
         }
 
@@ -183,7 +180,6 @@ export default function StatsScreen() {
 
             cells.push(
                 <TouchableOpacity
-                    key={day}
                     style={[
                         styles.heatmapCell,
                         styles.heatmapDay,
@@ -204,7 +200,7 @@ export default function StatsScreen() {
         const remaining = totalCells - cells.length;
         for (let i = 0; i < remaining; i++) {
             cells.push(
-                <View key={`empty-end-${i}`} style={styles.heatmapCell} />
+                <View style={styles.heatmapCell} />
             );
         }
 
@@ -219,7 +215,11 @@ export default function StatsScreen() {
 
                 {/* Calendar grid */}
                 <View style={styles.calendarGrid}>
-                    {cells}
+                    {cells.map((cell, index) => (
+                        <View key={index}>
+                            {cell}
+                        </View>
+                    ))}
                 </View>
             </View>
         );
