@@ -151,7 +151,7 @@ export default function HomeScreen() {
             } else {
                 // Add completion
                 const today = new Date().toISOString().split('T')[0];
-                let weekStartDate = null;
+                let weekStartDate: string | null = null;
 
                 if (isWeekly) {
                     const now = new Date();
