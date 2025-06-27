@@ -3,70 +3,38 @@ import {
     View,
     Text,
     StyleSheet,
+    SafeAreaView,
     ScrollView,
     TouchableOpacity,
-    Alert,
     RefreshControl,
-    SafeAreaView,
+    Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import { supabase } from '../../services/supabase';
-import { UserRoutine, RoutineCompletion } from '../../types/database';
+import { supabase, UserRoutine } from '../../services/supabase';
 
 interface RoutineWithCompletion extends UserRoutine {
     isCompleted: boolean;
     completionId?: string;
 }
 
-export default function HomeScreen() {
+interface HomeScreenProps {
+    navigation: any;
+}
+
+const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     const [dailyRoutines, setDailyRoutines] = useState<RoutineWithCompletion[]>([]);
     const [weeklyRoutines, setWeeklyRoutines] = useState<RoutineWithCompletion[]>([]);
-    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [weekTimeRemaining, setWeekTimeRemaining] = useState('');
 
-    useFocusEffect(
-        useCallback(() => {
-            loadRoutines();
-            calculateWeekTimeRemaining();
-        }, [])
-    );
-
-    const calculateWeekTimeRemaining = () => {
-        const now = new Date();
-        const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        const currentHour = now.getHours();
-
-        // Calculate days until next Monday (assuming week resets on Monday)
-        let daysUntilReset = currentDay === 0 ? 1 : 8 - currentDay; // If Sunday, 1 day. Otherwise, 8 - current day
-        if (currentDay === 1 && currentHour === 0) {
-            daysUntilReset = 7; // If it's Monday at midnight, 7 days until next reset
-        }
-
-        const hoursUntilReset = daysUntilReset === 1 ? (24 - currentHour) :
-            daysUntilReset > 1 ? ((daysUntilReset - 1) * 24 + (24 - currentHour)) : 0;
-
-        if (daysUntilReset === 0) {
-            setWeekTimeRemaining('Resets today!');
-        } else if (daysUntilReset === 1) {
-            setWeekTimeRemaining(`${hoursUntilReset}h remaining`);
-        } else {
-            const days = Math.floor(hoursUntilReset / 24);
-            const hours = hoursUntilReset % 24;
-            setWeekTimeRemaining(`${days}d ${hours}h remaining`);
-        }
-    };
-
-    const loadRoutines = async () => {
+    const loadData = useCallback(async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // Get today's date for completion checking
             const today = new Date().toISOString().split('T')[0];
 
-            // Get current week start (Monday)
+            // Calculate week start (Monday)
             const now = new Date();
             const currentDay = now.getDay();
             const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
@@ -126,14 +94,37 @@ export default function HomeScreen() {
 
             setDailyRoutines(daily);
             setWeeklyRoutines(weekly);
+
+            // Calculate time remaining in week
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            weekEnd.setHours(23, 59, 59, 999);
+
+            const timeLeft = weekEnd.getTime() - now.getTime();
+            const daysLeft = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+            const hoursLeft = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+            if (daysLeft > 0) {
+                setWeekTimeRemaining(`${daysLeft}d ${hoursLeft}h left`);
+            } else {
+                setWeekTimeRemaining(`${hoursLeft}h left`);
+            }
+
         } catch (error) {
-            console.error('Error loading routines:', error);
+            console.error('Error loading data:', error);
             Alert.alert('Error', 'Failed to load routines');
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await loadData();
+        setRefreshing(false);
+    }, [loadData]);
 
     const toggleRoutineCompletion = async (routine: RoutineWithCompletion, isWeekly = false) => {
         try {
@@ -151,8 +142,8 @@ export default function HomeScreen() {
             } else {
                 // Add completion
                 const today = new Date().toISOString().split('T')[0];
-                let weekStartDate: string | null = null;
 
+                let weekStartDate = null;
                 if (isWeekly) {
                     const now = new Date();
                     const currentDay = now.getDay();
@@ -174,18 +165,12 @@ export default function HomeScreen() {
                 if (error) throw error;
             }
 
-            // Reload routines to update UI
-            loadRoutines();
+            // Reload data to reflect changes
+            await loadData();
         } catch (error) {
             console.error('Error toggling routine completion:', error);
-            Alert.alert('Error', 'Failed to update routine');
+            Alert.alert('Error', 'Failed to update routine status');
         }
-    };
-
-    const onRefresh = () => {
-        setRefreshing(true);
-        loadRoutines();
-        calculateWeekTimeRemaining();
     };
 
     const renderRoutineItem = (routine: RoutineWithCompletion, isWeekly = false) => (
@@ -246,13 +231,19 @@ export default function HomeScreen() {
                     <View style={styles.sectionHeader}>
                         <Ionicons name="sunny" size={24} color="#ff9500" />
                         <Text style={styles.sectionTitle}>Daily Goals</Text>
+                        <TouchableOpacity
+                            style={styles.addButton}
+                            onPress={() => navigation.navigate('AddRoutine')}
+                        >
+                            <Ionicons name="add" size={24} color="#007AFF" />
+                        </TouchableOpacity>
                     </View>
 
                     {dailyRoutines.length === 0 ? (
                         <View style={styles.emptyState}>
                             <Text style={styles.emptyStateText}>No daily routines set up yet</Text>
                             <Text style={styles.emptyStateSubtext}>
-                                Go to Profile → Manage Routines to add some!
+                                Tap the + button above to add your first routine!
                             </Text>
                         </View>
                     ) : (
@@ -329,6 +320,9 @@ const styles = StyleSheet.create({
         color: '#333',
         marginLeft: 10,
         flex: 1,
+    },
+    addButton: {
+        padding: 4,
     },
     weekTimer: {
         flexDirection: 'row',
@@ -414,3 +408,5 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
 });
+
+export default HomeScreen;
