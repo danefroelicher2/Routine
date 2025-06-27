@@ -103,6 +103,32 @@ export interface Database {
           updated_at?: string;
         };
       };
+      user_day_routines: {
+        Row: {
+          id: string;
+          user_id: string;
+          routine_id: string;
+          day_of_week: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          routine_id: string;
+          day_of_week: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          routine_id?: string;
+          day_of_week?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       routine_completions: {
         Row: {
           id: string;
@@ -207,3 +233,4 @@ export type RoutineTemplate = Database['public']['Tables']['routine_templates'][
 export type RoutineCompletion = Database['public']['Tables']['routine_completions']['Row'];
 export type Note = Database['public']['Tables']['notes']['Row'];
 export type UserSettings = Database['public']['Tables']['user_settings']['Row'];
+export type UserDayRoutine = Database['public']['Tables']['user_day_routines']['Row'];
