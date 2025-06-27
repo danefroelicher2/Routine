@@ -247,7 +247,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
     useEffect(() => {
         loadData();
-    }, [loadData]);
+    }, [selectedDay]);
+
+    // Add focus listener to reload data when coming back from AddRoutine
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            console.log('HomeScreen focused - reloading data');
+            loadData();
+        });
+
+        return unsubscribe;
+    }, [navigation]);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
