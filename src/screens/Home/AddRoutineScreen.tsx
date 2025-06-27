@@ -24,15 +24,24 @@ interface RoutineTemplate {
 
 interface AddRoutineScreenProps {
     navigation: any;
+    route?: {
+        params?: {
+            selectedDay?: number;
+        };
+    };
 }
 
-const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation }) => {
+const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation, route }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredRoutines, setFilteredRoutines] = useState<RoutineTemplate[]>([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [customTitle, setCustomTitle] = useState('');
     const [customDescription, setCustomDescription] = useState('');
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+    // Get the selected day from navigation params (if coming from day selection)
+    const selectedDay = route?.params?.selectedDay;
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     // Organized routine templates by category
     const routineTemplates: RoutineTemplate[] = [
@@ -155,22 +164,41 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation }) => {
                 ? existingRoutines[0].sort_order + 1
                 : 1;
 
-            const { error } = await supabase
+            // Insert the routine
+            const { data: newRoutine, error } = await supabase
                 .from('user_routines')
                 .insert({
                     user_id: user.id,
                     name: routine.name,
                     description: routine.description,
                     icon: routine.icon,
-                    is_daily: true, // Default to daily
+                    is_daily: selectedDay !== undefined, // If coming from day selection, make it daily
                     is_weekly: false,
                     is_active: true,
                     sort_order: nextSortOrder,
-                });
+                })
+                .select()
+                .single();
 
             if (error) throw error;
 
-            Alert.alert('Success', `${routine.name} added to your daily routine!`);
+            // If we have a selected day, also assign it to that day
+            if (selectedDay !== undefined && newRoutine) {
+                const { error: dayError } = await supabase
+                    .from('user_day_routines')
+                    .insert({
+                        user_id: user.id,
+                        routine_id: newRoutine.id,
+                        day_of_week: selectedDay,
+                    });
+
+                if (dayError) throw dayError;
+
+                Alert.alert('Success', `${routine.name} added to your ${dayNames[selectedDay]} routine!`);
+            } else {
+                Alert.alert('Success', `${routine.name} added to your daily routine!`);
+            }
+
             navigation.goBack();
         } catch (error) {
             console.error('Error adding routine:', error);
@@ -210,22 +238,41 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation }) => {
                 ? existingRoutines[0].sort_order + 1
                 : 1;
 
-            const { error } = await supabase
+            // Insert the routine
+            const { data: newRoutine, error } = await supabase
                 .from('user_routines')
                 .insert({
                     user_id: user.id,
                     name: customTitle.trim(),
                     description: customDescription.trim() || null,
                     icon: 'checkmark-circle', // Default icon
-                    is_daily: true, // Default to daily
+                    is_daily: selectedDay !== undefined, // If coming from day selection, make it daily
                     is_weekly: false,
                     is_active: true,
                     sort_order: nextSortOrder,
-                });
+                })
+                .select()
+                .single();
 
             if (error) throw error;
 
-            Alert.alert('Success', `${customTitle} added to your daily routine!`);
+            // If we have a selected day, also assign it to that day
+            if (selectedDay !== undefined && newRoutine) {
+                const { error: dayError } = await supabase
+                    .from('user_day_routines')
+                    .insert({
+                        user_id: user.id,
+                        routine_id: newRoutine.id,
+                        day_of_week: selectedDay,
+                    });
+
+                if (dayError) throw dayError;
+
+                Alert.alert('Success', `${customTitle} added to your ${dayNames[selectedDay]} routine!`);
+            } else {
+                Alert.alert('Success', `${customTitle} added to your daily routine!`);
+            }
+
             setShowCreateModal(false);
             setCustomTitle('');
             setCustomDescription('');
@@ -288,7 +335,12 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation }) => {
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Ionicons name="arrow-back" size={24} color="#007AFF" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Add Routine</Text>
+                <Text style={styles.headerTitle}>
+                    {selectedDay !== undefined
+                        ? `Add Routine for ${dayNames[selectedDay]}`
+                        : 'Add Routine'
+                    }
+                </Text>
                 <View style={{ width: 24 }} />
             </View>
 

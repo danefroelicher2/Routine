@@ -173,7 +173,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
     const handleDayPress = (day: number) => {
         setSelectedDay(day);
-        setShowDayRoutineModal(true);
+    };
+
+    const handleAddRoutineForDay = () => {
+        // Navigate to AddRoutine screen and pass the selected day
+        navigation.navigate('AddRoutine', { selectedDay });
     };
 
     const toggleRoutineForDay = async (routineId: string, dayOfWeek: number) => {
@@ -310,12 +314,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
             {/* Day Calendar Strip */}
             <View style={styles.calendarContainer}>
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.calendarScroll}
-                >
-                    {daysOfWeek.map((day, index) => {
+                <View style={styles.calendarGrid}>
+                    {daysOfWeek.map((day) => {
                         const isToday = day.value === new Date().getDay();
                         const isSelected = day.value === selectedDay;
                         const hasRoutines = (daySpecificRoutines[day.value] || []).length > 0;
@@ -324,28 +324,27 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                             <TouchableOpacity
                                 key={day.value}
                                 style={[
-                                    styles.dayItem,
-                                    isToday && styles.dayItemToday,
-                                    isSelected && styles.dayItemSelected,
+                                    styles.dayBox,
+                                    isToday && styles.dayBoxToday,
+                                    isSelected && styles.dayBoxSelected,
                                 ]}
                                 onPress={() => handleDayPress(day.value)}
                             >
                                 <Text style={[
-                                    styles.dayName,
-                                    isToday && styles.dayNameToday,
-                                    isSelected && styles.dayNameSelected,
+                                    styles.dayBoxName,
+                                    isToday && styles.dayBoxNameToday,
+                                    isSelected && styles.dayBoxNameSelected,
                                 ]}>
                                     {day.name}
                                 </Text>
                                 <View style={[
-                                    styles.dayIndicator,
-                                    hasRoutines && styles.dayIndicatorActive,
-                                    isToday && styles.dayIndicatorToday,
+                                    styles.dayBoxIndicator,
+                                    hasRoutines && styles.dayBoxIndicatorActive,
                                 ]} />
                             </TouchableOpacity>
                         );
                     })}
-                </ScrollView>
+                </View>
             </View>
 
             <ScrollView
@@ -404,76 +403,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     )}
                 </View>
             </ScrollView>
-
-            {/* Day Routine Assignment Modal */}
-            <Modal
-                visible={showDayRoutineModal}
-                animationType="slide"
-                presentationStyle="pageSheet"
-            >
-                <SafeAreaView style={styles.modalContainer}>
-                    <View style={styles.modalHeader}>
-                        <TouchableOpacity onPress={() => setShowDayRoutineModal(false)}>
-                            <Text style={styles.cancelButton}>Done</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.modalTitle}>
-                            Routines for {daysOfWeek.find(d => d.value === selectedDay)?.name}
-                        </Text>
-                        <View style={{ width: 50 }} />
-                    </View>
-
-                    <ScrollView style={styles.modalContent}>
-                        <Text style={styles.modalSubtitle}>
-                            Select which routines you want to do on this day:
-                        </Text>
-
-                        {availableRoutines.map(routine => {
-                            const isAssigned = (daySpecificRoutines[selectedDay] || []).includes(routine.id);
-
-                            return (
-                                <TouchableOpacity
-                                    key={routine.id}
-                                    style={styles.routineSelectionItem}
-                                    onPress={() => toggleRoutineForDay(routine.id, selectedDay)}
-                                >
-                                    <View style={styles.routineSelectionContent}>
-                                        <View style={styles.routineSelectionLeft}>
-                                            <View style={[
-                                                styles.selectionCheckbox,
-                                                isAssigned && styles.selectionCheckboxSelected
-                                            ]}>
-                                                {isAssigned && (
-                                                    <Ionicons name="checkmark" size={16} color="#fff" />
-                                                )}
-                                            </View>
-                                            <View style={styles.routineSelectionInfo}>
-                                                <Text style={styles.routineSelectionName}>{routine.name}</Text>
-                                                {routine.description && (
-                                                    <Text style={styles.routineSelectionDescription}>
-                                                        {routine.description}
-                                                    </Text>
-                                                )}
-                                            </View>
-                                        </View>
-                                        {routine.icon && (
-                                            <Ionicons name={routine.icon as any} size={24} color="#666" />
-                                        )}
-                                    </View>
-                                </TouchableOpacity>
-                            );
-                        })}
-
-                        {availableRoutines.length === 0 && (
-                            <View style={styles.emptyModalState}>
-                                <Text style={styles.emptyModalText}>No routines available</Text>
-                                <Text style={styles.emptyModalSubtext}>
-                                    Create some routines first using the + button
-                                </Text>
-                            </View>
-                        )}
-                    </ScrollView>
-                </SafeAreaView>
-            </Modal>
         </SafeAreaView>
     );
 };
@@ -611,149 +540,59 @@ const styles = StyleSheet.create({
     calendarContainer: {
         backgroundColor: '#fff',
         paddingVertical: 15,
+        paddingHorizontal: 15,
         borderBottomWidth: 1,
         borderBottomColor: '#e9ecef',
     },
-    calendarScroll: {
-        paddingHorizontal: 20,
-    },
-    dayItem: {
+    calendarGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        marginHorizontal: 4,
+    },
+    dayBox: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 12,
+        marginHorizontal: 2,
         borderRadius: 12,
-        minWidth: 50,
+        backgroundColor: '#f8f9fa',
+        borderWidth: 2,
+        borderColor: 'transparent',
+        minHeight: 65,
+        justifyContent: 'center',
     },
-    dayItemToday: {
-        backgroundColor: '#f0f8ff',
+    dayBoxToday: {
+        backgroundColor: '#e6f3ff',
+        borderColor: '#007AFF',
     },
-    dayItemSelected: {
+    dayBoxSelected: {
         backgroundColor: '#007AFF',
+        borderColor: '#007AFF',
     },
-    dayName: {
-        fontSize: 14,
-        fontWeight: '500',
+    dayBoxName: {
+        fontSize: 13,
+        fontWeight: '600',
         color: '#333',
         marginBottom: 4,
     },
-    dayNameToday: {
+    dayBoxNameToday: {
         color: '#007AFF',
-        fontWeight: '600',
+        fontWeight: '700',
     },
-    dayNameSelected: {
+    dayBoxNameSelected: {
         color: '#fff',
-        fontWeight: '600',
+        fontWeight: '700',
     },
-    dayIndicator: {
+    dayBoxIndicator: {
         width: 6,
         height: 6,
         borderRadius: 3,
         backgroundColor: '#ddd',
     },
-    dayIndicatorActive: {
+    dayBoxIndicatorActive: {
         backgroundColor: '#34c759',
     },
-    dayIndicatorToday: {
-        backgroundColor: '#007AFF',
-    },
-    // Modal Styles
-    modalContainer: {
-        flex: 1,
-        backgroundColor: '#f8f9fa',
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e9ecef',
-    },
-    cancelButton: {
-        fontSize: 16,
-        color: '#007AFF',
-        fontWeight: '500',
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#333',
-    },
-    modalContent: {
-        flex: 1,
-        paddingHorizontal: 20,
-        paddingTop: 20,
-    },
-    modalSubtitle: {
-        fontSize: 16,
-        color: '#666',
-        marginBottom: 20,
-        textAlign: 'center',
-    },
-    routineSelectionItem: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        marginBottom: 8,
-        borderWidth: 1,
-        borderColor: '#e9ecef',
-    },
-    routineSelectionContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-    },
-    routineSelectionLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    selectionCheckbox: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#ddd',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    selectionCheckboxSelected: {
-        backgroundColor: '#007AFF',
-        borderColor: '#007AFF',
-    },
-    routineSelectionInfo: {
-        flex: 1,
-    },
-    routineSelectionName: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#333',
-    },
-    routineSelectionDescription: {
-        fontSize: 14,
-        color: '#666',
-        marginTop: 2,
-    },
-    emptyModalState: {
-        alignItems: 'center',
-        paddingVertical: 40,
-    },
-    emptyModalText: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-    },
-    emptyModalSubtext: {
-        fontSize: 14,
-        color: '#999',
-        textAlign: 'center',
-        marginTop: 8,
-    },
 });
+;
 
 export default HomeScreen;
