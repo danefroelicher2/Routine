@@ -152,51 +152,78 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation, route }
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('No user found');
 
-            // Get the current highest sort_order
-            const { data: existingRoutines } = await supabase
+            // Check if this routine already exists for this user
+            const { data: existingRoutine, error: checkError } = await supabase
                 .from('user_routines')
-                .select('sort_order')
+                .select('id')
                 .eq('user_id', user.id)
-                .order('sort_order', { ascending: false })
-                .limit(1);
-
-            const nextSortOrder = existingRoutines && existingRoutines.length > 0
-                ? existingRoutines[0].sort_order + 1
-                : 1;
-
-            // Insert the routine
-            const { data: newRoutine, error } = await supabase
-                .from('user_routines')
-                .insert({
-                    user_id: user.id,
-                    name: routine.name,
-                    description: routine.description,
-                    icon: routine.icon,
-                    is_daily: selectedDay !== undefined, // If coming from day selection, make it daily
-                    is_weekly: false,
-                    is_active: true,
-                    sort_order: nextSortOrder,
-                })
-                .select()
+                .eq('name', routine.name)
+                .eq('is_active', true)
                 .single();
 
-            if (error) throw error;
+            let routineId: string;
 
-            // If we have a selected day, also assign it to that day
-            if (selectedDay !== undefined && newRoutine) {
-                const { error: dayError } = await supabase
-                    .from('user_day_routines')
+            if (existingRoutine) {
+                // Use existing routine
+                routineId = existingRoutine.id;
+            } else {
+                // Create new routine
+                const { data: existingRoutines } = await supabase
+                    .from('user_routines')
+                    .select('sort_order')
+                    .eq('user_id', user.id)
+                    .order('sort_order', { ascending: false })
+                    .limit(1);
+
+                const nextSortOrder = existingRoutines && existingRoutines.length > 0
+                    ? existingRoutines[0].sort_order + 1
+                    : 1;
+
+                const { data: newRoutine, error } = await supabase
+                    .from('user_routines')
                     .insert({
                         user_id: user.id,
-                        routine_id: newRoutine.id,
-                        day_of_week: selectedDay,
-                    });
+                        name: routine.name,
+                        description: routine.description,
+                        icon: routine.icon,
+                        is_daily: selectedDay !== undefined,
+                        is_weekly: false,
+                        is_active: true,
+                        sort_order: nextSortOrder,
+                    })
+                    .select('id')
+                    .single();
 
-                if (dayError) throw dayError;
+                if (error) throw error;
+                routineId = newRoutine.id;
+            }
+
+            // If we have a selected day, assign it to that day
+            if (selectedDay !== undefined) {
+                // Check if already assigned to this day
+                const { data: existingAssignment } = await supabase
+                    .from('user_day_routines')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('routine_id', routineId)
+                    .eq('day_of_week', selectedDay)
+                    .single();
+
+                if (!existingAssignment) {
+                    const { error: dayError } = await supabase
+                        .from('user_day_routines')
+                        .insert({
+                            user_id: user.id,
+                            routine_id: routineId,
+                            day_of_week: selectedDay,
+                        });
+
+                    if (dayError) throw dayError;
+                }
 
                 Alert.alert('Success', `${routine.name} added to your ${dayNames[selectedDay]} routine!`);
             } else {
-                Alert.alert('Success', `${routine.name} added to your daily routine!`);
+                Alert.alert('Success', `${routine.name} added to your routines!`);
             }
 
             navigation.goBack();
@@ -226,51 +253,78 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation, route }
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('No user found');
 
-            // Get the current highest sort_order
-            const { data: existingRoutines } = await supabase
+            // Check if this routine name already exists for this user
+            const { data: existingRoutine, error: checkError } = await supabase
                 .from('user_routines')
-                .select('sort_order')
+                .select('id')
                 .eq('user_id', user.id)
-                .order('sort_order', { ascending: false })
-                .limit(1);
-
-            const nextSortOrder = existingRoutines && existingRoutines.length > 0
-                ? existingRoutines[0].sort_order + 1
-                : 1;
-
-            // Insert the routine
-            const { data: newRoutine, error } = await supabase
-                .from('user_routines')
-                .insert({
-                    user_id: user.id,
-                    name: customTitle.trim(),
-                    description: customDescription.trim() || null,
-                    icon: 'checkmark-circle', // Default icon
-                    is_daily: selectedDay !== undefined, // If coming from day selection, make it daily
-                    is_weekly: false,
-                    is_active: true,
-                    sort_order: nextSortOrder,
-                })
-                .select()
+                .eq('name', customTitle.trim())
+                .eq('is_active', true)
                 .single();
 
-            if (error) throw error;
+            let routineId: string;
 
-            // If we have a selected day, also assign it to that day
-            if (selectedDay !== undefined && newRoutine) {
-                const { error: dayError } = await supabase
-                    .from('user_day_routines')
+            if (existingRoutine) {
+                // Use existing routine
+                routineId = existingRoutine.id;
+            } else {
+                // Create new routine
+                const { data: existingRoutines } = await supabase
+                    .from('user_routines')
+                    .select('sort_order')
+                    .eq('user_id', user.id)
+                    .order('sort_order', { ascending: false })
+                    .limit(1);
+
+                const nextSortOrder = existingRoutines && existingRoutines.length > 0
+                    ? existingRoutines[0].sort_order + 1
+                    : 1;
+
+                const { data: newRoutine, error } = await supabase
+                    .from('user_routines')
                     .insert({
                         user_id: user.id,
-                        routine_id: newRoutine.id,
-                        day_of_week: selectedDay,
-                    });
+                        name: customTitle.trim(),
+                        description: customDescription.trim() || null,
+                        icon: 'checkmark-circle',
+                        is_daily: selectedDay !== undefined,
+                        is_weekly: false,
+                        is_active: true,
+                        sort_order: nextSortOrder,
+                    })
+                    .select('id')
+                    .single();
 
-                if (dayError) throw dayError;
+                if (error) throw error;
+                routineId = newRoutine.id;
+            }
+
+            // If we have a selected day, assign it to that day
+            if (selectedDay !== undefined) {
+                // Check if already assigned to this day
+                const { data: existingAssignment } = await supabase
+                    .from('user_day_routines')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('routine_id', routineId)
+                    .eq('day_of_week', selectedDay)
+                    .single();
+
+                if (!existingAssignment) {
+                    const { error: dayError } = await supabase
+                        .from('user_day_routines')
+                        .insert({
+                            user_id: user.id,
+                            routine_id: routineId,
+                            day_of_week: selectedDay,
+                        });
+
+                    if (dayError) throw dayError;
+                }
 
                 Alert.alert('Success', `${customTitle} added to your ${dayNames[selectedDay]} routine!`);
             } else {
-                Alert.alert('Success', `${customTitle} added to your daily routine!`);
+                Alert.alert('Success', `${customTitle} added to your routines!`);
             }
 
             setShowCreateModal(false);
