@@ -184,13 +184,13 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation }) => {
             return;
         }
 
-        if (customTitle.length > 15) {
-            Alert.alert('Error', 'Title must be 15 characters or less');
+        if (customTitle.length > 20) {
+            Alert.alert('Error', 'Title must be 20 characters or less');
             return;
         }
 
-        if (customDescription.length > 30) {
-            Alert.alert('Error', 'Description must be 30 characters or less');
+        if (customDescription.length > 35) {
+            Alert.alert('Error', 'Description must be 35 characters or less');
             return;
         }
 
@@ -380,16 +380,16 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation }) => {
                         <View style={styles.inputGroup}>
                             <View style={styles.inputLabelContainer}>
                                 <Text style={styles.inputLabel}>Title *</Text>
-                                <Text style={[styles.characterCount, customTitle.length > 15 && styles.characterCountError]}>
-                                    {customTitle.length}/15
+                                <Text style={[styles.characterCount, customTitle.length > 20 && styles.characterCountError]}>
+                                    {customTitle.length}/20
                                 </Text>
                             </View>
                             <TextInput
-                                style={[styles.textInput, customTitle.length > 15 && styles.textInputError]}
+                                style={[styles.textInput, customTitle.length > 20 && styles.textInputError]}
                                 placeholder="Enter routine name"
                                 value={customTitle}
                                 onChangeText={setCustomTitle}
-                                maxLength={15}
+                                maxLength={20}
                                 autoFocus
                             />
                         </View>
@@ -397,16 +397,16 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation }) => {
                         <View style={styles.inputGroup}>
                             <View style={styles.inputLabelContainer}>
                                 <Text style={styles.inputLabel}>Description (Optional)</Text>
-                                <Text style={[styles.characterCount, customDescription.length > 30 && styles.characterCountError]}>
-                                    {customDescription.length}/30
+                                <Text style={[styles.characterCount, customDescription.length > 35 && styles.characterCountError]}>
+                                    {customDescription.length}/35
                                 </Text>
                             </View>
                             <TextInput
-                                style={[styles.textInput, styles.textAreaInput, customDescription.length > 30 && styles.textInputError]}
+                                style={[styles.textInput, styles.textAreaInput, customDescription.length > 35 && styles.textInputError]}
                                 placeholder="Enter description"
                                 value={customDescription}
                                 onChangeText={setCustomDescription}
-                                maxLength={30}
+                                maxLength={35}
                                 multiline
                                 numberOfLines={4}
                                 textAlignVertical="top"
