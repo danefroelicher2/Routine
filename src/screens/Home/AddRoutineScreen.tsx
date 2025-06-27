@@ -152,84 +152,80 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation, route }
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('No user found');
 
-            // Check if this routine already exists for this user
-            const { data: existingRoutine, error: checkError } = await supabase
+            console.log('=== STARTING ROUTINE CREATION ===');
+            console.log('User ID:', user.id);
+            console.log('Selected day:', selectedDay);
+            console.log('Routine name:', routine.name);
+
+            // Always create a new routine (don't reuse existing ones to avoid confusion)
+            const { data: existingRoutines } = await supabase
                 .from('user_routines')
-                .select('id')
+                .select('sort_order')
                 .eq('user_id', user.id)
-                .eq('name', routine.name)
-                .eq('is_active', true)
+                .order('sort_order', { ascending: false })
+                .limit(1);
+
+            const nextSortOrder = existingRoutines && existingRoutines.length > 0
+                ? existingRoutines[0].sort_order + 1
+                : 1;
+
+            console.log('Creating routine with sort order:', nextSortOrder);
+
+            const { data: newRoutine, error: routineError } = await supabase
+                .from('user_routines')
+                .insert({
+                    user_id: user.id,
+                    name: routine.name,
+                    description: routine.description,
+                    icon: routine.icon,
+                    is_daily: true, // Always set to daily for day-specific routines
+                    is_weekly: false,
+                    is_active: true,
+                    sort_order: nextSortOrder,
+                })
+                .select('id')
                 .single();
 
-            let routineId: string;
-
-            if (existingRoutine) {
-                // Use existing routine
-                routineId = existingRoutine.id;
-            } else {
-                // Create new routine
-                const { data: existingRoutines } = await supabase
-                    .from('user_routines')
-                    .select('sort_order')
-                    .eq('user_id', user.id)
-                    .order('sort_order', { ascending: false })
-                    .limit(1);
-
-                const nextSortOrder = existingRoutines && existingRoutines.length > 0
-                    ? existingRoutines[0].sort_order + 1
-                    : 1;
-
-                const { data: newRoutine, error } = await supabase
-                    .from('user_routines')
-                    .insert({
-                        user_id: user.id,
-                        name: routine.name,
-                        description: routine.description,
-                        icon: routine.icon,
-                        is_daily: selectedDay !== undefined,
-                        is_weekly: false,
-                        is_active: true,
-                        sort_order: nextSortOrder,
-                    })
-                    .select('id')
-                    .single();
-
-                if (error) throw error;
-                routineId = newRoutine.id;
+            if (routineError) {
+                console.error('Routine creation error:', routineError);
+                throw routineError;
             }
 
+            console.log('Routine created successfully:', newRoutine);
+
             // If we have a selected day, assign it to that day
-            if (selectedDay !== undefined) {
-                // Check if already assigned to this day
-                const { data: existingAssignment } = await supabase
+            if (selectedDay !== undefined && newRoutine) {
+                console.log('Assigning routine to day:', selectedDay);
+
+                const { data: dayAssignment, error: dayError } = await supabase
                     .from('user_day_routines')
-                    .select('id')
-                    .eq('user_id', user.id)
-                    .eq('routine_id', routineId)
-                    .eq('day_of_week', selectedDay)
-                    .single();
+                    .insert({
+                        user_id: user.id,
+                        routine_id: newRoutine.id,
+                        day_of_week: selectedDay,
+                    })
+                    .select();
 
-                if (!existingAssignment) {
-                    const { error: dayError } = await supabase
-                        .from('user_day_routines')
-                        .insert({
-                            user_id: user.id,
-                            routine_id: routineId,
-                            day_of_week: selectedDay,
-                        });
-
-                    if (dayError) throw dayError;
+                if (dayError) {
+                    console.error('Day assignment error:', dayError);
+                    console.error('Day assignment error details:', JSON.stringify(dayError, null, 2));
+                    throw dayError;
                 }
 
+                console.log('Day assignment created successfully:', dayAssignment);
                 Alert.alert('Success', `${routine.name} added to your ${dayNames[selectedDay]} routine!`);
             } else {
+                console.log('No selected day - routine created without day assignment');
                 Alert.alert('Success', `${routine.name} added to your routines!`);
             }
 
+            console.log('=== ROUTINE CREATION COMPLETED ===');
             navigation.goBack();
         } catch (error) {
-            console.error('Error adding routine:', error);
-            Alert.alert('Error', 'Failed to add routine. Please try again.');
+            console.error('=== ERROR IN ROUTINE CREATION ===');
+            console.error('Full error:', error);
+            console.error('Error message:', error.message);
+            Alert.alert('Error', `Failed to add routine: ${error.message}`);
         }
     };
 
