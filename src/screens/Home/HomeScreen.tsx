@@ -10,7 +10,8 @@ import {
     Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase, UserRoutine } from '../../services/supabase';
+import { supabase } from '../../services/supabase';
+import { UserRoutine } from '../../types/database';
 
 interface RoutineWithCompletion extends UserRoutine {
     isCompleted: boolean;
