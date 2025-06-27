@@ -32,35 +32,102 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation }) => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [customTitle, setCustomTitle] = useState('');
     const [customDescription, setCustomDescription] = useState('');
+    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-    // Pre-defined routine templates
+    // Organized routine templates by category
     const routineTemplates: RoutineTemplate[] = [
+        // Fitness
         { id: '1', name: 'Workout', description: 'Physical exercise session', icon: 'fitness', category: 'Fitness' },
         { id: '2', name: 'Run', description: 'Go for a run', icon: 'walk', category: 'Fitness' },
-        { id: '3', name: 'Read a Book', description: 'Reading time', icon: 'book', category: 'Learning' },
-        { id: '4', name: 'Bicycling', description: 'Bike ride', icon: 'bicycle', category: 'Fitness' },
-        { id: '5', name: 'Work', description: 'Work session', icon: 'briefcase', category: 'Productivity' },
-        { id: '6', name: 'Coffee', description: 'Coffee break', icon: 'cafe', category: 'Lifestyle' },
-        { id: '7', name: 'Meditation', description: 'Mindfulness practice', icon: 'leaf', category: 'Wellness' },
-        { id: '8', name: 'Yoga', description: 'Yoga practice', icon: 'body', category: 'Fitness' },
-        { id: '9', name: 'Walk', description: 'Take a walk', icon: 'walk', category: 'Fitness' },
-        { id: '10', name: 'Study', description: 'Study session', icon: 'school', category: 'Learning' },
-        { id: '11', name: 'Cook', description: 'Prepare meals', icon: 'restaurant', category: 'Lifestyle' },
-        { id: '12', name: 'Sleep 8 Hours', description: 'Get adequate rest', icon: 'bed', category: 'Wellness' },
-        { id: '13', name: 'Drink Water', description: 'Stay hydrated', icon: 'water', category: 'Wellness' },
-        { id: '14', name: 'Journal', description: 'Write in journal', icon: 'create', category: 'Wellness' },
-        { id: '15', name: 'Stretch', description: 'Stretching exercises', icon: 'accessibility', category: 'Fitness' },
-        { id: '16', name: 'Social Media Break', description: 'Limit screen time', icon: 'phone-portrait', category: 'Wellness' },
-        { id: '17', name: 'Music Practice', description: 'Practice instrument', icon: 'musical-notes', category: 'Learning' },
-        { id: '18', name: 'Clean House', description: 'Household cleaning', icon: 'home', category: 'Lifestyle' },
-        { id: '19', name: 'Garden', description: 'Gardening activities', icon: 'flower', category: 'Lifestyle' },
-        { id: '20', name: 'Video Call Family', description: 'Connect with family', icon: 'videocam', category: 'Social' },
+        { id: '3', name: 'Bicycling', description: 'Bike ride', icon: 'bicycle', category: 'Fitness' },
+        { id: '4', name: 'Yoga', description: 'Yoga practice', icon: 'body', category: 'Fitness' },
+        { id: '5', name: 'Walk', description: 'Take a walk', icon: 'walk', category: 'Fitness' },
+        { id: '6', name: 'Stretch', description: 'Stretching exercises', icon: 'accessibility', category: 'Fitness' },
+        { id: '7', name: 'Swimming', description: 'Swimming workout', icon: 'water', category: 'Fitness' },
+        { id: '8', name: 'Weightlifting', description: 'Strength training', icon: 'barbell', category: 'Fitness' },
+        { id: '9', name: 'Cardio', description: 'Cardiovascular exercise', icon: 'heart', category: 'Fitness' },
+
+        // Learning
+        { id: '10', name: 'Read a Book', description: 'Reading time', icon: 'book', category: 'Learning' },
+        { id: '11', name: 'Study', description: 'Study session', icon: 'school', category: 'Learning' },
+        { id: '12', name: 'Music Practice', description: 'Practice instrument', icon: 'musical-notes', category: 'Learning' },
+        { id: '13', name: 'Language Learning', description: 'Practice new language', icon: 'chatbubbles', category: 'Learning' },
+        { id: '14', name: 'Online Course', description: 'Take online classes', icon: 'laptop', category: 'Learning' },
+        { id: '15', name: 'Podcast', description: 'Listen to educational content', icon: 'headset', category: 'Learning' },
+        { id: '16', name: 'Writing', description: 'Creative or technical writing', icon: 'create', category: 'Learning' },
+
+        // Productivity
+        { id: '17', name: 'Work', description: 'Work session', icon: 'briefcase', category: 'Productivity' },
+        { id: '18', name: 'Plan Day', description: 'Daily planning', icon: 'calendar', category: 'Productivity' },
+        { id: '19', name: 'Email Management', description: 'Process emails', icon: 'mail', category: 'Productivity' },
+        { id: '20', name: 'Deep Work', description: 'Focused work session', icon: 'bulb', category: 'Productivity' },
+        { id: '21', name: 'Review Goals', description: 'Check progress', icon: 'checkmark-done', category: 'Productivity' },
+        { id: '22', name: 'Organize Workspace', description: 'Clean and organize', icon: 'file-tray', category: 'Productivity' },
+
+        // Wellness
+        { id: '23', name: 'Meditation', description: 'Mindfulness practice', icon: 'leaf', category: 'Wellness' },
+        { id: '24', name: 'Sleep 8 Hours', description: 'Get adequate rest', icon: 'bed', category: 'Wellness' },
+        { id: '25', name: 'Drink Water', description: 'Stay hydrated', icon: 'water', category: 'Wellness' },
+        { id: '26', name: 'Journal', description: 'Write in journal', icon: 'create', category: 'Wellness' },
+        { id: '27', name: 'Social Media Break', description: 'Limit screen time', icon: 'phone-portrait', category: 'Wellness' },
+        { id: '28', name: 'Breathwork', description: 'Breathing exercises', icon: 'flower', category: 'Wellness' },
+        { id: '29', name: 'Gratitude Practice', description: 'Count your blessings', icon: 'heart', category: 'Wellness' },
+        { id: '30', name: 'Nature Time', description: 'Spend time outdoors', icon: 'leaf', category: 'Wellness' },
+
+        // Lifestyle
+        { id: '31', name: 'Coffee', description: 'Coffee break', icon: 'cafe', category: 'Lifestyle' },
+        { id: '32', name: 'Cook', description: 'Prepare meals', icon: 'restaurant', category: 'Lifestyle' },
+        { id: '33', name: 'Clean House', description: 'Household cleaning', icon: 'home', category: 'Lifestyle' },
+        { id: '34', name: 'Garden', description: 'Gardening activities', icon: 'flower', category: 'Lifestyle' },
+        { id: '35', name: 'Grocery Shopping', description: 'Buy groceries', icon: 'basket', category: 'Lifestyle' },
+        { id: '36', name: 'Meal Prep', description: 'Prepare meals in advance', icon: 'nutrition', category: 'Lifestyle' },
+        { id: '37', name: 'Laundry', description: 'Wash clothes', icon: 'shirt', category: 'Lifestyle' },
+
+        // Social
+        { id: '38', name: 'Video Call Family', description: 'Connect with family', icon: 'videocam', category: 'Social' },
+        { id: '39', name: 'Call Friends', description: 'Catch up with friends', icon: 'call', category: 'Social' },
+        { id: '40', name: 'Social Activity', description: 'Meet with others', icon: 'people', category: 'Social' },
+        { id: '41', name: 'Date Night', description: 'Spend time with partner', icon: 'heart', category: 'Social' },
+        { id: '42', name: 'Community Service', description: 'Help others', icon: 'hand-left', category: 'Social' },
+
+        // Spiritual
+        { id: '43', name: 'Prayer', description: 'Prayer time', icon: 'rose', category: 'Spiritual' },
+        { id: '44', name: 'Bible Study', description: 'Read scripture', icon: 'book', category: 'Spiritual' },
+        { id: '45', name: 'Church', description: 'Attend service', icon: 'home', category: 'Spiritual' },
+        { id: '46', name: 'Reflection', description: 'Spiritual reflection', icon: 'bulb', category: 'Spiritual' },
+        { id: '47', name: 'Devotional', description: 'Daily devotional', icon: 'heart', category: 'Spiritual' },
+
+        // Business
+        { id: '48', name: 'Networking', description: 'Build connections', icon: 'people', category: 'Business' },
+        { id: '49', name: 'Skill Development', description: 'Learn new skills', icon: 'trending-up', category: 'Business' },
+        { id: '50', name: 'Client Calls', description: 'Talk to clients', icon: 'call', category: 'Business' },
+        { id: '51', name: 'Business Planning', description: 'Strategic planning', icon: 'analytics', category: 'Business' },
+        { id: '52', name: 'Marketing', description: 'Promote business', icon: 'megaphone', category: 'Business' },
     ];
+
+    // Group routines by category
+    const routinesByCategory = routineTemplates.reduce((acc, routine) => {
+        if (!acc[routine.category]) {
+            acc[routine.category] = [];
+        }
+        acc[routine.category].push(routine);
+        return acc;
+    }, {} as Record<string, RoutineTemplate[]>);
+
+    const toggleCategory = (category: string) => {
+        const newExpanded = new Set(expandedCategories);
+        if (newExpanded.has(category)) {
+            newExpanded.delete(category);
+        } else {
+            newExpanded.add(category);
+        }
+        setExpandedCategories(newExpanded);
+    };
 
     useEffect(() => {
         // Filter routines based on search query
         if (searchQuery.trim() === '') {
-            setFilteredRoutines(routineTemplates);
+            setFilteredRoutines([]);
         } else {
             const filtered = routineTemplates.filter(routine =>
                 routine.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -117,6 +184,16 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation }) => {
             return;
         }
 
+        if (customTitle.length > 15) {
+            Alert.alert('Error', 'Title must be 15 characters or less');
+            return;
+        }
+
+        if (customDescription.length > 30) {
+            Alert.alert('Error', 'Description must be 30 characters or less');
+            return;
+        }
+
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('No user found');
@@ -159,24 +236,51 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation }) => {
         }
     };
 
-    const renderRoutineItem = ({ item }: { item: RoutineTemplate }) => (
-        <TouchableOpacity
-            style={styles.routineItem}
-            onPress={() => handleSelectRoutine(item)}
-        >
-            <View style={styles.routineIcon}>
-                <Ionicons name={item.icon as any} size={24} color="#007AFF" />
-            </View>
-            <View style={styles.routineInfo}>
-                <Text style={styles.routineName}>{item.name}</Text>
-                {item.description && (
-                    <Text style={styles.routineDescription}>{item.description}</Text>
+    const renderCategorySection = (category: string, routines: RoutineTemplate[]) => {
+        const isExpanded = expandedCategories.has(category);
+
+        return (
+            <View key={category} style={styles.categorySection}>
+                <TouchableOpacity
+                    style={styles.categoryHeader}
+                    onPress={() => toggleCategory(category)}
+                >
+                    <View style={styles.categoryHeaderLeft}>
+                        <Text style={styles.categoryTitle}>{category}</Text>
+                        <Text style={styles.categoryCount}>({routines.length})</Text>
+                    </View>
+                    <Ionicons
+                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={20}
+                        color="#666"
+                    />
+                </TouchableOpacity>
+
+                {isExpanded && (
+                    <View style={styles.categoryContent}>
+                        {routines.map(routine => (
+                            <TouchableOpacity
+                                key={routine.id}
+                                style={styles.routineItemInCategory}
+                                onPress={() => handleSelectRoutine(routine)}
+                            >
+                                <View style={styles.routineIcon}>
+                                    <Ionicons name={routine.icon as any} size={20} color="#007AFF" />
+                                </View>
+                                <View style={styles.routineInfo}>
+                                    <Text style={styles.routineName}>{routine.name}</Text>
+                                    {routine.description && (
+                                        <Text style={styles.routineDescription}>{routine.description}</Text>
+                                    )}
+                                </View>
+                                <Ionicons name="add-circle" size={20} color="#007AFF" />
+                            </TouchableOpacity>
+                        ))}
+                    </View>
                 )}
-                <Text style={styles.routineCategory}>{item.category}</Text>
             </View>
-            <Ionicons name="add-circle" size={24} color="#007AFF" />
-        </TouchableOpacity>
-    );
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -210,15 +314,49 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation }) => {
                     <Text style={styles.createCustomText}>Create Your Own Routine</Text>
                 </TouchableOpacity>
 
-                {/* Routines List */}
-                <Text style={styles.sectionTitle}>Popular Routines</Text>
-                <FlatList
-                    data={filteredRoutines}
-                    renderItem={renderRoutineItem}
-                    keyExtractor={(item) => item.id}
-                    style={styles.routinesList}
-                    showsVerticalScrollIndicator={false}
-                />
+                {/* Routines Content */}
+                {searchQuery.trim() !== '' ? (
+                    // Show search results
+                    <>
+                        <Text style={styles.sectionTitle}>
+                            Search Results ({filteredRoutines.length})
+                        </Text>
+                        <FlatList
+                            data={filteredRoutines}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={styles.routineItem}
+                                    onPress={() => handleSelectRoutine(item)}
+                                >
+                                    <View style={styles.routineIcon}>
+                                        <Ionicons name={item.icon as any} size={24} color="#007AFF" />
+                                    </View>
+                                    <View style={styles.routineInfo}>
+                                        <Text style={styles.routineName}>{item.name}</Text>
+                                        {item.description && (
+                                            <Text style={styles.routineDescription}>{item.description}</Text>
+                                        )}
+                                        <Text style={styles.routineCategory}>{item.category}</Text>
+                                    </View>
+                                    <Ionicons name="add-circle" size={24} color="#007AFF" />
+                                </TouchableOpacity>
+                            )}
+                            keyExtractor={(item) => item.id}
+                            style={styles.routinesList}
+                            showsVerticalScrollIndicator={false}
+                        />
+                    </>
+                ) : (
+                    // Show categorized routines
+                    <>
+                        <Text style={styles.sectionTitle}>Browse by Category</Text>
+                        <ScrollView style={styles.categoriesContainer} showsVerticalScrollIndicator={false}>
+                            {Object.entries(routinesByCategory).map(([category, routines]) =>
+                                renderCategorySection(category, routines)
+                            )}
+                        </ScrollView>
+                    </>
+                )}
             </View>
 
             {/* Create Custom Modal */}
@@ -240,23 +378,35 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({ navigation }) => {
 
                     <View style={styles.modalContent}>
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Title *</Text>
+                            <View style={styles.inputLabelContainer}>
+                                <Text style={styles.inputLabel}>Title *</Text>
+                                <Text style={[styles.characterCount, customTitle.length > 15 && styles.characterCountError]}>
+                                    {customTitle.length}/15
+                                </Text>
+                            </View>
                             <TextInput
-                                style={styles.textInput}
+                                style={[styles.textInput, customTitle.length > 15 && styles.textInputError]}
                                 placeholder="Enter routine name"
                                 value={customTitle}
                                 onChangeText={setCustomTitle}
+                                maxLength={15}
                                 autoFocus
                             />
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Description (Optional)</Text>
+                            <View style={styles.inputLabelContainer}>
+                                <Text style={styles.inputLabel}>Description (Optional)</Text>
+                                <Text style={[styles.characterCount, customDescription.length > 30 && styles.characterCountError]}>
+                                    {customDescription.length}/30
+                                </Text>
+                            </View>
                             <TextInput
-                                style={[styles.textInput, styles.textAreaInput]}
+                                style={[styles.textInput, styles.textAreaInput, customDescription.length > 30 && styles.textInputError]}
                                 placeholder="Enter description"
                                 value={customDescription}
                                 onChangeText={setCustomDescription}
+                                maxLength={30}
                                 multiline
                                 numberOfLines={4}
                                 textAlignVertical="top"
@@ -339,6 +489,52 @@ const styles = StyleSheet.create({
     routinesList: {
         flex: 1,
     },
+    categoriesContainer: {
+        flex: 1,
+    },
+    categorySection: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+    },
+    categoryHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f8f9fa',
+    },
+    categoryHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    categoryTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+    },
+    categoryCount: {
+        fontSize: 14,
+        color: '#666',
+        marginLeft: 6,
+    },
+    categoryContent: {
+        paddingHorizontal: 8,
+        paddingBottom: 8,
+    },
+    routineItemInCategory: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginVertical: 2,
+        borderRadius: 8,
+        backgroundColor: '#f8f9fa',
+    },
     routineItem: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -351,9 +547,9 @@ const styles = StyleSheet.create({
         borderColor: '#e9ecef',
     },
     routineIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: '#f0f8ff',
         alignItems: 'center',
         justifyContent: 'center',
@@ -415,11 +611,24 @@ const styles = StyleSheet.create({
     inputGroup: {
         marginBottom: 20,
     },
+    inputLabelContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
     inputLabel: {
         fontSize: 16,
         fontWeight: '500',
         color: '#333',
-        marginBottom: 8,
+    },
+    characterCount: {
+        fontSize: 12,
+        color: '#999',
+        fontWeight: '500',
+    },
+    characterCountError: {
+        color: '#ff6b6b',
     },
     textInput: {
         backgroundColor: '#fff',
@@ -430,6 +639,10 @@ const styles = StyleSheet.create({
         color: '#333',
         borderWidth: 1,
         borderColor: '#e9ecef',
+    },
+    textInputError: {
+        borderColor: '#ff6b6b',
+        backgroundColor: '#fff5f5',
     },
     textAreaInput: {
         height: 100,
