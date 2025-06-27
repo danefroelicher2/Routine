@@ -32,6 +32,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     const [showDayRoutineModal, setShowDayRoutineModal] = useState(false);
     const [availableRoutines, setAvailableRoutines] = useState<UserRoutine[]>([]);
     const [daySpecificRoutines, setDaySpecificRoutines] = useState<Record<number, string[]>>({});
+    const [userProfile, setUserProfile] = useState<any>(null);
 
     // Days of the week
     const daysOfWeek = [
@@ -44,10 +45,93 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         { name: 'Sat', value: 6 },
     ];
 
+    // Dynamic greeting function
+    const getPersonalizedGreeting = () => {
+        const hour = new Date().getHours();
+        const firstName = userProfile?.full_name?.split(' ')[0] || 'there';
+
+        // Morning greetings (5 AM - 11:59 AM)
+        const morningGreetings = [
+            `Good morning, ${firstName}!`,
+            `Rise and shine, ${firstName}`,
+            `Morning, ${firstName}.`,
+            `Start strong, ${firstName}`,
+            `New day, new you, ${firstName}.`,
+            `Let's conquer today, ${firstName}!`,
+            `Early bird gets the worm, ${firstName}`,
+            `Ready to seize the day, ${firstName}?`,
+            `Fresh start awaits, ${firstName}.`,
+        ];
+
+        // Afternoon greetings (12 PM - 4:59 PM) 
+        const afternoonGreetings = [
+            `Good afternoon, ${firstName}`,
+            `Halfway there, ${firstName}!`,
+            `Keep it up, ${firstName}.`,
+            `Afternoon momentum, ${firstName}`,
+            `You're crushing it, ${firstName}`,
+            `Stay focused, ${firstName}.`,
+            `Pushing through, ${firstName}?`,
+            `Making progress, ${firstName}`,
+            `Steady as she goes, ${firstName}.`,
+        ];
+
+        // Evening greetings (5 PM - 8:59 PM)
+        const eveningGreetings = [
+            `Good evening, ${firstName}`,
+            `Evening vibes, ${firstName}.`,
+            `Wind down time, ${firstName}`,
+            `Almost there, ${firstName}!`,
+            `Finish strong, ${firstName}`,
+            `Home stretch, ${firstName}.`,
+            `Wrapping up the day, ${firstName}?`,
+            `Time to unwind, ${firstName}`,
+            `Day's end approaches, ${firstName}.`,
+        ];
+
+        // Night greetings (9 PM - 4:59 AM)
+        const nightGreetings = [
+            `Good night, ${firstName}`,
+            `Night owl mode, ${firstName}?`,
+            `Late night grind, ${firstName}.`,
+            `Burning the midnight oil, ${firstName}`,
+            `Rest well soon, ${firstName}`,
+            `Tomorrow's another day, ${firstName}.`,
+            `Still going strong, ${firstName}?`,
+            `Time for some rest, ${firstName}`,
+            `The night is yours, ${firstName}.`,
+        ];
+
+        let greetings;
+        if (hour >= 5 && hour < 12) {
+            greetings = morningGreetings;
+        } else if (hour >= 12 && hour < 17) {
+            greetings = afternoonGreetings;
+        } else if (hour >= 17 && hour < 21) {
+            greetings = eveningGreetings;
+        } else {
+            greetings = nightGreetings;
+        }
+
+        // Return a random greeting from the appropriate time period
+        return greetings[Math.floor(Math.random() * greetings.length)];
+    };
+
     const loadData = useCallback(async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
+
+            // Fetch user profile for personalized greeting
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', user.id)
+                .single();
+
+            if (!profileError && profile) {
+                setUserProfile(profile);
+            }
 
             const today = new Date().toISOString().split('T')[0];
 
@@ -302,7 +386,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Today's Routine</Text>
+                <Text style={styles.headerTitle}>{getPersonalizedGreeting()}</Text>
                 <Text style={styles.headerDate}>
                     {new Date().toLocaleDateString('en-US', {
                         weekday: 'long',
