@@ -16,6 +16,7 @@ import SignupScreen from './src/screens/Auth/SignupScreen';
 
 // Main App Screens
 import HomeScreen from './src/screens/Home/HomeScreen';
+import AddRoutineScreen from './src/screens/Home/AddRoutineScreen';
 import StatsScreen from './src/screens/Stats/StatsScreen';
 import NotesScreen from './src/screens/Notes/NotesScreen';
 import NoteDetailScreen from './src/screens/Notes/NoteDetailScreen';
@@ -25,6 +26,24 @@ import RoutineManagerScreen from './src/screens/Profile/RoutineManagerScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+// Stack Navigator for Home (includes add routine)
+function HomeStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="HomeMain"
+        component={HomeScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddRoutine"
+        component={AddRoutineScreen}
+        options={{ headerShown: false }}
+      />
+    </Stack.Navigator>
+  );
+}
 
 // Stack Navigator for Notes (includes note detail)
 function NotesStack() {
@@ -104,7 +123,7 @@ function MainTabs() {
         headerShown: false,
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Stats" component={StatsScreen} />
       <Tab.Screen name="Notes" component={NotesStack} />
       <Tab.Screen name="Profile" component={ProfileStack} />
