@@ -9,9 +9,6 @@ import {
   RefreshControl,
   Alert,
   Modal,
-  FlatList,
-  PanGestureHandler,
-  State,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
