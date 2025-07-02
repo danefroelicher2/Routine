@@ -52,6 +52,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [originalIndex, setOriginalIndex] = useState<number | null>(null);
   const [lastSwapIndex, setLastSwapIndex] = useState<number | null>(null);
+  // FIXED: Add state to track which section is being dragged
+  const [draggedSection, setDraggedSection] = useState<
+    "daily" | "weekly" | null
+  >(null);
 
   const dragY = useRef(new Animated.Value(0)).current;
 
@@ -489,6 +493,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     updateRoutineOrder(routines);
   };
 
+  // FIXED: Modified createPanResponder to track which section is being dragged
   const createPanResponder = (index: number, isWeekly: boolean) => {
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -501,17 +506,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       },
 
       onPanResponderGrant: (evt, gestureState) => {
-        console.log("Drag started for index:", index);
+        console.log("Drag started for index:", index, "isWeekly:", isWeekly);
         setDraggedIndex(index);
         setOriginalIndex(index);
         setLastSwapIndex(index);
         setIsDragging(true);
         setScrollEnabled(false);
+        // FIXED: Track which section is being dragged
+        setDraggedSection(isWeekly ? "weekly" : "daily");
         dragY.setValue(0);
       },
 
       onPanResponderMove: (evt, gestureState) => {
-        if (isDragging) {
+        if (isDragging && draggedSection === (isWeekly ? "weekly" : "daily")) {
           dragY.setValue(gestureState.dy);
 
           const routines = isWeekly ? weeklyRoutines : dailyRoutines;
@@ -572,12 +579,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         const currentRoutines = isWeekly ? weeklyRoutines : dailyRoutines;
         updateRoutineOrder(currentRoutines);
 
-        // Reset all drag state
+        // FIXED: Reset all drag state including section tracking
         setDraggedIndex(null);
         setOriginalIndex(null);
         setLastSwapIndex(null);
         setIsDragging(false);
         setScrollEnabled(true);
+        setDraggedSection(null);
 
         Animated.spring(dragY, {
           toValue: 0,
@@ -589,11 +597,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       onPanResponderTerminate: () => {
         console.log("Drag terminated");
+        // FIXED: Reset all drag state including section tracking
         setDraggedIndex(null);
         setOriginalIndex(null);
         setLastSwapIndex(null);
         setIsDragging(false);
         setScrollEnabled(true);
+        setDraggedSection(null);
 
         Animated.spring(dragY, {
           toValue: 0,
@@ -612,7 +622,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     index: number
   ) => {
     const panResponder = createPanResponder(index, isWeekly);
-    const isBeingDragged = draggedIndex === index;
+    // FIXED: Only apply drag effects if this item is being dragged AND it's from the correct section
+    const isBeingDragged =
+      draggedIndex === index &&
+      draggedSection === (isWeekly ? "weekly" : "daily");
 
     return (
       <Animated.View
@@ -775,15 +788,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           )}
         </View>
 
-        {/* Weekly Routines Section */}
+        {/* FIXED: Weekly Routines Section with proper header layout */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Ionicons name="calendar" size={24} color="#007AFF" />
-            <Text style={styles.sectionTitle}>Weekly Goals</Text>
-            <View style={styles.weekTimer}>
-              <Ionicons name="time" size={16} color="#666" />
-              <Text style={styles.weekTimerText}>{weekTimeRemaining}</Text>
+            {/* FIXED: New layout structure for Weekly Goals header */}
+            <View style={styles.weeklyGoalsHeaderContainer}>
+              <Text style={styles.sectionTitle}>Weekly Goals</Text>
+              {/* FIXED: Time remaining directly to the right of "Weekly Goals" */}
+              <View style={styles.weekTimer}>
+                <Ionicons name="time" size={16} color="#666" />
+                <Text style={styles.weekTimerText}>{weekTimeRemaining}</Text>
+              </View>
             </View>
+            {/* FIXED: Plus icon separated on the far right */}
             <TouchableOpacity
               onPress={addWeeklyRoutine}
               style={styles.addButton}
@@ -853,7 +871,14 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#333",
     marginLeft: 8,
+    // FIXED: Remove flex: 1 to allow proper layout
+  },
+  // FIXED: New container for Weekly Goals header layout
+  weeklyGoalsHeaderContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
+    marginLeft: 8,
   },
   addButton: {
     padding: 4,
@@ -865,6 +890,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    // FIXED: Add margin to properly space from "Weekly Goals"
+    marginLeft: 12,
   },
   weekTimerText: {
     fontSize: 12,
