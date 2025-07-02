@@ -226,7 +226,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         .from("routine_completions")
         .select("*")
         .eq("user_id", user.id)
-        .eq("completed_date", selectedDateString);
+        .eq("completion_date", selectedDateString);
 
       // Get weekly completions (from week start to now)
       const weekStartString = weekStart.toISOString().split("T")[0];
@@ -234,7 +234,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         .from("routine_completions")
         .select("*")
         .eq("user_id", user.id)
-        .gte("completed_date", weekStartString);
+        .gte("completion_date", weekStartString);
 
       if (dailyError || weeklyError) {
         console.error("Error fetching completions:", dailyError || weeklyError);
