@@ -338,10 +338,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       } else {
         // Add completion
         const today = new Date().toISOString().split("T")[0];
+
+        let weekStartDate = null;
+        if (isWeekly) {
+          const now = new Date();
+          const currentDay = now.getDay();
+          const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
+          const weekStart = new Date(now);
+          weekStart.setDate(now.getDate() - daysFromMonday);
+          weekStartDate = weekStart.toISOString().split("T")[0];
+        }
+
         const { error } = await supabase.from("routine_completions").insert({
           user_id: user.id,
           routine_id: routine.id,
-          completed_date: today,
+          completion_date: today,
+          week_start_date: weekStartDate,
         });
 
         if (error) throw error;
