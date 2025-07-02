@@ -49,6 +49,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   const dragY = useRef(new Animated.Value(0)).current;
 
@@ -486,12 +487,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Continue the gesture if we're already dragging or if there's significant movement
         return isDragging || Math.abs(gestureState.dy) > 5;
       },
       onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
-        // Capture the gesture if there's vertical movement
         return Math.abs(gestureState.dy) > 3;
       },
 
@@ -499,50 +498,74 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         console.log("Drag started for index:", index);
         setDraggedIndex(index);
         setIsDragging(true);
+        setScrollEnabled(false); // Disable page scrolling during drag
         dragY.setValue(0);
       },
 
       onPanResponderMove: (evt, gestureState) => {
         if (isDragging) {
-          console.log("Dragging with dy:", gestureState.dy);
           dragY.setValue(gestureState.dy);
+
+          // Real-time position updates
+          const routines = isWeekly ? weeklyRoutines : dailyRoutines;
+          const itemHeight = 76;
+          const moveThreshold = itemHeight / 2;
+
+          let newIndex = index;
+
+          if (Math.abs(gestureState.dy) > moveThreshold) {
+            if (gestureState.dy > 0) {
+              // Dragging down
+              newIndex = Math.min(
+                routines.length - 1,
+                index + Math.floor(gestureState.dy / itemHeight)
+              );
+            } else {
+              // Dragging up
+              newIndex = Math.max(
+                0,
+                index + Math.ceil(gestureState.dy / itemHeight)
+              );
+            }
+
+            // Update positions in real-time if index has changed
+            if (
+              newIndex !== index &&
+              newIndex >= 0 &&
+              newIndex < routines.length
+            ) {
+              const updatedRoutines = [...routines];
+              const [movedItem] = updatedRoutines.splice(index, 1);
+              updatedRoutines.splice(newIndex, 0, movedItem);
+
+              if (isWeekly) {
+                setWeeklyRoutines(updatedRoutines);
+              } else {
+                setDailyRoutines(updatedRoutines);
+              }
+
+              // Update the dragged index to reflect new position
+              setDraggedIndex(newIndex);
+
+              // Reset drag offset since we've moved the item
+              dragY.setValue(0);
+            }
+          }
         }
       },
 
       onPanResponderRelease: (evt, gestureState) => {
-        console.log("Drag ended with final dy:", gestureState.dy);
+        console.log("Drag ended");
 
-        const routines = isWeekly ? weeklyRoutines : dailyRoutines;
-        const itemHeight = 76; // More accurate height based on our styles
-        const moveThreshold = itemHeight / 2; // Need to move at least half an item height
+        // Save the current order to database
+        const currentRoutines = isWeekly ? weeklyRoutines : dailyRoutines;
+        updateRoutineOrder(currentRoutines);
 
-        let newIndex = index;
-
-        if (Math.abs(gestureState.dy) > moveThreshold) {
-          if (gestureState.dy > 0) {
-            // Dragged down
-            newIndex = Math.min(
-              routines.length - 1,
-              index + Math.floor(gestureState.dy / itemHeight)
-            );
-          } else {
-            // Dragged up
-            newIndex = Math.max(
-              0,
-              index + Math.ceil(gestureState.dy / itemHeight)
-            );
-          }
-        }
-
-        console.log("Moving from index", index, "to index", newIndex);
-
-        if (newIndex !== index && newIndex >= 0 && newIndex < routines.length) {
-          moveRoutineToPosition(index, newIndex, isWeekly);
-        }
-
-        // Reset drag state with animation
+        // Reset drag state
         setDraggedIndex(null);
         setIsDragging(false);
+        setScrollEnabled(true); // Re-enable page scrolling
+
         Animated.spring(dragY, {
           toValue: 0,
           useNativeDriver: true,
@@ -553,16 +576,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       onPanResponderTerminate: () => {
         console.log("Drag terminated");
-        // Reset drag state if gesture is terminated
         setDraggedIndex(null);
         setIsDragging(false);
+        setScrollEnabled(true); // Re-enable page scrolling
+
         Animated.spring(dragY, {
           toValue: 0,
           useNativeDriver: true,
         }).start();
       },
 
-      // Important: These prevent the gesture from being terminated too early
       onPanResponderTerminationRequest: () => false,
       onShouldBlockNativeResponder: () => true,
     });
@@ -696,6 +719,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       <ScrollView
         style={styles.scrollView}
+        scrollEnabled={scrollEnabled}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
