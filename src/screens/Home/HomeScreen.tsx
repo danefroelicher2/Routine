@@ -485,11 +485,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const createPanResponder = (index: number, isWeekly: boolean) => {
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Continue the gesture if we're already dragging or if there's significant movement
+        return isDragging || Math.abs(gestureState.dy) > 5;
+      },
       onStartShouldSetPanResponderCapture: () => true,
-      onMoveShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
+        // Capture the gesture if there's vertical movement
+        return Math.abs(gestureState.dy) > 3;
+      },
 
-      onPanResponderGrant: () => {
+      onPanResponderGrant: (evt, gestureState) => {
         console.log("Drag started for index:", index);
         setDraggedIndex(index);
         setIsDragging(true);
@@ -497,36 +503,56 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       },
 
       onPanResponderMove: (evt, gestureState) => {
-        console.log("Dragging with dy:", gestureState.dy);
-        dragY.setValue(gestureState.dy);
+        if (isDragging) {
+          console.log("Dragging with dy:", gestureState.dy);
+          dragY.setValue(gestureState.dy);
+        }
       },
 
       onPanResponderRelease: (evt, gestureState) => {
         console.log("Drag ended with final dy:", gestureState.dy);
+
         const routines = isWeekly ? weeklyRoutines : dailyRoutines;
-        const itemHeight = 80; // Approximate height of each routine item
-        const movement = Math.round(gestureState.dy / itemHeight);
-        const newIndex = Math.max(
-          0,
-          Math.min(routines.length - 1, index + movement)
-        );
+        const itemHeight = 76; // More accurate height based on our styles
+        const moveThreshold = itemHeight / 2; // Need to move at least half an item height
+
+        let newIndex = index;
+
+        if (Math.abs(gestureState.dy) > moveThreshold) {
+          if (gestureState.dy > 0) {
+            // Dragged down
+            newIndex = Math.min(
+              routines.length - 1,
+              index + Math.floor(gestureState.dy / itemHeight)
+            );
+          } else {
+            // Dragged up
+            newIndex = Math.max(
+              0,
+              index + Math.ceil(gestureState.dy / itemHeight)
+            );
+          }
+        }
 
         console.log("Moving from index", index, "to index", newIndex);
 
-        if (newIndex !== index) {
+        if (newIndex !== index && newIndex >= 0 && newIndex < routines.length) {
           moveRoutineToPosition(index, newIndex, isWeekly);
         }
 
-        // Reset drag state
+        // Reset drag state with animation
         setDraggedIndex(null);
         setIsDragging(false);
         Animated.spring(dragY, {
           toValue: 0,
           useNativeDriver: true,
+          tension: 150,
+          friction: 8,
         }).start();
       },
 
       onPanResponderTerminate: () => {
+        console.log("Drag terminated");
         // Reset drag state if gesture is terminated
         setDraggedIndex(null);
         setIsDragging(false);
@@ -535,6 +561,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           useNativeDriver: true,
         }).start();
       },
+
+      // Important: These prevent the gesture from being terminated too early
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
     });
   };
 
@@ -933,8 +963,10 @@ const styles = StyleSheet.create({
   dragHandle: {
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minWidth: 40,
+    minHeight: 40,
   },
   dragIcon: {
     alignItems: "center",
