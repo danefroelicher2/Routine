@@ -604,14 +604,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         key={routine.id}
         style={[
           styles.routineItem,
-          isBeingDragged && styles.routineItemDragging,
           isBeingDragged && {
             transform: [{ translateY: dragY }],
             zIndex: 1000,
           },
         ]}
       >
-        <View style={styles.routineContent}>
+        <View
+          style={[
+            styles.routineContent,
+            isBeingDragged && styles.routineContentDragging,
+          ]}
+        >
           <TouchableOpacity
             style={styles.routineLeft}
             onPress={() =>
@@ -859,7 +863,19 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.25,
     shadowRadius: 8,
-    backgroundColor: "#fff",
+    // Keep the same background and border radius as the content
+  },
+  routineContentDragging: {
+    elevation: 12,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    // Maintains the same borderRadius: 12 and backgroundColor: '#f8f9fa'
+    // from the base routineContent style
   },
   routineContent: {
     flexDirection: "row",
