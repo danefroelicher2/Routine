@@ -349,14 +349,30 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           weekStartDate = weekStart.toISOString().split("T")[0];
         }
 
-        const { error } = await supabase.from("routine_completions").insert({
-          user_id: user.id,
-          routine_id: routine.id,
-          completion_date: today,
-          week_start_date: weekStartDate,
-        });
+        // Check if completion already exists to avoid duplicate key error
+        const { data: existingCompletion, error: checkError } = await supabase
+          .from("routine_completions")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("routine_id", routine.id)
+          .eq("completion_date", today)
+          .single();
 
-        if (error) throw error;
+        if (checkError && checkError.code !== "PGRST116") {
+          // PGRST116 is "not found" error, which is expected if no completion exists
+          throw checkError;
+        }
+
+        if (!existingCompletion) {
+          const { error } = await supabase.from("routine_completions").insert({
+            user_id: user.id,
+            routine_id: routine.id,
+            completion_date: today,
+            week_start_date: weekStartDate,
+          });
+
+          if (error) throw error;
+        }
       }
 
       // Reload data to reflect changes
