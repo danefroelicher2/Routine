@@ -391,7 +391,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 routine.isCompleted && styles.routineNameCompleted,
               ]}
             >
-              {routine.title}
+              {routine.name}
             </Text>
             {routine.description && (
               <Text style={styles.routineDescription}>
