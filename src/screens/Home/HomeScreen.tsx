@@ -195,7 +195,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         .eq("user_id", user.id);
 
       const { data: dayAssignments, error: dayError } = await supabase
-        .from("routine_day_assignments")
+        .from("user_day_routines")
         .select("*")
         .eq("user_id", user.id);
 
