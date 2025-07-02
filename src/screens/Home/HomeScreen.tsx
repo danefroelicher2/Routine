@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,802 +6,880 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  RefreshControl,
-  Alert,
+  TextInput,
   Modal,
-  Animated,
-  PanResponder,
+  Alert,
+  FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
-import { UserRoutine } from "../../types/database";
 
-interface RoutineWithCompletion extends UserRoutine {
-  isCompleted: boolean;
-  completionId?: string;
+interface RoutineTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  icon: string;
+  category: string;
 }
 
-interface HomeScreenProps {
+interface AddRoutineScreenProps {
   navigation: any;
+  route?: {
+    params?: {
+      selectedDay?: number;
+      isWeekly?: boolean;
+    };
+  };
 }
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
-  const [dailyRoutines, setDailyRoutines] = useState<RoutineWithCompletion[]>(
+const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
+  navigation,
+  route,
+}) => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredRoutines, setFilteredRoutines] = useState<RoutineTemplate[]>(
     []
   );
-  const [weeklyRoutines, setWeeklyRoutines] = useState<RoutineWithCompletion[]>(
-    []
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [customTitle, setCustomTitle] = useState("");
+  const [customDescription, setCustomDescription] = useState("");
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set()
   );
-  const [refreshing, setRefreshing] = useState(false);
-  const [weekTimeRemaining, setWeekTimeRemaining] = useState("");
-  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
-  const [showDayRoutineModal, setShowDayRoutineModal] = useState(false);
-  const [availableRoutines, setAvailableRoutines] = useState<UserRoutine[]>([]);
-  const [daySpecificRoutines, setDaySpecificRoutines] = useState<
-    Record<number, string[]>
-  >({});
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [scrollEnabled, setScrollEnabled] = useState(true);
-  const [originalIndex, setOriginalIndex] = useState<number | null>(null);
-  const [lastSwapIndex, setLastSwapIndex] = useState<number | null>(null);
 
-  const dragY = useRef(new Animated.Value(0)).current;
-
-  // Days of the week
-  const daysOfWeek = [
-    { name: "Sun", value: 0 },
-    { name: "Mon", value: 1 },
-    { name: "Tue", value: 2 },
-    { name: "Wed", value: 3 },
-    { name: "Thu", value: 4 },
-    { name: "Fri", value: 5 },
-    { name: "Sat", value: 6 },
+  // Get parameters from navigation
+  const selectedDay = route?.params?.selectedDay;
+  const isWeekly = route?.params?.isWeekly;
+  const dayNames = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
   ];
 
-  // Create a function to get time period and generate seed for consistent randomness
-  const getTimePeriodInfo = () => {
-    const now = new Date();
-    const hour = now.getHours();
-    const dateString = now.toDateString(); // This will be the same for the entire day
+  // Organized routine templates by category
+  const routineTemplates: RoutineTemplate[] = [
+    // Fitness
+    {
+      id: "1",
+      name: "Workout",
+      description: "Physical exercise session",
+      icon: "fitness",
+      category: "Fitness",
+    },
+    {
+      id: "2",
+      name: "Run",
+      description: "Go for a run",
+      icon: "walk",
+      category: "Fitness",
+    },
+    {
+      id: "3",
+      name: "Bicycling",
+      description: "Bike ride",
+      icon: "bicycle",
+      category: "Fitness",
+    },
+    {
+      id: "4",
+      name: "Yoga",
+      description: "Yoga practice",
+      icon: "body",
+      category: "Fitness",
+    },
+    {
+      id: "5",
+      name: "Walk",
+      description: "Take a walk",
+      icon: "walk",
+      category: "Fitness",
+    },
+    {
+      id: "6",
+      name: "Stretch",
+      description: "Stretching exercises",
+      icon: "accessibility",
+      category: "Fitness",
+    },
+    {
+      id: "7",
+      name: "Swimming",
+      description: "Swimming workout",
+      icon: "water",
+      category: "Fitness",
+    },
+    {
+      id: "8",
+      name: "Weightlifting",
+      description: "Strength training",
+      icon: "barbell",
+      category: "Fitness",
+    },
+    {
+      id: "9",
+      name: "Cardio",
+      description: "Cardiovascular exercise",
+      icon: "heart",
+      category: "Fitness",
+    },
 
-    let timePeriod: string;
-    if (hour >= 5 && hour < 12) {
-      timePeriod = "morning";
-    } else if (hour >= 12 && hour < 17) {
-      timePeriod = "afternoon";
-    } else if (hour >= 17 && hour < 21) {
-      timePeriod = "evening";
-    } else {
-      timePeriod = "night";
+    // Learning
+    {
+      id: "10",
+      name: "Read a Book",
+      description: "Reading time",
+      icon: "book",
+      category: "Learning",
+    },
+    {
+      id: "11",
+      name: "Study",
+      description: "Study session",
+      icon: "school",
+      category: "Learning",
+    },
+    {
+      id: "12",
+      name: "Music Practice",
+      description: "Practice instrument",
+      icon: "musical-notes",
+      category: "Learning",
+    },
+    {
+      id: "13",
+      name: "Language Learning",
+      description: "Practice new language",
+      icon: "chatbubbles",
+      category: "Learning",
+    },
+    {
+      id: "14",
+      name: "Online Course",
+      description: "Take online classes",
+      icon: "laptop",
+      category: "Learning",
+    },
+    {
+      id: "15",
+      name: "Podcast",
+      description: "Listen to educational content",
+      icon: "headset",
+      category: "Learning",
+    },
+    {
+      id: "16",
+      name: "Writing",
+      description: "Creative or technical writing",
+      icon: "create",
+      category: "Learning",
+    },
+
+    // Productivity
+    {
+      id: "17",
+      name: "Work",
+      description: "Work session",
+      icon: "briefcase",
+      category: "Productivity",
+    },
+    {
+      id: "18",
+      name: "Plan Day",
+      description: "Daily planning",
+      icon: "calendar",
+      category: "Productivity",
+    },
+    {
+      id: "19",
+      name: "Email Management",
+      description: "Process emails",
+      icon: "mail",
+      category: "Productivity",
+    },
+    {
+      id: "20",
+      name: "Deep Work",
+      description: "Focused work session",
+      icon: "bulb",
+      category: "Productivity",
+    },
+    {
+      id: "21",
+      name: "Review Goals",
+      description: "Check progress",
+      icon: "checkmark-done",
+      category: "Productivity",
+    },
+    {
+      id: "22",
+      name: "Organize Workspace",
+      description: "Clean and organize",
+      icon: "file-tray",
+      category: "Productivity",
+    },
+
+    // Wellness
+    {
+      id: "23",
+      name: "Meditation",
+      description: "Mindfulness practice",
+      icon: "leaf",
+      category: "Wellness",
+    },
+    {
+      id: "24",
+      name: "Sleep 8 Hours",
+      description: "Get quality sleep",
+      icon: "bed",
+      category: "Wellness",
+    },
+    {
+      id: "25",
+      name: "Drink Water",
+      description: "Stay hydrated",
+      icon: "water",
+      category: "Wellness",
+    },
+    {
+      id: "26",
+      name: "Take Vitamins",
+      description: "Daily supplements",
+      icon: "medical",
+      category: "Wellness",
+    },
+    {
+      id: "27",
+      name: "Skincare Routine",
+      description: "Take care of skin",
+      icon: "sparkles",
+      category: "Wellness",
+    },
+    {
+      id: "28",
+      name: "Gratitude Practice",
+      description: "Practice gratitude",
+      icon: "heart-outline",
+      category: "Wellness",
+    },
+
+    // Nutrition
+    {
+      id: "29",
+      name: "Eat Healthy Breakfast",
+      description: "Nutritious morning meal",
+      icon: "restaurant",
+      category: "Nutrition",
+    },
+    {
+      id: "30",
+      name: "Meal Prep",
+      description: "Prepare healthy meals",
+      icon: "nutrition",
+      category: "Nutrition",
+    },
+    {
+      id: "31",
+      name: "Cook Dinner",
+      description: "Prepare evening meal",
+      icon: "flame",
+      category: "Nutrition",
+    },
+    {
+      id: "32",
+      name: "Eat Fruits/Vegetables",
+      description: "Get daily servings",
+      icon: "leaf-outline",
+      category: "Nutrition",
+    },
+    {
+      id: "33",
+      name: "Avoid Junk Food",
+      description: "Make healthy choices",
+      icon: "close-circle",
+      category: "Nutrition",
+    },
+
+    // Household
+    {
+      id: "34",
+      name: "Clean House",
+      description: "Tidy up living space",
+      icon: "home",
+      category: "Household",
+    },
+    {
+      id: "35",
+      name: "Do Laundry",
+      description: "Wash and fold clothes",
+      icon: "shirt",
+      category: "Household",
+    },
+    {
+      id: "36",
+      name: "Take Out Trash",
+      description: "Empty garbage",
+      icon: "trash",
+      category: "Household",
+    },
+    {
+      id: "37",
+      name: "Grocery Shopping",
+      description: "Buy food and supplies",
+      icon: "bag",
+      category: "Household",
+    },
+    {
+      id: "38",
+      name: "Garden Work",
+      description: "Tend to plants",
+      icon: "flower",
+      category: "Household",
+    },
+
+    // Social
+    {
+      id: "39",
+      name: "Call Family/Friends",
+      description: "Stay connected",
+      icon: "call",
+      category: "Social",
+    },
+    {
+      id: "40",
+      name: "Social Activity",
+      description: "Meet with others",
+      icon: "people",
+      category: "Social",
+    },
+    {
+      id: "41",
+      name: "Date Night",
+      description: "Spend time with partner",
+      icon: "heart",
+      category: "Social",
+    },
+    {
+      id: "42",
+      name: "Community Service",
+      description: "Help others",
+      icon: "hand-left",
+      category: "Social",
+    },
+
+    // Spiritual
+    {
+      id: "43",
+      name: "Prayer",
+      description: "Prayer time",
+      icon: "rose",
+      category: "Spiritual",
+    },
+    {
+      id: "44",
+      name: "Bible Study",
+      description: "Read scripture",
+      icon: "book",
+      category: "Spiritual",
+    },
+    {
+      id: "45",
+      name: "Church",
+      description: "Attend service",
+      icon: "home",
+      category: "Spiritual",
+    },
+    {
+      id: "46",
+      name: "Reflection",
+      description: "Spiritual reflection",
+      icon: "bulb",
+      category: "Spiritual",
+    },
+    {
+      id: "47",
+      name: "Devotional",
+      description: "Daily devotional",
+      icon: "heart",
+      category: "Spiritual",
+    },
+
+    // Business
+    {
+      id: "48",
+      name: "Networking",
+      description: "Build connections",
+      icon: "people",
+      category: "Business",
+    },
+    {
+      id: "49",
+      name: "Skill Development",
+      description: "Learn new skills",
+      icon: "trending-up",
+      category: "Business",
+    },
+    {
+      id: "50",
+      name: "Client Calls",
+      description: "Talk to clients",
+      icon: "call",
+      category: "Business",
+    },
+    {
+      id: "51",
+      name: "Business Planning",
+      description: "Strategic planning",
+      icon: "analytics",
+      category: "Business",
+    },
+    {
+      id: "52",
+      name: "Marketing",
+      description: "Promote business",
+      icon: "megaphone",
+      category: "Business",
+    },
+  ];
+
+  // Group routines by category
+  const routinesByCategory = routineTemplates.reduce((acc, routine) => {
+    if (!acc[routine.category]) {
+      acc[routine.category] = [];
     }
+    acc[routine.category].push(routine);
+    return acc;
+  }, {} as Record<string, RoutineTemplate[]>);
 
-    // Create a consistent seed based on date + time period
-    // This ensures the same greeting within the same time period of the same day
-    const seed = `${dateString}-${timePeriod}`;
-    return { timePeriod, seed, hour };
+  const toggleCategory = (category: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(category)) {
+      newExpanded.delete(category);
+    } else {
+      newExpanded.add(category);
+    }
+    setExpandedCategories(newExpanded);
   };
 
-  // Simple seeded random function to ensure consistency
-  const seededRandom = (seed: string) => {
-    let hash = 0;
-    for (let i = 0; i < seed.length; i++) {
-      const char = seed.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    // Normalize to 0-1 range
-    return Math.abs(hash) / 2147483648;
-  };
-
-  // Memoized greeting that only changes when the time period changes
-  const personalizedGreeting = useMemo(() => {
-    const { timePeriod, seed, hour } = getTimePeriodInfo();
-    const firstName = userProfile?.full_name?.split(" ")[0] || "there";
-
-    // Morning greetings (5 AM - 11:59 AM)
-    const morningGreetings = [
-      `Good morning, ${firstName}!`,
-      `Rise and shine, ${firstName}`,
-      `Morning, ${firstName}.`,
-      `Start strong, ${firstName}`,
-      `New day, new you, ${firstName}.`,
-      `Let's conquer today, ${firstName}!`,
-      `Early bird gets the worm, ${firstName}`,
-      `Ready to seize the day, ${firstName}?`,
-      `Fresh start awaits, ${firstName}.`,
-    ];
-
-    // Afternoon greetings (12 PM - 4:59 PM)
-    const afternoonGreetings = [
-      `Good afternoon, ${firstName}`,
-      `Halfway there, ${firstName}!`,
-      `Keep it up, ${firstName}.`,
-      `Afternoon momentum, ${firstName}`,
-      `You're crushing it, ${firstName}`,
-      `Stay focused, ${firstName}.`,
-      `Pushing through, ${firstName}?`,
-      `Making progress, ${firstName}`,
-      `Steady as she goes, ${firstName}.`,
-    ];
-
-    // Evening greetings (5 PM - 8:59 PM)
-    const eveningGreetings = [
-      `Good evening, ${firstName}`,
-      `Evening vibes, ${firstName}.`,
-      `Wind down time, ${firstName}`,
-      `Almost there, ${firstName}!`,
-      `Finish strong, ${firstName}`,
-      `Home stretch, ${firstName}.`,
-      `Wrapping up the day, ${firstName}?`,
-      `Time to unwind, ${firstName}`,
-      `Day's end approaches, ${firstName}.`,
-    ];
-
-    // Night greetings (9 PM - 4:59 AM)
-    const nightGreetings = [
-      `Good night, ${firstName}`,
-      `Night owl mode, ${firstName}?`,
-      `Late night grind, ${firstName}.`,
-      `Burning the midnight oil, ${firstName}`,
-      `Rest well soon, ${firstName}`,
-      `Tomorrow's another day, ${firstName}.`,
-      `Still going strong, ${firstName}?`,
-      `Time for some rest, ${firstName}`,
-      `The night is yours, ${firstName}.`,
-    ];
-
-    let greetings;
-    if (hour >= 5 && hour < 12) {
-      greetings = morningGreetings;
-    } else if (hour >= 12 && hour < 17) {
-      greetings = afternoonGreetings;
-    } else if (hour >= 17 && hour < 21) {
-      greetings = eveningGreetings;
+  useEffect(() => {
+    // Filter routines based on search query
+    if (searchQuery.trim() === "") {
+      setFilteredRoutines([]);
     } else {
-      greetings = nightGreetings;
+      const filtered = routineTemplates.filter(
+        (routine) =>
+          routine.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          routine.description
+            ?.toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          routine.category.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredRoutines(filtered);
     }
+  }, [searchQuery]);
 
-    // Use seeded random to get consistent greeting for this time period
-    const randomValue = seededRandom(seed);
-    const index = Math.floor(randomValue * greetings.length);
-    return greetings[index];
-  }, [userProfile?.full_name, getTimePeriodInfo().seed]); // Only re-compute when user name or time period changes
-
-  const loadData = useCallback(async () => {
+  const handleSelectRoutine = async (routine: RoutineTemplate) => {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) throw new Error("No user found");
 
-      // Fetch user profile for personalized greeting
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", user.id)
+      console.log("=== STARTING ROUTINE CREATION ===");
+      console.log("User ID:", user.id);
+      console.log("Selected day:", selectedDay);
+      console.log("Is weekly:", isWeekly);
+      console.log("Routine name:", routine.name);
+
+      // Get next sort order
+      const { data: existingRoutines } = await supabase
+        .from("user_routines")
+        .select("sort_order")
+        .eq("user_id", user.id)
+        .order("sort_order", { ascending: false })
+        .limit(1);
+
+      const nextSortOrder =
+        existingRoutines && existingRoutines.length > 0
+          ? existingRoutines[0].sort_order + 1
+          : 1;
+
+      console.log("Creating routine with sort order:", nextSortOrder);
+
+      const { data: newRoutine, error: routineError } = await supabase
+        .from("user_routines")
+        .insert({
+          user_id: user.id,
+          name: routine.name,
+          description: routine.description,
+          icon: routine.icon,
+          is_daily: selectedDay !== undefined, // Daily if has selectedDay
+          is_weekly: isWeekly || false, // Weekly if isWeekly flag is true
+          is_active: true,
+          sort_order: nextSortOrder,
+        })
+        .select("id")
         .single();
 
-      if (!profileError && profile) {
-        setUserProfile(profile);
+      if (routineError) {
+        console.error("Routine creation error:", routineError);
+        throw routineError;
       }
 
-      const today = new Date().toISOString().split("T")[0];
+      console.log("Routine created successfully:", newRoutine);
 
-      // Calculate week start (Monday)
-      const now = new Date();
-      const currentDay = now.getDay();
-      const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - daysFromMonday);
-      weekStart.setHours(0, 0, 0, 0);
+      // If we have a selected day, assign it to that day (daily routine)
+      if (selectedDay !== undefined && newRoutine) {
+        console.log("Assigning routine to day:", selectedDay);
 
-      // Get user's routines and day-specific assignments
-      const { data: routines, error: routinesError } = await supabase
-        .from("user_routines")
-        .select("*")
-        .eq("user_id", user.id);
+        const { data: dayAssignment, error: dayError } = await supabase
+          .from("user_day_routines")
+          .insert({
+            user_id: user.id,
+            routine_id: newRoutine.id,
+            day_of_week: selectedDay,
+          })
+          .select();
 
-      const { data: dayAssignments, error: dayError } = await supabase
-        .from("user_day_routines")
-        .select("*")
-        .eq("user_id", user.id);
-
-      if (routinesError || dayError) {
-        console.error("Error fetching routines:", routinesError || dayError);
-        return;
-      }
-
-      // Build day-specific routines mapping
-      const dayRoutineMap: Record<number, string[]> = {};
-      dayAssignments?.forEach((assignment) => {
-        if (!dayRoutineMap[assignment.day_of_week]) {
-          dayRoutineMap[assignment.day_of_week] = [];
+        if (dayError) {
+          console.error("Day assignment error:", dayError);
+          throw dayError;
         }
-        dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
-      });
-      setDaySpecificRoutines(dayRoutineMap);
 
-      // Get selected date for filtering daily routines
-      const selectedDate = new Date();
-      selectedDate.setDate(
-        selectedDate.getDate() + (selectedDay - selectedDate.getDay())
-      );
-      const selectedDateString = selectedDate.toISOString().split("T")[0];
-
-      // Get completions for selected day
-      const { data: dailyCompletions, error: dailyError } = await supabase
-        .from("routine_completions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("completion_date", selectedDateString);
-
-      // Get weekly completions (from week start to now)
-      const weekStartString = weekStart.toISOString().split("T")[0];
-      const { data: weeklyCompletions, error: weeklyError } = await supabase
-        .from("routine_completions")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("completion_date", weekStartString);
-
-      if (dailyError || weeklyError) {
-        console.error("Error fetching completions:", dailyError || weeklyError);
-        return;
-      }
-
-      // Filter routines for selected day
-      const selectedDayRoutineIds = dayRoutineMap[selectedDay] || [];
-      const daily: RoutineWithCompletion[] = [];
-
-      routines?.forEach((routine) => {
-        if (!routine.is_weekly && selectedDayRoutineIds.includes(routine.id)) {
-          const completion = dailyCompletions?.find(
-            (c) => c.routine_id === routine.id
-          );
-          daily.push({
-            ...routine,
-            isCompleted: !!completion,
-            completionId: completion?.id,
-          });
-        }
-      });
-
-      // Process weekly routines (unchanged)
-      const weekly: RoutineWithCompletion[] = [];
-      routines?.forEach((routine) => {
-        if (routine.is_weekly) {
-          const completion = weeklyCompletions?.find(
-            (c) => c.routine_id === routine.id
-          );
-          weekly.push({
-            ...routine,
-            isCompleted: !!completion,
-            completionId: completion?.id,
-          });
-        }
-      });
-
-      setDailyRoutines(daily);
-      setWeeklyRoutines(weekly);
-
-      // Calculate time remaining in week
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-
-      const timeLeft = weekEnd.getTime() - now.getTime();
-      const daysLeft = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
-      const hoursLeft = Math.floor(
-        (timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-      );
-
-      if (daysLeft > 0) {
-        setWeekTimeRemaining(`${daysLeft}d ${hoursLeft}h left`);
+        console.log("Day assignment created successfully:", dayAssignment);
+        Alert.alert(
+          "Success",
+          `${routine.name} added to your ${dayNames[selectedDay]} routine!`
+        );
+      } else if (isWeekly) {
+        console.log("Weekly routine created without day assignment");
+        Alert.alert("Success", `${routine.name} added to your weekly goals!`);
       } else {
-        setWeekTimeRemaining(`${hoursLeft}h left`);
+        console.log("No selected day - routine created without day assignment");
+        Alert.alert("Success", `${routine.name} added to your routines!`);
       }
+
+      console.log("=== ROUTINE CREATION COMPLETED ===");
+      navigation.goBack();
     } catch (error) {
-      console.error("Error loading data:", error);
-      Alert.alert("Error", "Failed to load routines");
+      console.error("=== ERROR IN ROUTINE CREATION ===");
+      console.error("Full error:", error);
+      console.error("Error message:", error.message);
+      Alert.alert("Error", `Failed to add routine: ${error.message}`);
     }
-  }, [selectedDay]);
+  };
 
-  useEffect(() => {
-    loadData();
-  }, [selectedDay]);
+  const handleCreateCustom = async () => {
+    if (!customTitle.trim()) {
+      Alert.alert("Error", "Please enter a title for your routine");
+      return;
+    }
 
-  // Add focus listener to reload data when coming back from AddRoutine
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", () => {
-      console.log("HomeScreen focused - reloading data");
-      loadData();
-    });
+    if (customTitle.length > 20) {
+      Alert.alert("Error", "Title must be 20 characters or less");
+      return;
+    }
 
-    return unsubscribe;
-  }, [navigation, loadData]);
+    if (customDescription.length > 35) {
+      Alert.alert("Error", "Description must be 35 characters or less");
+      return;
+    }
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadData().finally(() => setRefreshing(false));
-  }, [loadData]);
-
-  const toggleRoutineCompletion = async (
-    routine: RoutineWithCompletion,
-    isWeekly: boolean
-  ) => {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) throw new Error("No user found");
 
-      if (routine.isCompleted && routine.completionId) {
-        // Remove completion
-        const { error } = await supabase
-          .from("routine_completions")
-          .delete()
-          .eq("id", routine.completionId);
+      // Check if this routine name already exists for this user
+      const { data: existingRoutine, error: checkError } = await supabase
+        .from("user_routines")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("name", customTitle.trim())
+        .eq("is_active", true)
+        .single();
 
-        if (error) throw error;
+      let routineId: string;
+
+      if (existingRoutine) {
+        // Use existing routine
+        routineId = existingRoutine.id;
       } else {
-        // Add completion
-        const today = new Date().toISOString().split("T")[0];
-
-        let weekStartDate = null;
-        if (isWeekly) {
-          const now = new Date();
-          const currentDay = now.getDay();
-          const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
-          const weekStart = new Date(now);
-          weekStart.setDate(now.getDate() - daysFromMonday);
-          weekStartDate = weekStart.toISOString().split("T")[0];
-        }
-
-        // Check if completion already exists to avoid duplicate key error
-        const { data: existingCompletion, error: checkError } = await supabase
-          .from("routine_completions")
-          .select("id")
+        // Create new routine
+        const { data: existingRoutines } = await supabase
+          .from("user_routines")
+          .select("sort_order")
           .eq("user_id", user.id)
-          .eq("routine_id", routine.id)
-          .eq("completion_date", today)
+          .order("sort_order", { ascending: false })
+          .limit(1);
+
+        const nextSortOrder =
+          existingRoutines && existingRoutines.length > 0
+            ? existingRoutines[0].sort_order + 1
+            : 1;
+
+        const { data: newRoutine, error } = await supabase
+          .from("user_routines")
+          .insert({
+            user_id: user.id,
+            name: customTitle.trim(),
+            description: customDescription.trim() || null,
+            icon: "checkmark-circle",
+            is_daily: selectedDay !== undefined,
+            is_weekly: isWeekly || false,
+            is_active: true,
+            sort_order: nextSortOrder,
+          })
+          .select("id")
           .single();
 
-        if (checkError && checkError.code !== "PGRST116") {
-          // PGRST116 is "not found" error, which is expected if no completion exists
-          throw checkError;
-        }
-
-        if (!existingCompletion) {
-          const { error } = await supabase.from("routine_completions").insert({
-            user_id: user.id,
-            routine_id: routine.id,
-            completion_date: today,
-            week_start_date: weekStartDate,
-          });
-
-          if (error) throw error;
-        }
-      }
-
-      // Reload data to reflect changes
-      loadData();
-    } catch (error) {
-      console.error("Error toggling completion:", error);
-      Alert.alert("Error", "Failed to update routine");
-    }
-  };
-
-  const handleDayPress = (dayValue: number) => {
-    setSelectedDay(dayValue);
-  };
-
-  const addRoutineToDay = () => {
-    navigation.navigate("AddRoutine", { selectedDay });
-  };
-
-  const addWeeklyRoutine = () => {
-    navigation.navigate("AddRoutine", { isWeekly: true });
-  };
-
-  const updateRoutineOrder = async (routines: RoutineWithCompletion[]) => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Update sort_order for each routine based on new position
-      const updates = routines.map((routine, index) => ({
-        id: routine.id,
-        sort_order: index + 1,
-      }));
-
-      for (const update of updates) {
-        const { error } = await supabase
-          .from("user_routines")
-          .update({ sort_order: update.sort_order })
-          .eq("id", update.id);
-
         if (error) throw error;
+        routineId = newRoutine.id;
       }
-    } catch (error) {
-      console.error("Error updating routine order:", error);
-      Alert.alert("Error", "Failed to update routine order");
-    }
-  };
 
-  const moveRoutineUp = (index: number, isWeekly: boolean) => {
-    if (index === 0) return; // Already at top
+      // If we have a selected day, assign it to that day
+      if (selectedDay !== undefined) {
+        // Check if already assigned to this day
+        const { data: existingAssignment } = await supabase
+          .from("user_day_routines")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("routine_id", routineId)
+          .eq("day_of_week", selectedDay)
+          .single();
 
-    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
-    const [movedItem] = routines.splice(index, 1);
-    routines.splice(index - 1, 0, movedItem);
+        if (!existingAssignment) {
+          const { error: dayError } = await supabase
+            .from("user_day_routines")
+            .insert({
+              user_id: user.id,
+              routine_id: routineId,
+              day_of_week: selectedDay,
+            });
 
-    if (isWeekly) {
-      setWeeklyRoutines(routines);
-    } else {
-      setDailyRoutines(routines);
-    }
-
-    updateRoutineOrder(routines);
-  };
-
-  const moveRoutineDown = (index: number, isWeekly: boolean) => {
-    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
-    if (index === routines.length - 1) return; // Already at bottom
-
-    const [movedItem] = routines.splice(index, 1);
-    routines.splice(index + 1, 0, movedItem);
-
-    if (isWeekly) {
-      setWeeklyRoutines(routines);
-    } else {
-      setDailyRoutines(routines);
-    }
-
-    updateRoutineOrder(routines);
-  };
-
-  const moveRoutineToPosition = (
-    fromIndex: number,
-    toIndex: number,
-    isWeekly: boolean
-  ) => {
-    if (fromIndex === toIndex) return;
-
-    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
-    const [movedItem] = routines.splice(fromIndex, 1);
-    routines.splice(toIndex, 0, movedItem);
-
-    if (isWeekly) {
-      setWeeklyRoutines(routines);
-    } else {
-      setDailyRoutines(routines);
-    }
-
-    updateRoutineOrder(routines);
-  };
-
-  const createPanResponder = (index: number, isWeekly: boolean) => {
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return isDragging || Math.abs(gestureState.dy) > 5;
-      },
-      onStartShouldSetPanResponderCapture: () => true,
-      onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
-        return Math.abs(gestureState.dy) > 3;
-      },
-
-      onPanResponderGrant: (evt, gestureState) => {
-        console.log("Drag started for index:", index);
-        setDraggedIndex(index);
-        setOriginalIndex(index);
-        setLastSwapIndex(index);
-        setIsDragging(true);
-        setScrollEnabled(false);
-        dragY.setValue(0);
-      },
-
-      onPanResponderMove: (evt, gestureState) => {
-        if (isDragging) {
-          dragY.setValue(gestureState.dy);
-
-          const routines = isWeekly ? weeklyRoutines : dailyRoutines;
-          const itemHeight = 76;
-          const swapThreshold = itemHeight * 0.6; // More forgiving threshold
-
-          // Calculate which position we should be at based on drag distance
-          let targetIndex = originalIndex!;
-
-          if (gestureState.dy > swapThreshold) {
-            // Dragging down - calculate how many items we've passed
-            targetIndex = Math.min(
-              routines.length - 1,
-              originalIndex! + Math.floor(gestureState.dy / itemHeight)
-            );
-          } else if (gestureState.dy < -swapThreshold) {
-            // Dragging up - calculate how many items we've passed
-            targetIndex = Math.max(
-              0,
-              originalIndex! + Math.ceil(gestureState.dy / itemHeight)
-            );
-          }
-
-          // Only update if we've moved to a new position and it's different from last swap
-          if (
-            targetIndex !== lastSwapIndex &&
-            targetIndex !== draggedIndex &&
-            targetIndex >= 0 &&
-            targetIndex < routines.length
-          ) {
-            console.log(`Swapping from ${draggedIndex} to ${targetIndex}`);
-
-            const updatedRoutines = [...routines];
-            const [movedItem] = updatedRoutines.splice(draggedIndex!, 1);
-            updatedRoutines.splice(targetIndex, 0, movedItem);
-
-            if (isWeekly) {
-              setWeeklyRoutines(updatedRoutines);
-            } else {
-              setDailyRoutines(updatedRoutines);
-            }
-
-            // Update tracking indices
-            setDraggedIndex(targetIndex);
-            setLastSwapIndex(targetIndex);
-
-            // Adjust drag offset to prevent visual jump
-            const offsetAdjustment = (targetIndex - draggedIndex!) * itemHeight;
-            dragY.setValue(gestureState.dy - offsetAdjustment);
-          }
+          if (dayError) throw dayError;
         }
-      },
 
-      onPanResponderRelease: (evt, gestureState) => {
-        console.log("Drag ended");
+        Alert.alert(
+          "Success",
+          `${customTitle} added to your ${dayNames[selectedDay]} routine!`
+        );
+      } else if (isWeekly) {
+        Alert.alert("Success", `${customTitle} added to your weekly goals!`);
+      } else {
+        Alert.alert("Success", `${customTitle} added to your routines!`);
+      }
 
-        // Save the current order to database
-        const currentRoutines = isWeekly ? weeklyRoutines : dailyRoutines;
-        updateRoutineOrder(currentRoutines);
-
-        // Reset all drag state
-        setDraggedIndex(null);
-        setOriginalIndex(null);
-        setLastSwapIndex(null);
-        setIsDragging(false);
-        setScrollEnabled(true);
-
-        Animated.spring(dragY, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 120,
-          friction: 7,
-        }).start();
-      },
-
-      onPanResponderTerminate: () => {
-        console.log("Drag terminated");
-        setDraggedIndex(null);
-        setOriginalIndex(null);
-        setLastSwapIndex(null);
-        setIsDragging(false);
-        setScrollEnabled(true);
-
-        Animated.spring(dragY, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      },
-
-      onPanResponderTerminationRequest: () => false,
-      onShouldBlockNativeResponder: () => true,
-    });
+      setShowCreateModal(false);
+      setCustomTitle("");
+      setCustomDescription("");
+      navigation.goBack();
+    } catch (error) {
+      console.error("Error creating custom routine:", error);
+      Alert.alert("Error", "Failed to create routine. Please try again.");
+    }
   };
 
-  const renderRoutineItem = (
-    routine: RoutineWithCompletion,
-    isWeekly: boolean,
-    index: number
+  const renderCategorySection = (
+    category: string,
+    routines: RoutineTemplate[]
   ) => {
-    const panResponder = createPanResponder(index, isWeekly);
-    const isBeingDragged = draggedIndex === index;
+    const isExpanded = expandedCategories.has(category);
 
     return (
-      <Animated.View
-        key={routine.id}
-        style={[
-          styles.routineItem,
-          isBeingDragged && {
-            transform: [{ translateY: dragY }],
-            zIndex: 1000,
-          },
-        ]}
-      >
-        <View
-          style={[
-            styles.routineContent,
-            isBeingDragged && styles.routineContentDragging,
-          ]}
+      <View key={category} style={styles.categorySection}>
+        <TouchableOpacity
+          style={styles.categoryHeader}
+          onPress={() => toggleCategory(category)}
         >
-          <TouchableOpacity
-            style={styles.routineLeft}
-            onPress={() =>
-              !isDragging && toggleRoutineCompletion(routine, isWeekly)
-            }
-            activeOpacity={isDragging ? 1 : 0.7}
-          >
-            <View
-              style={[
-                styles.checkbox,
-                routine.isCompleted && styles.checkboxCompleted,
-              ]}
-            >
-              {routine.isCompleted && (
-                <Ionicons name="checkmark" size={16} color="#fff" />
-              )}
-            </View>
-            <View style={styles.routineInfo}>
-              <Text
-                style={[
-                  styles.routineName,
-                  routine.isCompleted && styles.routineNameCompleted,
-                ]}
-              >
-                {routine.name}
-              </Text>
-              {routine.description && (
-                <Text style={styles.routineDescription}>
-                  {routine.description}
-                </Text>
-              )}
-              {routine.target_value && routine.target_unit && (
-                <Text style={styles.routineTarget}>
-                  Target: {routine.target_value} {routine.target_unit}
-                </Text>
-              )}
-            </View>
-          </TouchableOpacity>
-
-          {/* Drag Handle - Separate from main touch area */}
-          <View style={styles.dragHandle} {...panResponder.panHandlers}>
-            <View style={styles.dragIcon}>
-              <View style={styles.dragLine} />
-              <View style={styles.dragLine} />
-              <View style={styles.dragLine} />
-            </View>
+          <View style={styles.categoryHeaderLeft}>
+            <Text style={styles.categoryTitle}>{category}</Text>
+            <Text style={styles.categoryCount}>({routines.length})</Text>
           </View>
-        </View>
-      </Animated.View>
+          <Ionicons
+            name={isExpanded ? "chevron-up" : "chevron-down"}
+            size={20}
+            color="#666"
+          />
+        </TouchableOpacity>
+
+        {isExpanded && (
+          <View style={styles.categoryContent}>
+            {routines.map((routine) => (
+              <TouchableOpacity
+                key={routine.id}
+                style={styles.routineItemInCategory}
+                onPress={() => handleSelectRoutine(routine)}
+              >
+                <View style={styles.routineIcon}>
+                  <Ionicons
+                    name={routine.icon as any}
+                    size={20}
+                    color="#007AFF"
+                  />
+                </View>
+                <View style={styles.routineInfo}>
+                  <Text style={styles.routineName}>{routine.name}</Text>
+                  {routine.description && (
+                    <Text style={styles.routineDescription}>
+                      {routine.description}
+                    </Text>
+                  )}
+                </View>
+                <Ionicons name="add-circle" size={20} color="#007AFF" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
     );
+  };
+
+  const getHeaderTitle = () => {
+    if (isWeekly) {
+      return "Add Weekly Goal";
+    } else if (selectedDay !== undefined) {
+      return `Add ${dayNames[selectedDay]} Routine`;
+    } else {
+      return "Add Routine";
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{personalizedGreeting}</Text>
-        <Text style={styles.headerDate}>
-          {new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        </Text>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      {/* Day Calendar Strip */}
-      <View style={styles.calendarContainer}>
-        <View style={styles.calendarGrid}>
-          {daysOfWeek.map((day) => {
-            const isToday = day.value === new Date().getDay();
-            const isSelected = day.value === selectedDay;
-            const hasRoutines =
-              (daySpecificRoutines[day.value] || []).length > 0;
-
-            return (
-              <TouchableOpacity
-                key={day.value}
-                style={[
-                  styles.dayBox,
-                  isToday && styles.dayBoxToday,
-                  isSelected && styles.dayBoxSelected,
-                ]}
-                onPress={() => handleDayPress(day.value)}
-              >
-                <Text
-                  style={[
-                    styles.dayBoxName,
-                    isToday && styles.dayBoxNameToday,
-                    isSelected && styles.dayBoxNameSelected,
-                  ]}
-                >
-                  {day.name}
-                </Text>
-                <View
-                  style={[
-                    styles.dayBoxIndicator,
-                    hasRoutines && styles.dayBoxIndicatorActive,
-                  ]}
-                />
-              </TouchableOpacity>
-            );
-          })}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={20} color="#666" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search routines..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
         </View>
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => setShowCreateModal(true)}
+        >
+          <Ionicons name="add" size={20} color="#007AFF" />
+          <Text style={styles.createButtonText}>Create</Text>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        scrollEnabled={scrollEnabled}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {/* Daily Routines Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="today" size={24} color="#007AFF" />
+      <ScrollView style={styles.content}>
+        {searchQuery.trim() ? (
+          // Show search results
+          <>
             <Text style={styles.sectionTitle}>
-              {daysOfWeek.find((d) => d.value === selectedDay)?.name} Routines
+              Search Results ({filteredRoutines.length})
             </Text>
-            <TouchableOpacity
-              onPress={addRoutineToDay}
-              style={styles.addButton}
+            <FlatList
+              data={filteredRoutines}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.routineItem}
+                  onPress={() => handleSelectRoutine(item)}
+                >
+                  <View style={styles.routineIcon}>
+                    <Ionicons
+                      name={item.icon as any}
+                      size={24}
+                      color="#007AFF"
+                    />
+                  </View>
+                  <View style={styles.routineInfo}>
+                    <Text style={styles.routineName}>{item.name}</Text>
+                    {item.description && (
+                      <Text style={styles.routineDescription}>
+                        {item.description}
+                      </Text>
+                    )}
+                    <Text style={styles.routineCategory}>{item.category}</Text>
+                  </View>
+                  <Ionicons name="add-circle" size={24} color="#007AFF" />
+                </TouchableOpacity>
+              )}
+              keyExtractor={(item) => item.id}
+              style={styles.routinesList}
+              showsVerticalScrollIndicator={false}
+            />
+          </>
+        ) : (
+          // Show categorized routines
+          <>
+            <Text style={styles.sectionTitle}>Browse by Category</Text>
+            <ScrollView
+              style={styles.categoriesContainer}
+              showsVerticalScrollIndicator={false}
             >
-              <Ionicons name="add" size={20} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
-
-          {dailyRoutines.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>
-                No routines set for{" "}
-                {daysOfWeek.find((d) => d.value === selectedDay)?.name}
-              </Text>
-              <Text style={styles.emptyStateSubtext}>
-                Tap on the day above to assign routines!
-              </Text>
-            </View>
-          ) : (
-            dailyRoutines.map((routine, index) =>
-              renderRoutineItem(routine, false, index)
-            )
-          )}
-        </View>
-
-        {/* Weekly Routines Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="calendar" size={24} color="#007AFF" />
-            <Text style={styles.sectionTitle}>Weekly Goals</Text>
-            <View style={styles.weekTimer}>
-              <Ionicons name="time" size={16} color="#666" />
-              <Text style={styles.weekTimerText}>{weekTimeRemaining}</Text>
-            </View>
-            <TouchableOpacity
-              onPress={addWeeklyRoutine}
-              style={styles.addButton}
-            >
-              <Ionicons name="add" size={20} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
-
-          {weeklyRoutines.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>
-                No weekly routines set up yet
-              </Text>
-              <Text style={styles.emptyStateSubtext}>
-                Add weekly goals to track longer-term habits!
-              </Text>
-            </View>
-          ) : (
-            weeklyRoutines.map((routine, index) =>
-              renderRoutineItem(routine, true, index)
-            )
-          )}
-        </View>
+              {Object.entries(routinesByCategory).map(([category, routines]) =>
+                renderCategorySection(category, routines)
+              )}
+            </ScrollView>
+          </>
+        )}
       </ScrollView>
+
+      {/* Create Custom Routine Modal */}
+      <Modal
+        visible={showCreateModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowCreateModal(false)}>
+              <Text style={styles.modalCancelButton}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Create Custom Routine</Text>
+            <TouchableOpacity onPress={handleCreateCustom}>
+              <Text style={styles.modalSaveButton}>Save</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalContent}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Title *</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Enter routine title..."
+                value={customTitle}
+                onChangeText={setCustomTitle}
+                maxLength={20}
+              />
+              <Text style={styles.charCount}>{customTitle.length}/20</Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Description (Optional)</Text>
+              <TextInput
+                style={[styles.textInput, styles.textArea]}
+                placeholder="Enter description..."
+                value={customDescription}
+                onChangeText={setCustomDescription}
+                maxLength={35}
+                multiline
+                numberOfLines={3}
+              />
+              <Text style={styles.charCount}>
+                {customDescription.length}/35
+              </Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -818,113 +890,130 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f5f5",
   },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: "#fff",
-    paddingVertical: 20,
-    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: "#e9ecef",
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 4,
-  },
-  headerDate: {
-    fontSize: 16,
-    color: "#666",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  section: {
-    backgroundColor: "#fff",
-    marginVertical: 8,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
     color: "#333",
-    marginLeft: 8,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#fff",
+    gap: 12,
+  },
+  searchBar: {
     flex: 1,
-  },
-  addButton: {
-    padding: 4,
-  },
-  weekTimer: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#f8f9fa",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 8,
   },
-  weekTimerText: {
-    fontSize: 12,
-    color: "#666",
-    marginLeft: 4,
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+  },
+  createButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#f0f8ff",
+    borderRadius: 8,
+    gap: 4,
+  },
+  createButtonText: {
+    fontSize: 16,
     fontWeight: "500",
+    color: "#007AFF",
   },
-  routineItem: {
-    marginBottom: 12,
+  content: {
+    flex: 1,
+    paddingHorizontal: 16,
   },
-  routineItemDragging: {
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    // Keep the same background and border radius as the content
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+    marginVertical: 16,
   },
-  routineContentDragging: {
-    elevation: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    // Maintains the same borderRadius: 12 and backgroundColor: '#f8f9fa'
-    // from the base routineContent style
+  categoriesContainer: {
+    flex: 1,
   },
-  routineContent: {
+  categorySection: {
+    marginBottom: 16,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  categoryHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 12,
     paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: "#f8f9fa",
-    borderRadius: 12,
   },
-  routineLeft: {
+  categoryHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+  },
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  categoryCount: {
+    fontSize: 14,
+    color: "#666",
+  },
+  categoryContent: {
+    padding: 8,
+  },
+  routineItemInCategory: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    marginBottom: 4,
+    gap: 12,
+  },
+  routinesList: {
     flex: 1,
   },
-  checkbox: {
-    width: 24,
-    height: 24,
+  routineItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#fff",
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#ddd",
+    marginBottom: 8,
+    gap: 12,
+  },
+  routineIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f0f8ff",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
-  },
-  checkboxCompleted: {
-    backgroundColor: "#007AFF",
-    borderColor: "#007AFF",
   },
   routineInfo: {
     flex: 1,
@@ -933,113 +1022,81 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
     color: "#333",
-  },
-  routineNameCompleted: {
-    textDecorationLine: "line-through",
-    color: "#999",
+    marginBottom: 2,
   },
   routineDescription: {
     fontSize: 14,
     color: "#666",
-    marginTop: 2,
   },
-  routineTarget: {
+  routineCategory: {
     fontSize: 12,
     color: "#007AFF",
-    marginTop: 2,
     fontWeight: "500",
+    marginTop: 2,
   },
-  emptyState: {
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "#f5f5f5",
+  },
+  modalHeader: {
+    flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 40,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: "#999",
-    textAlign: "center",
-    marginTop: 8,
-  },
-  // Calendar Strip Styles
-  calendarContainer: {
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: "#fff",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#e9ecef",
   },
-  calendarGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  dayBox: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 12,
-    marginHorizontal: 2,
-    borderRadius: 12,
-    backgroundColor: "#f8f9fa",
-    borderWidth: 2,
-    borderColor: "transparent",
-    minHeight: 65,
-    justifyContent: "center",
-  },
-  dayBoxToday: {
-    backgroundColor: "#e6f3ff",
-    borderColor: "#007AFF",
-  },
-  dayBoxSelected: {
-    backgroundColor: "#007AFF",
-    borderColor: "#007AFF",
-  },
-  dayBoxName: {
-    fontSize: 13,
+  modalTitle: {
+    fontSize: 18,
     fontWeight: "600",
     color: "#333",
-    marginBottom: 4,
   },
-  dayBoxNameToday: {
+  modalCancelButton: {
+    fontSize: 16,
+    color: "#666",
+  },
+  modalSaveButton: {
+    fontSize: 16,
+    fontWeight: "600",
     color: "#007AFF",
-    fontWeight: "700",
   },
-  dayBoxNameSelected: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-  dayBoxIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#ddd",
-  },
-  dayBoxIndicatorActive: {
-    backgroundColor: "#34c759",
-  },
-  // Drag and Drop Styles
-  dragHandle: {
-    alignItems: "center",
-    justifyContent: "center",
+  modalContent: {
+    flex: 1,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    minWidth: 40,
-    minHeight: 40,
+    paddingTop: 20,
   },
-  dragIcon: {
-    alignItems: "center",
-    justifyContent: "center",
+  inputGroup: {
+    marginBottom: 20,
   },
-  dragLine: {
-    width: 18,
-    height: 2,
-    backgroundColor: "#666",
-    marginVertical: 1,
-    borderRadius: 1,
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#333",
+    marginBottom: 8,
+  },
+  textInput: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: "#333",
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: "top",
+  },
+  charCount: {
+    fontSize: 12,
+    color: "#666",
+    textAlign: "right",
+    marginTop: 4,
   },
 });
 
-export default HomeScreen;
+export default AddRoutineScreen;
