@@ -458,12 +458,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     isWeekly: boolean,
     index: number
   ) => (
-    <View key={routine.id} style={styles.routineItem}>
-      <TouchableOpacity
-        style={styles.routineContent}
-        onPress={() => toggleRoutineCompletion(routine, isWeekly)}
-        activeOpacity={0.7}
-      >
+    <TouchableOpacity
+      key={routine.id}
+      style={styles.routineItem}
+      onPress={() => toggleRoutineCompletion(routine, isWeekly)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.routineContent}>
         <View style={styles.routineLeft}>
           <View
             style={[
@@ -496,51 +497,27 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             )}
           </View>
         </View>
-      </TouchableOpacity>
 
-      {/* Drag Handle */}
-      <View style={styles.dragHandle}>
+        {/* Inline Drag Handle */}
         <TouchableOpacity
-          onPress={() => moveRoutineUp(index, isWeekly)}
-          style={[styles.dragButton, index === 0 && styles.dragButtonDisabled]}
-          disabled={index === 0}
+          style={styles.dragHandle}
+          onLongPress={() => {
+            // TODO: Start drag functionality
+            Alert.alert(
+              "Drag",
+              "Long press detected - drag functionality coming soon!"
+            );
+          }}
+          onPress={(e) => e.stopPropagation()} // Prevent routine completion when touching drag handle
         >
-          <Ionicons
-            name="chevron-up"
-            size={16}
-            color={index === 0 ? "#ccc" : "#666"}
-          />
-        </TouchableOpacity>
-
-        <View style={styles.dragIcon}>
-          <View style={styles.dragLine} />
-          <View style={styles.dragLine} />
-          <View style={styles.dragLine} />
-        </View>
-
-        <TouchableOpacity
-          onPress={() => moveRoutineDown(index, isWeekly)}
-          style={[
-            styles.dragButton,
-            index === (isWeekly ? weeklyRoutines : dailyRoutines).length - 1 &&
-              styles.dragButtonDisabled,
-          ]}
-          disabled={
-            index === (isWeekly ? weeklyRoutines : dailyRoutines).length - 1
-          }
-        >
-          <Ionicons
-            name="chevron-down"
-            size={16}
-            color={
-              index === (isWeekly ? weeklyRoutines : dailyRoutines).length - 1
-                ? "#ccc"
-                : "#666"
-            }
-          />
+          <View style={styles.dragIcon}>
+            <View style={styles.dragLine} />
+            <View style={styles.dragLine} />
+            <View style={styles.dragLine} />
+          </View>
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -733,11 +710,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 12,
-    paddingLeft: 16,
-    paddingRight: 12,
+    paddingHorizontal: 16,
     backgroundColor: "#f8f9fa",
     borderRadius: 12,
-    flex: 1,
   },
   routineLeft: {
     flexDirection: "row",
@@ -856,22 +831,15 @@ const styles = StyleSheet.create({
   dragHandle: {
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  dragButton: {
-    padding: 4,
-  },
-  dragButtonDisabled: {
-    opacity: 0.3,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   dragIcon: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 4,
   },
   dragLine: {
-    width: 16,
+    width: 18,
     height: 2,
     backgroundColor: "#666",
     marginVertical: 1,
