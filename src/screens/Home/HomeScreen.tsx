@@ -493,7 +493,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     updateRoutineOrder(routines);
   };
 
-  // FIXED: Smooth drag with better thresholds and visual feedback
+  // FIXED: Real-time drag with section constraints
   const createPanResponder = (index: number, isWeekly: boolean) => {
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -514,7 +514,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         );
         setDraggedIndex(index);
         setOriginalIndex(index);
-        setLastSwapIndex(index);
         setIsDragging(true);
         setScrollEnabled(false);
         setDraggedSection(isWeekly ? "weekly" : "daily");
@@ -538,54 +537,34 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           Math.min(maxDownMovement, gestureState.dy)
         );
 
-        // Always update visual position
         dragY.setValue(constrainedDy);
 
-        // FIXED: Use larger threshold for smoother swapping (75% of item height)
-        const swapThreshold = itemHeight * 0.75;
+        // FIXED: Real-time position calculation and swapping
+        const positionsToMove = Math.round(constrainedDy / itemHeight);
+        const newIndex = Math.max(
+          0,
+          Math.min(routines.length - 1, originalIndex! + positionsToMove)
+        );
 
-        // Calculate target index based on drag distance
-        let targetIndex = originalIndex!;
-
-        if (constrainedDy > swapThreshold) {
-          // Dragging down
-          targetIndex = Math.min(
-            routines.length - 1,
-            originalIndex! + Math.floor(constrainedDy / itemHeight)
-          );
-        } else if (constrainedDy < -swapThreshold) {
-          // Dragging up
-          targetIndex = Math.max(
-            0,
-            originalIndex! + Math.ceil(constrainedDy / itemHeight)
-          );
-        }
-
-        // FIXED: Only swap when crossing threshold AND different from last swap
-        // This prevents rapid back-and-forth swapping
-        if (targetIndex !== lastSwapIndex && targetIndex !== draggedIndex) {
+        // Only reorder if we've moved to a different position
+        if (newIndex !== draggedIndex && newIndex !== originalIndex) {
           console.log(
-            `Smooth swap: ${draggedIndex} -> ${targetIndex} (last: ${lastSwapIndex})`
+            `Real-time swap: moving from ${draggedIndex} to ${newIndex}`
           );
 
           const newRoutines = [...routines];
           const [draggedItem] = newRoutines.splice(draggedIndex!, 1);
-          newRoutines.splice(targetIndex, 0, draggedItem);
+          newRoutines.splice(newIndex, 0, draggedItem);
 
-          // Update state
+          // FIXED: Update state immediately for real-time feedback
           if (isWeekly) {
             setWeeklyRoutines(newRoutines);
           } else {
             setDailyRoutines(newRoutines);
           }
 
-          // Update tracking indices
-          setDraggedIndex(targetIndex);
-          setLastSwapIndex(targetIndex);
-
-          // FIXED: Adjust visual position to prevent jumping
-          const positionOffset = (targetIndex - originalIndex!) * itemHeight;
-          dragY.setValue(constrainedDy - positionOffset);
+          // Update tracking
+          setDraggedIndex(newIndex);
         }
       },
 
@@ -596,24 +575,23 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         console.log("Drag ended - saving to database");
 
-        // Save final order to database
+        // FIXED: Save final order to database
         const currentRoutines = isWeekly ? weeklyRoutines : dailyRoutines;
         updateRoutineOrder(currentRoutines);
 
-        // Reset all drag state
+        // Reset drag state
         setDraggedIndex(null);
         setOriginalIndex(null);
-        setLastSwapIndex(null);
         setIsDragging(false);
         setScrollEnabled(true);
         setDraggedSection(null);
 
-        // Smooth return animation
+        // Animate back to rest position
         Animated.spring(dragY, {
           toValue: 0,
           useNativeDriver: true,
-          tension: 100,
-          friction: 8,
+          tension: 120,
+          friction: 7,
         }).start();
       },
 
@@ -623,7 +601,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         // Reset everything
         setDraggedIndex(null);
         setOriginalIndex(null);
-        setLastSwapIndex(null);
         setIsDragging(false);
         setScrollEnabled(true);
         setDraggedSection(null);
@@ -631,8 +608,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         Animated.spring(dragY, {
           toValue: 0,
           useNativeDriver: true,
-          tension: 100,
-          friction: 8,
         }).start();
       },
 
