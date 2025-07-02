@@ -50,6 +50,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [originalIndex, setOriginalIndex] = useState<number | null>(null);
+  const [lastSwapIndex, setLastSwapIndex] = useState<number | null>(null);
 
   const dragY = useRef(new Animated.Value(0)).current;
 
@@ -404,6 +406,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     navigation.navigate("AddRoutine", { selectedDay });
   };
 
+  const addWeeklyRoutine = () => {
+    navigation.navigate("AddRoutine", { isWeekly: true });
+  };
+
   const updateRoutineOrder = async (routines: RoutineWithCompletion[]) => {
     try {
       const {
@@ -497,8 +503,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       onPanResponderGrant: (evt, gestureState) => {
         console.log("Drag started for index:", index);
         setDraggedIndex(index);
+        setOriginalIndex(index);
+        setLastSwapIndex(index);
         setIsDragging(true);
-        setScrollEnabled(false); // Disable page scrolling during drag
+        setScrollEnabled(false);
         dragY.setValue(0);
       },
 
@@ -506,50 +514,53 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         if (isDragging) {
           dragY.setValue(gestureState.dy);
 
-          // Real-time position updates
           const routines = isWeekly ? weeklyRoutines : dailyRoutines;
           const itemHeight = 76;
-          const moveThreshold = itemHeight / 2;
+          const swapThreshold = itemHeight * 0.6; // More forgiving threshold
 
-          let newIndex = index;
+          // Calculate which position we should be at based on drag distance
+          let targetIndex = originalIndex!;
 
-          if (Math.abs(gestureState.dy) > moveThreshold) {
-            if (gestureState.dy > 0) {
-              // Dragging down
-              newIndex = Math.min(
-                routines.length - 1,
-                index + Math.floor(gestureState.dy / itemHeight)
-              );
+          if (gestureState.dy > swapThreshold) {
+            // Dragging down - calculate how many items we've passed
+            targetIndex = Math.min(
+              routines.length - 1,
+              originalIndex! + Math.floor(gestureState.dy / itemHeight)
+            );
+          } else if (gestureState.dy < -swapThreshold) {
+            // Dragging up - calculate how many items we've passed
+            targetIndex = Math.max(
+              0,
+              originalIndex! + Math.ceil(gestureState.dy / itemHeight)
+            );
+          }
+
+          // Only update if we've moved to a new position and it's different from last swap
+          if (
+            targetIndex !== lastSwapIndex &&
+            targetIndex !== draggedIndex &&
+            targetIndex >= 0 &&
+            targetIndex < routines.length
+          ) {
+            console.log(`Swapping from ${draggedIndex} to ${targetIndex}`);
+
+            const updatedRoutines = [...routines];
+            const [movedItem] = updatedRoutines.splice(draggedIndex!, 1);
+            updatedRoutines.splice(targetIndex, 0, movedItem);
+
+            if (isWeekly) {
+              setWeeklyRoutines(updatedRoutines);
             } else {
-              // Dragging up
-              newIndex = Math.max(
-                0,
-                index + Math.ceil(gestureState.dy / itemHeight)
-              );
+              setDailyRoutines(updatedRoutines);
             }
 
-            // Update positions in real-time if index has changed
-            if (
-              newIndex !== index &&
-              newIndex >= 0 &&
-              newIndex < routines.length
-            ) {
-              const updatedRoutines = [...routines];
-              const [movedItem] = updatedRoutines.splice(index, 1);
-              updatedRoutines.splice(newIndex, 0, movedItem);
+            // Update tracking indices
+            setDraggedIndex(targetIndex);
+            setLastSwapIndex(targetIndex);
 
-              if (isWeekly) {
-                setWeeklyRoutines(updatedRoutines);
-              } else {
-                setDailyRoutines(updatedRoutines);
-              }
-
-              // Update the dragged index to reflect new position
-              setDraggedIndex(newIndex);
-
-              // Reset drag offset since we've moved the item
-              dragY.setValue(0);
-            }
+            // Adjust drag offset to prevent visual jump
+            const offsetAdjustment = (targetIndex - draggedIndex!) * itemHeight;
+            dragY.setValue(gestureState.dy - offsetAdjustment);
           }
         }
       },
@@ -561,24 +572,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         const currentRoutines = isWeekly ? weeklyRoutines : dailyRoutines;
         updateRoutineOrder(currentRoutines);
 
-        // Reset drag state
+        // Reset all drag state
         setDraggedIndex(null);
+        setOriginalIndex(null);
+        setLastSwapIndex(null);
         setIsDragging(false);
-        setScrollEnabled(true); // Re-enable page scrolling
+        setScrollEnabled(true);
 
         Animated.spring(dragY, {
           toValue: 0,
           useNativeDriver: true,
-          tension: 150,
-          friction: 8,
+          tension: 120,
+          friction: 7,
         }).start();
       },
 
       onPanResponderTerminate: () => {
         console.log("Drag terminated");
         setDraggedIndex(null);
+        setOriginalIndex(null);
+        setLastSwapIndex(null);
         setIsDragging(false);
-        setScrollEnabled(true); // Re-enable page scrolling
+        setScrollEnabled(true);
 
         Animated.spring(dragY, {
           toValue: 0,
@@ -769,6 +784,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Ionicons name="time" size={16} color="#666" />
               <Text style={styles.weekTimerText}>{weekTimeRemaining}</Text>
             </View>
+            <TouchableOpacity
+              onPress={addWeeklyRoutine}
+              style={styles.addButton}
+            >
+              <Ionicons name="add" size={20} color="#007AFF" />
+            </TouchableOpacity>
           </View>
 
           {weeklyRoutines.length === 0 ? (
