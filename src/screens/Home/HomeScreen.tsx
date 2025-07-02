@@ -9,6 +9,9 @@ import {
   RefreshControl,
   Alert,
   Modal,
+  FlatList,
+  PanGestureHandler,
+  State,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
@@ -391,16 +394,79 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     navigation.navigate("AddRoutine", { selectedDay });
   };
 
+  const updateRoutineOrder = async (routines: RoutineWithCompletion[]) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Update sort_order for each routine based on new position
+      const updates = routines.map((routine, index) => ({
+        id: routine.id,
+        sort_order: index + 1,
+      }));
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from("user_routines")
+          .update({ sort_order: update.sort_order })
+          .eq("id", update.id);
+
+        if (error) throw error;
+      }
+
+      // Reload data to reflect changes
+      await loadData();
+    } catch (error) {
+      console.error("Error updating routine order:", error);
+      Alert.alert("Error", "Failed to update routine order");
+    }
+  };
+
+  const moveRoutineUp = (index: number, isWeekly: boolean) => {
+    if (index === 0) return; // Already at top
+
+    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
+    const [movedItem] = routines.splice(index, 1);
+    routines.splice(index - 1, 0, movedItem);
+
+    if (isWeekly) {
+      setWeeklyRoutines(routines);
+    } else {
+      setDailyRoutines(routines);
+    }
+
+    updateRoutineOrder(routines);
+  };
+
+  const moveRoutineDown = (index: number, isWeekly: boolean) => {
+    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
+    if (index === routines.length - 1) return; // Already at bottom
+
+    const [movedItem] = routines.splice(index, 1);
+    routines.splice(index + 1, 0, movedItem);
+
+    if (isWeekly) {
+      setWeeklyRoutines(routines);
+    } else {
+      setDailyRoutines(routines);
+    }
+
+    updateRoutineOrder(routines);
+  };
+
   const renderRoutineItem = (
     routine: RoutineWithCompletion,
-    isWeekly: boolean
+    isWeekly: boolean,
+    index: number
   ) => (
-    <TouchableOpacity
-      key={routine.id}
-      style={styles.routineItem}
-      onPress={() => toggleRoutineCompletion(routine, isWeekly)}
-    >
-      <View style={styles.routineContent}>
+    <View key={routine.id} style={styles.routineItem}>
+      <TouchableOpacity
+        style={styles.routineContent}
+        onPress={() => toggleRoutineCompletion(routine, isWeekly)}
+        activeOpacity={0.7}
+      >
         <View style={styles.routineLeft}>
           <View
             style={[
@@ -433,11 +499,51 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             )}
           </View>
         </View>
-        {routine.icon && (
-          <Ionicons name={routine.icon as any} size={24} color="#666" />
-        )}
+      </TouchableOpacity>
+
+      {/* Drag Handle */}
+      <View style={styles.dragHandle}>
+        <TouchableOpacity
+          onPress={() => moveRoutineUp(index, isWeekly)}
+          style={[styles.dragButton, index === 0 && styles.dragButtonDisabled]}
+          disabled={index === 0}
+        >
+          <Ionicons
+            name="chevron-up"
+            size={16}
+            color={index === 0 ? "#ccc" : "#666"}
+          />
+        </TouchableOpacity>
+
+        <View style={styles.dragIcon}>
+          <View style={styles.dragLine} />
+          <View style={styles.dragLine} />
+          <View style={styles.dragLine} />
+        </View>
+
+        <TouchableOpacity
+          onPress={() => moveRoutineDown(index, isWeekly)}
+          style={[
+            styles.dragButton,
+            index === (isWeekly ? weeklyRoutines : dailyRoutines).length - 1 &&
+              styles.dragButtonDisabled,
+          ]}
+          disabled={
+            index === (isWeekly ? weeklyRoutines : dailyRoutines).length - 1
+          }
+        >
+          <Ionicons
+            name="chevron-down"
+            size={16}
+            color={
+              index === (isWeekly ? weeklyRoutines : dailyRoutines).length - 1
+                ? "#ccc"
+                : "#666"
+            }
+          />
+        </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -525,7 +631,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </Text>
             </View>
           ) : (
-            dailyRoutines.map((routine) => renderRoutineItem(routine, false))
+            dailyRoutines.map((routine, index) =>
+              renderRoutineItem(routine, false, index)
+            )
           )}
         </View>
 
@@ -550,7 +658,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </Text>
             </View>
           ) : (
-            weeklyRoutines.map((routine) => renderRoutineItem(routine, true))
+            weeklyRoutines.map((routine, index) =>
+              renderRoutineItem(routine, true, index)
+            )
           )}
         </View>
       </ScrollView>
@@ -626,9 +736,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingLeft: 16,
+    paddingRight: 12,
     backgroundColor: "#f8f9fa",
     borderRadius: 12,
+    flex: 1,
   },
   routineLeft: {
     flexDirection: "row",
@@ -742,6 +854,31 @@ const styles = StyleSheet.create({
   },
   dayBoxIndicatorActive: {
     backgroundColor: "#34c759",
+  },
+  // Drag and Drop Styles
+  dragHandle: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  dragButton: {
+    padding: 4,
+  },
+  dragButtonDisabled: {
+    opacity: 0.3,
+  },
+  dragIcon: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 4,
+  },
+  dragLine: {
+    width: 16,
+    height: 2,
+    backgroundColor: "#666",
+    marginVertical: 1,
+    borderRadius: 1,
   },
 });
 
