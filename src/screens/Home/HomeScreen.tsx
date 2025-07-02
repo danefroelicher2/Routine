@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   View,
   Text,
@@ -9,11 +15,10 @@ import {
   RefreshControl,
   Alert,
   Modal,
+  Animated,
+  PanResponder,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import DraggableFlatList, {
-  RenderItemParams,
-} from "react-native-draggable-flatlist";
 import { supabase } from "../../services/supabase";
 import { UserRoutine } from "../../types/database";
 
@@ -42,6 +47,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     Record<number, string[]>
   >({});
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const dragY = useRef(new Animated.Value(0)).current;
 
   // Days of the week
   const daysOfWeek = [
@@ -421,76 +430,186 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  const onDragEnd = useCallback(
-    (data: RoutineWithCompletion[], isWeekly: boolean) => {
-      if (isWeekly) {
-        setWeeklyRoutines(data);
-      } else {
-        setDailyRoutines(data);
-      }
-      updateRoutineOrder(data);
-    },
-    []
-  );
+  const moveRoutineUp = (index: number, isWeekly: boolean) => {
+    if (index === 0) return; // Already at top
+
+    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
+    const [movedItem] = routines.splice(index, 1);
+    routines.splice(index - 1, 0, movedItem);
+
+    if (isWeekly) {
+      setWeeklyRoutines(routines);
+    } else {
+      setDailyRoutines(routines);
+    }
+
+    updateRoutineOrder(routines);
+  };
+
+  const moveRoutineDown = (index: number, isWeekly: boolean) => {
+    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
+    if (index === routines.length - 1) return; // Already at bottom
+
+    const [movedItem] = routines.splice(index, 1);
+    routines.splice(index + 1, 0, movedItem);
+
+    if (isWeekly) {
+      setWeeklyRoutines(routines);
+    } else {
+      setDailyRoutines(routines);
+    }
+
+    updateRoutineOrder(routines);
+  };
+
+  const moveRoutineToPosition = (
+    fromIndex: number,
+    toIndex: number,
+    isWeekly: boolean
+  ) => {
+    if (fromIndex === toIndex) return;
+
+    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
+    const [movedItem] = routines.splice(fromIndex, 1);
+    routines.splice(toIndex, 0, movedItem);
+
+    if (isWeekly) {
+      setWeeklyRoutines(routines);
+    } else {
+      setDailyRoutines(routines);
+    }
+
+    updateRoutineOrder(routines);
+  };
+
+  const createPanResponder = (index: number, isWeekly: boolean) => {
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+
+      onPanResponderGrant: () => {
+        console.log("Drag started for index:", index);
+        setDraggedIndex(index);
+        setIsDragging(true);
+        dragY.setValue(0);
+      },
+
+      onPanResponderMove: (evt, gestureState) => {
+        console.log("Dragging with dy:", gestureState.dy);
+        dragY.setValue(gestureState.dy);
+      },
+
+      onPanResponderRelease: (evt, gestureState) => {
+        console.log("Drag ended with final dy:", gestureState.dy);
+        const routines = isWeekly ? weeklyRoutines : dailyRoutines;
+        const itemHeight = 80; // Approximate height of each routine item
+        const movement = Math.round(gestureState.dy / itemHeight);
+        const newIndex = Math.max(
+          0,
+          Math.min(routines.length - 1, index + movement)
+        );
+
+        console.log("Moving from index", index, "to index", newIndex);
+
+        if (newIndex !== index) {
+          moveRoutineToPosition(index, newIndex, isWeekly);
+        }
+
+        // Reset drag state
+        setDraggedIndex(null);
+        setIsDragging(false);
+        Animated.spring(dragY, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+
+      onPanResponderTerminate: () => {
+        // Reset drag state if gesture is terminated
+        setDraggedIndex(null);
+        setIsDragging(false);
+        Animated.spring(dragY, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+    });
+  };
 
   const renderRoutineItem = (
-    { item: routine, drag, isActive }: RenderItemParams<RoutineWithCompletion>,
-    isWeekly: boolean
-  ) => (
-    <TouchableOpacity
-      style={[styles.routineItem, isActive && styles.routineItemDragging]}
-      onPress={() => toggleRoutineCompletion(routine, isWeekly)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.routineContent}>
-        <View style={styles.routineLeft}>
-          <View
-            style={[
-              styles.checkbox,
-              routine.isCompleted && styles.checkboxCompleted,
-            ]}
+    routine: RoutineWithCompletion,
+    isWeekly: boolean,
+    index: number
+  ) => {
+    const panResponder = createPanResponder(index, isWeekly);
+    const isBeingDragged = draggedIndex === index;
+
+    return (
+      <Animated.View
+        key={routine.id}
+        style={[
+          styles.routineItem,
+          isBeingDragged && styles.routineItemDragging,
+          isBeingDragged && {
+            transform: [{ translateY: dragY }],
+            zIndex: 1000,
+          },
+        ]}
+      >
+        <View style={styles.routineContent}>
+          <TouchableOpacity
+            style={styles.routineLeft}
+            onPress={() =>
+              !isDragging && toggleRoutineCompletion(routine, isWeekly)
+            }
+            activeOpacity={isDragging ? 1 : 0.7}
           >
-            {routine.isCompleted && (
-              <Ionicons name="checkmark" size={16} color="#fff" />
-            )}
-          </View>
-          <View style={styles.routineInfo}>
-            <Text
+            <View
               style={[
-                styles.routineName,
-                routine.isCompleted && styles.routineNameCompleted,
+                styles.checkbox,
+                routine.isCompleted && styles.checkboxCompleted,
               ]}
             >
-              {routine.name}
-            </Text>
-            {routine.description && (
-              <Text style={styles.routineDescription}>
-                {routine.description}
+              {routine.isCompleted && (
+                <Ionicons name="checkmark" size={16} color="#fff" />
+              )}
+            </View>
+            <View style={styles.routineInfo}>
+              <Text
+                style={[
+                  styles.routineName,
+                  routine.isCompleted && styles.routineNameCompleted,
+                ]}
+              >
+                {routine.name}
               </Text>
-            )}
-            {routine.target_value && routine.target_unit && (
-              <Text style={styles.routineTarget}>
-                Target: {routine.target_value} {routine.target_unit}
-              </Text>
-            )}
+              {routine.description && (
+                <Text style={styles.routineDescription}>
+                  {routine.description}
+                </Text>
+              )}
+              {routine.target_value && routine.target_unit && (
+                <Text style={styles.routineTarget}>
+                  Target: {routine.target_value} {routine.target_unit}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          {/* Drag Handle - Separate from main touch area */}
+          <View style={styles.dragHandle} {...panResponder.panHandlers}>
+            <View style={styles.dragIcon}>
+              <View style={styles.dragLine} />
+              <View style={styles.dragLine} />
+              <View style={styles.dragLine} />
+            </View>
           </View>
         </View>
-
-        {/* Drag Handle */}
-        <TouchableOpacity
-          style={styles.dragHandle}
-          onLongPress={drag}
-          delayLongPress={100}
-        >
-          <View style={styles.dragIcon}>
-            <View style={styles.dragLine} />
-            <View style={styles.dragLine} />
-            <View style={styles.dragLine} />
-          </View>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+      </Animated.View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -577,13 +696,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </Text>
             </View>
           ) : (
-            <DraggableFlatList
-              data={dailyRoutines}
-              renderItem={(params) => renderRoutineItem(params, false)}
-              keyExtractor={(item) => item.id}
-              onDragEnd={({ data }) => onDragEnd(data, false)}
-              scrollEnabled={false}
-            />
+            dailyRoutines.map((routine, index) =>
+              renderRoutineItem(routine, false, index)
+            )
           )}
         </View>
 
@@ -608,13 +723,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </Text>
             </View>
           ) : (
-            <DraggableFlatList
-              data={weeklyRoutines}
-              renderItem={(params) => renderRoutineItem(params, true)}
-              keyExtractor={(item) => item.id}
-              onDragEnd={({ data }) => onDragEnd(data, true)}
-              scrollEnabled={false}
-            />
+            weeklyRoutines.map((routine, index) =>
+              renderRoutineItem(routine, true, index)
+            )
           )}
         </View>
       </ScrollView>
@@ -694,7 +805,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.25,
     shadowRadius: 8,
-    transform: [{ scale: 1.02 }],
+    backgroundColor: "#fff",
   },
   routineContent: {
     flexDirection: "row",
