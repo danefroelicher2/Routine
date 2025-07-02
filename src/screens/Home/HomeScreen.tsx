@@ -493,12 +493,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     updateRoutineOrder(routines);
   };
 
-  // FIXED: Modified createPanResponder to track which section is being dragged
+  // FIXED: Real-time drag with section constraints
   const createPanResponder = (index: number, isWeekly: boolean) => {
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return isDragging || Math.abs(gestureState.dy) > 5;
+        return Math.abs(gestureState.dy) > 5;
       },
       onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
@@ -506,87 +506,87 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       },
 
       onPanResponderGrant: (evt, gestureState) => {
-        console.log("Drag started for index:", index, "isWeekly:", isWeekly);
+        console.log(
+          "Starting drag for",
+          isWeekly ? "weekly" : "daily",
+          "routine at index:",
+          index
+        );
         setDraggedIndex(index);
         setOriginalIndex(index);
-        setLastSwapIndex(index);
         setIsDragging(true);
         setScrollEnabled(false);
-        // FIXED: Track which section is being dragged
         setDraggedSection(isWeekly ? "weekly" : "daily");
         dragY.setValue(0);
       },
 
       onPanResponderMove: (evt, gestureState) => {
-        if (isDragging && draggedSection === (isWeekly ? "weekly" : "daily")) {
-          dragY.setValue(gestureState.dy);
+        if (!isDragging || draggedSection !== (isWeekly ? "weekly" : "daily")) {
+          return;
+        }
 
-          const routines = isWeekly ? weeklyRoutines : dailyRoutines;
-          const itemHeight = 76;
-          const swapThreshold = itemHeight * 0.6; // More forgiving threshold
+        const routines = isWeekly ? weeklyRoutines : dailyRoutines;
+        const itemHeight = 76;
 
-          // Calculate which position we should be at based on drag distance
-          let targetIndex = originalIndex!;
+        // FIXED: Constrain drag movement within section bounds
+        const maxUpMovement = -(originalIndex! * itemHeight);
+        const maxDownMovement =
+          (routines.length - 1 - originalIndex!) * itemHeight;
+        const constrainedDy = Math.max(
+          maxUpMovement,
+          Math.min(maxDownMovement, gestureState.dy)
+        );
 
-          if (gestureState.dy > swapThreshold) {
-            // Dragging down - calculate how many items we've passed
-            targetIndex = Math.min(
-              routines.length - 1,
-              originalIndex! + Math.floor(gestureState.dy / itemHeight)
-            );
-          } else if (gestureState.dy < -swapThreshold) {
-            // Dragging up - calculate how many items we've passed
-            targetIndex = Math.max(
-              0,
-              originalIndex! + Math.ceil(gestureState.dy / itemHeight)
-            );
+        dragY.setValue(constrainedDy);
+
+        // FIXED: Real-time position calculation and swapping
+        const positionsToMove = Math.round(constrainedDy / itemHeight);
+        const newIndex = Math.max(
+          0,
+          Math.min(routines.length - 1, originalIndex! + positionsToMove)
+        );
+
+        // Only reorder if we've moved to a different position
+        if (newIndex !== draggedIndex && newIndex !== originalIndex) {
+          console.log(
+            `Real-time swap: moving from ${draggedIndex} to ${newIndex}`
+          );
+
+          const newRoutines = [...routines];
+          const [draggedItem] = newRoutines.splice(draggedIndex!, 1);
+          newRoutines.splice(newIndex, 0, draggedItem);
+
+          // FIXED: Update state immediately for real-time feedback
+          if (isWeekly) {
+            setWeeklyRoutines(newRoutines);
+          } else {
+            setDailyRoutines(newRoutines);
           }
 
-          // Only update if we've moved to a new position and it's different from last swap
-          if (
-            targetIndex !== lastSwapIndex &&
-            targetIndex !== draggedIndex &&
-            targetIndex >= 0 &&
-            targetIndex < routines.length
-          ) {
-            console.log(`Swapping from ${draggedIndex} to ${targetIndex}`);
-
-            const updatedRoutines = [...routines];
-            const [movedItem] = updatedRoutines.splice(draggedIndex!, 1);
-            updatedRoutines.splice(targetIndex, 0, movedItem);
-
-            if (isWeekly) {
-              setWeeklyRoutines(updatedRoutines);
-            } else {
-              setDailyRoutines(updatedRoutines);
-            }
-
-            // Update tracking indices
-            setDraggedIndex(targetIndex);
-            setLastSwapIndex(targetIndex);
-
-            // Adjust drag offset to prevent visual jump
-            const offsetAdjustment = (targetIndex - draggedIndex!) * itemHeight;
-            dragY.setValue(gestureState.dy - offsetAdjustment);
-          }
+          // Update tracking
+          setDraggedIndex(newIndex);
         }
       },
 
       onPanResponderRelease: (evt, gestureState) => {
-        console.log("Drag ended");
+        if (!isDragging || draggedSection !== (isWeekly ? "weekly" : "daily")) {
+          return;
+        }
 
-        // Save the current order to database
+        console.log("Drag ended - saving to database");
+
+        // FIXED: Save final order to database
         const currentRoutines = isWeekly ? weeklyRoutines : dailyRoutines;
         updateRoutineOrder(currentRoutines);
 
-        // FIXED: Reset all drag state including section tracking
+        // Reset drag state
         setDraggedIndex(null);
         setOriginalIndex(null);
-        setLastSwapIndex(null);
         setIsDragging(false);
         setScrollEnabled(true);
         setDraggedSection(null);
 
+        // Animate back to rest position
         Animated.spring(dragY, {
           toValue: 0,
           useNativeDriver: true,
@@ -597,10 +597,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       onPanResponderTerminate: () => {
         console.log("Drag terminated");
-        // FIXED: Reset all drag state including section tracking
+
+        // Reset everything
         setDraggedIndex(null);
         setOriginalIndex(null);
-        setLastSwapIndex(null);
         setIsDragging(false);
         setScrollEnabled(true);
         setDraggedSection(null);
@@ -760,9 +760,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Ionicons name="today" size={24} color="#007AFF" />
-            <Text style={styles.sectionTitle}>
-              {daysOfWeek.find((d) => d.value === selectedDay)?.name} Routines
-            </Text>
+            {/* FIXED: Use same layout structure as weekly goals for consistency */}
+            <View style={styles.dailyRoutinesHeaderContainer}>
+              <Text style={styles.sectionTitle}>
+                {daysOfWeek.find((d) => d.value === selectedDay)?.name} Routines
+              </Text>
+            </View>
+            {/* FIXED: Plus icon separated on the far right */}
             <TouchableOpacity
               onPress={addRoutineToDay}
               style={styles.addButton}
@@ -875,6 +879,13 @@ const styles = StyleSheet.create({
   },
   // FIXED: New container for Weekly Goals header layout
   weeklyGoalsHeaderContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginLeft: 8,
+  },
+  // FIXED: New container for Daily Routines header layout (same as weekly)
+  dailyRoutinesHeaderContainer: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
