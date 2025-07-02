@@ -11,6 +11,9 @@ import {
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import DraggableFlatList, {
+  RenderItemParams,
+} from "react-native-draggable-flatlist";
 import { supabase } from "../../services/supabase";
 import { UserRoutine } from "../../types/database";
 
@@ -412,55 +415,30 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         if (error) throw error;
       }
-
-      // Reload data to reflect changes
-      await loadData();
     } catch (error) {
       console.error("Error updating routine order:", error);
       Alert.alert("Error", "Failed to update routine order");
     }
   };
 
-  const moveRoutineUp = (index: number, isWeekly: boolean) => {
-    if (index === 0) return; // Already at top
-
-    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
-    const [movedItem] = routines.splice(index, 1);
-    routines.splice(index - 1, 0, movedItem);
-
-    if (isWeekly) {
-      setWeeklyRoutines(routines);
-    } else {
-      setDailyRoutines(routines);
-    }
-
-    updateRoutineOrder(routines);
-  };
-
-  const moveRoutineDown = (index: number, isWeekly: boolean) => {
-    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
-    if (index === routines.length - 1) return; // Already at bottom
-
-    const [movedItem] = routines.splice(index, 1);
-    routines.splice(index + 1, 0, movedItem);
-
-    if (isWeekly) {
-      setWeeklyRoutines(routines);
-    } else {
-      setDailyRoutines(routines);
-    }
-
-    updateRoutineOrder(routines);
-  };
+  const onDragEnd = useCallback(
+    (data: RoutineWithCompletion[], isWeekly: boolean) => {
+      if (isWeekly) {
+        setWeeklyRoutines(data);
+      } else {
+        setDailyRoutines(data);
+      }
+      updateRoutineOrder(data);
+    },
+    []
+  );
 
   const renderRoutineItem = (
-    routine: RoutineWithCompletion,
-    isWeekly: boolean,
-    index: number
+    { item: routine, drag, isActive }: RenderItemParams<RoutineWithCompletion>,
+    isWeekly: boolean
   ) => (
     <TouchableOpacity
-      key={routine.id}
-      style={styles.routineItem}
+      style={[styles.routineItem, isActive && styles.routineItemDragging]}
       onPress={() => toggleRoutineCompletion(routine, isWeekly)}
       activeOpacity={0.7}
     >
@@ -498,17 +476,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Inline Drag Handle */}
+        {/* Drag Handle */}
         <TouchableOpacity
           style={styles.dragHandle}
-          onLongPress={() => {
-            // TODO: Start drag functionality
-            Alert.alert(
-              "Drag",
-              "Long press detected - drag functionality coming soon!"
-            );
-          }}
-          onPress={(e) => e.stopPropagation()} // Prevent routine completion when touching drag handle
+          onLongPress={drag}
+          delayLongPress={100}
         >
           <View style={styles.dragIcon}>
             <View style={styles.dragLine} />
@@ -605,9 +577,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </Text>
             </View>
           ) : (
-            dailyRoutines.map((routine, index) =>
-              renderRoutineItem(routine, false, index)
-            )
+            <DraggableFlatList
+              data={dailyRoutines}
+              renderItem={(params) => renderRoutineItem(params, false)}
+              keyExtractor={(item) => item.id}
+              onDragEnd={({ data }) => onDragEnd(data, false)}
+              scrollEnabled={false}
+            />
           )}
         </View>
 
@@ -632,9 +608,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </Text>
             </View>
           ) : (
-            weeklyRoutines.map((routine, index) =>
-              renderRoutineItem(routine, true, index)
-            )
+            <DraggableFlatList
+              data={weeklyRoutines}
+              renderItem={(params) => renderRoutineItem(params, true)}
+              keyExtractor={(item) => item.id}
+              onDragEnd={({ data }) => onDragEnd(data, true)}
+              scrollEnabled={false}
+            />
           )}
         </View>
       </ScrollView>
@@ -704,6 +684,17 @@ const styles = StyleSheet.create({
   },
   routineItem: {
     marginBottom: 12,
+  },
+  routineItemDragging: {
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    transform: [{ scale: 1.02 }],
   },
   routineContent: {
     flexDirection: "row",
