@@ -304,7 +304,6 @@ const styles = StyleSheet.create({
     color: "#333",
     lineHeight: 20,
     fontStyle: "italic",
-    numberOfLines: 3,
   },
   // END NEW quote styles
 
