@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Alert,
   Dimensions,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -185,8 +186,6 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
       </Text>
     </TouchableOpacity>
   );
-
-  const renderSeparator = () => <View style={styles.separator} />;
 
   const renderEmpty = () => (
     <View style={styles.emptyState}>
