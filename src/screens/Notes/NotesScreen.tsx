@@ -199,6 +199,34 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     </TouchableOpacity>
   );
 
+  const renderNoteCard = (note: Note) => (
+    <TouchableOpacity onPress={() => openNote(note)} style={styles.noteCard}>
+      <View style={styles.noteCardHeader}>
+        <Text style={styles.noteCardTitle} numberOfLines={1}>
+          {note.title || "Untitled"}
+        </Text>
+        <View style={styles.noteCardActions}>
+          <TouchableOpacity
+            onPress={() => {
+              /* Handle pin toggle */
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons
+              name={note.is_pinned ? "star" : "star-outline"}
+              size={16}
+              color={note.is_pinned ? "#ffb347" : "#666"}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <Text style={styles.noteCardDate}>
+        {formatDate(note.updated_at)} {getPreviewText(note.content || "")}
+      </Text>
+    </TouchableOpacity>
+  );
+
   const renderSeparator = () => <View style={styles.separator} />;
 
   const renderEmpty = () => (
@@ -225,27 +253,53 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
       </View>
 
       <FlatList
-        data={[...pinnedNotes, ...regularNotes]}
-        renderItem={renderNote}
+        data={notes}
+        renderItem={({ item }) => renderNote(item)}
         keyExtractor={(item) => item.id}
-        ItemSeparatorComponent={renderSeparator}
-        ListEmptyComponent={renderEmpty}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         contentContainerStyle={
           notes.length === 0 ? styles.emptyContainer : styles.listContainer
         }
-        ListHeaderComponent={() =>
-          pinnedNotes.length > 0 && regularNotes.length > 0 ? (
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Pinned</Text>
-            </View>
-          ) : null
-        }
-        stickyHeaderIndices={
-          pinnedNotes.length > 0 && regularNotes.length > 0 ? [0] : []
-        }
+        ListHeaderComponent={() => (
+          <View>
+            {/* Pinned Section */}
+            {pinnedNotes.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Pinned</Text>
+                <View style={styles.sectionContent}>
+                  {pinnedNotes.map((note, index) => (
+                    <View key={note.id}>
+                      {renderNoteCard(note)}
+                      {index < pinnedNotes.length - 1 && (
+                        <View style={styles.noteSeparator} />
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Recent Section */}
+            {regularNotes.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Recent</Text>
+                <View style={styles.sectionContent}>
+                  {regularNotes.map((note, index) => (
+                    <View key={note.id}>
+                      {renderNoteCard(note)}
+                      {index < regularNotes.length - 1 && (
+                        <View style={styles.noteSeparator} />
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+        ListEmptyComponent={renderEmpty}
       />
 
       {/* Floating Add Button - MOVED TO BOTTOM RIGHT */}
@@ -262,18 +316,18 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#000",
   },
   // NEW: Quote container styles
   quoteContainer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#000",
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
+    borderBottomColor: "#2c2c2e",
   },
   quoteBox: {
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#1c1c1e",
     borderLeftWidth: 4,
     borderLeftColor: "#007AFF",
     paddingHorizontal: 16,
@@ -283,18 +337,66 @@ const styles = StyleSheet.create({
   },
   quoteText: {
     fontSize: 16,
-    color: "#333",
+    color: "#fff",
     lineHeight: 24,
     fontStyle: "italic",
   },
   // END NEW quote styles
 
   listContainer: {
-    paddingVertical: 10,
+    paddingVertical: 0,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
+  },
+  section: {
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 16,
+    marginLeft: 20,
+  },
+  sectionContent: {
+    backgroundColor: "#2c2c2e",
+    marginHorizontal: 20,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  noteCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#2c2c2e",
+  },
+  noteCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  noteCardTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#fff",
+    marginRight: 12,
+  },
+  noteCardActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  noteCardDate: {
+    fontSize: 15,
+    color: "#8e8e93",
+    lineHeight: 20,
+  },
+  noteSeparator: {
+    height: 1,
+    backgroundColor: "#3c3c3e",
+    marginLeft: 16,
   },
   sectionHeader: {
     backgroundColor: "#f8f9fa",
@@ -302,12 +404,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#e9ecef",
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#666",
-    textTransform: "uppercase",
   },
   noteItem: {
     paddingHorizontal: 20,
