@@ -373,7 +373,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     paddingVertical: 16,
     minHeight: 400,
-    paddingBottom: 150, // Extra padding to keep text visible above keyboard
   },
   changeIndicator: {
     position: "absolute",
