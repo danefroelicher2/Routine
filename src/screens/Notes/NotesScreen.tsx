@@ -235,7 +235,9 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
       {/* Daily Quote Section - NEW */}
       <View style={styles.quoteContainer}>
         <View style={styles.quoteBox}>
-          <Text style={styles.quoteText}>{dailyQuote}</Text>
+          <Text style={styles.quoteText} numberOfLines={3} ellipsizeMode="tail">
+            {dailyQuote}
+          </Text>
         </View>
       </View>
 
@@ -282,29 +284,27 @@ const styles = StyleSheet.create({
   // NEW: Quote container styles
   quoteContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 12,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e9ecef",
   },
   quoteBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
     backgroundColor: "#f8f9fa",
     borderLeftWidth: 4,
     borderLeftColor: "#007AFF",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderRadius: 8,
-    marginVertical: 4,
+    marginVertical: 2,
   },
   quoteText: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     color: "#333",
-    lineHeight: 22,
+    lineHeight: 20,
     fontStyle: "italic",
-    maxHeight: 66, // 3 lines max (22 * 3)
+    numberOfLines: 3,
   },
   // END NEW quote styles
 
