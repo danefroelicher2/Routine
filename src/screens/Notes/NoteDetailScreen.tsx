@@ -215,8 +215,8 @@ export default function NoteDetailScreen({
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        behavior={Platform.OS === "ios" ? "position" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
         {/* UPDATED: Single header with Notes navigation and action buttons */}
         <View style={styles.header}>
