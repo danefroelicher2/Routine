@@ -254,7 +254,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
 
       <FlatList
         data={notes}
-        renderItem={({ item }) => renderNote(item)}
+        renderItem={renderNote}
         keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
