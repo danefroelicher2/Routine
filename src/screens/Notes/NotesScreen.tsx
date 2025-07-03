@@ -15,53 +15,38 @@ import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../services/supabase";
 import { Note } from "../../types/database";
 
-// Daily quotes array - includes your quotes plus additional similar ones
+// Daily quotes array - shorter quotes that fit well on mobile
 const DAILY_QUOTES = [
-  // Original quotes from your images (shortened for 3 lines max)
-  "Is it Important to you",
+  "Is it important to you",
   "Always ask questions",
-  "Your vision in life is key. Giraffes eat at the top as that's where they see",
+  "Your vision in life is key",
   "Love yours",
   "If it takes less than a minute, do it immediately",
-  "Early to bed, early to rise, makes a man young wealthy and wise",
+  "Early to bed, early to rise",
   "Action is the foundation, learning is the supplementation",
   "Be a good person. Be kind to others",
   "Never raise your voice",
-  "The man who blames others has a long way to go, the man who blames himself is halfway there",
+  "The man who blames no one has already arrived",
   "Do not make promises you do not intend to keep",
-  "Be a good listener, encourage others to talk about themselves",
+  "Be a good listener",
   "Become genuinely interested in other people",
   "Smile",
-  "The great pyramids were older to the Romans than the Romans are to us",
-  "When faced with a decision, flip a coin. In the air, you know which choice you're hoping for",
+  "When faced with a decision, flip a coin",
   "Look people in the eyes",
-  "If you are distressed by anything external, the pain is not the thing itself, but your estimation of it",
-  "As you are now, so once were they, as they are now, so shall you be",
   "Meditate. Find your peace",
-  "If I asked people what they want they would've said faster horses",
-  "Victory came to those who made the rules and imposed them on the enemy",
-
-  // Additional similar motivational/philosophical quotes (3 lines max)
-  "Success is not final, failure is not fatal: it is the courage to continue that counts",
-  "The best time to plant a tree was 20 years ago. The second best time is now",
-  "You are never too old to set another goal or to dream a new dream",
-  "The only way to do great work is to love what you do",
-  "It is during our darkest moments that we must focus to see the light",
-  "Believe you can and you're halfway there",
-  "The future belongs to those who believe in the beauty of their dreams",
-  "In the middle of difficulty lies opportunity",
-  "Life is what happens while you're busy making other plans",
-  "The only impossible journey is the one you never begin",
-  "What lies behind us and before us are tiny matters compared to what lies within us",
-  "Be yourself; everyone else is already taken",
-  "Two things are infinite: the universe and human stupidity",
-  "A room without books is like a body without a soul",
-  "The only thing we have to fear is fear itself",
-  "It takes courage to grow up and become who you really are",
-  "Life isn't about finding yourself. Life is about creating yourself",
-  "The way to get started is to quit talking and begin doing",
-  "Innovation distinguishes between a leader and a follower",
   "Stay hungry, stay foolish",
+  "The best time to plant a tree was 20 years ago",
+  "You are never too old to dream a new dream",
+  "The only way to do great work is to love what you do",
+  "Believe you can and you're halfway there",
+  "In the middle of difficulty lies opportunity",
+  "The only impossible journey is the one you never begin",
+  "Be yourself; everyone else is already taken",
+  "The only thing we have to fear is fear itself",
+  "Life is about creating yourself",
+  "Innovation distinguishes between a leader and a follower",
+  "Success is the courage to continue",
+  "What lies within us matters most",
 ];
 
 interface NotesScreenProps {
@@ -235,9 +220,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
       {/* Daily Quote Section - NEW */}
       <View style={styles.quoteContainer}>
         <View style={styles.quoteBox}>
-          <Text style={styles.quoteText} numberOfLines={3} ellipsizeMode="tail">
-            {dailyQuote}
-          </Text>
+          <Text style={styles.quoteText}>{dailyQuote}</Text>
         </View>
       </View>
 
@@ -284,7 +267,7 @@ const styles = StyleSheet.create({
   // NEW: Quote container styles
   quoteContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 16,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e9ecef",
@@ -294,15 +277,14 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: "#007AFF",
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 14,
     borderRadius: 8,
-    marginVertical: 2,
+    marginVertical: 4,
   },
   quoteText: {
-    flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     color: "#333",
-    lineHeight: 20,
+    lineHeight: 24,
     fontStyle: "italic",
   },
   // END NEW quote styles
