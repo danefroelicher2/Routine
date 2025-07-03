@@ -43,6 +43,14 @@ export default function NoteDetailScreen({
   const titleInputRef = useRef<TextInput>(null);
   const contentInputRef = useRef<TextInput>(null);
 
+  // Handle content input focus to ensure it's visible
+  const handleContentFocus = () => {
+    // Small delay to let keyboard animation start
+    setTimeout(() => {
+      contentInputRef.current?.focus();
+    }, 100);
+  };
+
   useEffect(() => {
     if (isNew && titleInputRef.current) {
       titleInputRef.current.focus();
@@ -196,6 +204,7 @@ export default function NoteDetailScreen({
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
         {/* UPDATED: Single header with Notes navigation and action buttons */}
         <View style={styles.header}>
@@ -244,7 +253,11 @@ export default function NoteDetailScreen({
           style={styles.content}
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={() => Keyboard.dismiss()}
+          onMomentumScrollBegin={() => Keyboard.dismiss()}
+          onScroll={() => Keyboard.dismiss()}
+          scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
+          keyboardDismissMode="on-drag"
         >
           <TextInput
             ref={titleInputRef}
@@ -264,8 +277,10 @@ export default function NoteDetailScreen({
             placeholderTextColor="#999"
             value={content}
             onChangeText={setContent}
+            onFocus={handleContentFocus}
             multiline
             textAlignVertical="top"
+            scrollEnabled={false}
           />
         </ScrollView>
 
@@ -346,6 +361,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     paddingVertical: 16,
     minHeight: 200,
+    paddingBottom: 100, // Extra padding to keep text visible above keyboard
   },
   changeIndicator: {
     position: "absolute",
