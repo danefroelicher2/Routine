@@ -121,6 +121,22 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     });
   };
 
+  const togglePinNote = async (note: Note) => {
+    try {
+      const { error } = await supabase
+        .from("notes")
+        .update({ is_pinned: !note.is_pinned })
+        .eq("id", note.id);
+
+      if (error) throw error;
+
+      await fetchNotes();
+    } catch (error) {
+      console.error("Error toggling pin:", error);
+      Alert.alert("Error", "Failed to update note");
+    }
+  };
+
   const deleteNote = async (note: Note) => {
     Alert.alert("Delete Note", "Are you sure you want to delete this note?", [
       { text: "Cancel", style: "cancel" },
