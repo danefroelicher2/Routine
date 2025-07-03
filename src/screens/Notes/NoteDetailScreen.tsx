@@ -42,12 +42,30 @@ export default function NoteDetailScreen({
 
   const titleInputRef = useRef<TextInput>(null);
   const contentInputRef = useRef<TextInput>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  // Handle content input focus to ensure it's visible
+  // Handle scrolling - disconnect cursor and dismiss keyboard
+  const handleScroll = () => {
+    Keyboard.dismiss();
+    // Blur both inputs to disconnect cursor
+    titleInputRef.current?.blur();
+    contentInputRef.current?.blur();
+  };
+
+  // Handle content input focus to ensure it's visible above keyboard
   const handleContentFocus = () => {
-    // Small delay to let keyboard animation start
+    // Small delay to let keyboard animation start, then scroll to keep cursor visible
     setTimeout(() => {
-      contentInputRef.current?.focus();
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 300);
+  };
+
+  // Handle content change - auto-scroll to follow typing
+  const handleContentChange = (text: string) => {
+    setContent(text);
+    // Auto-scroll to bottom when typing to keep cursor visible
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: false });
     }, 100);
   };
 
@@ -204,7 +222,7 @@ export default function NoteDetailScreen({
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         {/* UPDATED: Single header with Notes navigation and action buttons */}
         <View style={styles.header}>
@@ -250,14 +268,12 @@ export default function NoteDetailScreen({
         </View>
 
         <ScrollView
+          ref={scrollViewRef}
           style={styles.content}
           keyboardShouldPersistTaps="handled"
-          onScrollBeginDrag={() => Keyboard.dismiss()}
-          onMomentumScrollBegin={() => Keyboard.dismiss()}
-          onScroll={() => Keyboard.dismiss()}
-          scrollEventThrottle={16}
+          onScrollBeginDrag={handleScroll}
+          onMomentumScrollBegin={handleScroll}
           showsVerticalScrollIndicator={false}
-          keyboardDismissMode="on-drag"
         >
           <TextInput
             ref={titleInputRef}
@@ -276,7 +292,7 @@ export default function NoteDetailScreen({
             placeholder="Start writing..."
             placeholderTextColor="#999"
             value={content}
-            onChangeText={setContent}
+            onChangeText={handleContentChange}
             onFocus={handleContentFocus}
             multiline
             textAlignVertical="top"
@@ -360,8 +376,8 @@ const styles = StyleSheet.create({
     color: "#333",
     lineHeight: 24,
     paddingVertical: 16,
-    minHeight: 200,
-    paddingBottom: 100, // Extra padding to keep text visible above keyboard
+    minHeight: 400,
+    paddingBottom: 150, // Extra padding to keep text visible above keyboard
   },
   changeIndicator: {
     position: "absolute",
