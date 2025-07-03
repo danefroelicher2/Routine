@@ -17,7 +17,7 @@ import { Note } from "../../types/database";
 
 // Daily quotes array - includes your quotes plus additional similar ones
 const DAILY_QUOTES = [
-  // Original quotes from your images
+  // Original quotes from your images (shortened for 3 lines max)
   "Is it Important to you",
   "Always ask questions",
   "Your vision in life is key. Giraffes eat at the top as that's where they see",
@@ -27,21 +27,21 @@ const DAILY_QUOTES = [
   "Action is the foundation, learning is the supplementation",
   "Be a good person. Be kind to others",
   "Never raise your voice",
-  "The man who blames others has a long way in his journey to go, the man who blames himself is halfway there, and the man who blames no one has already arrived",
-  "Do not make promises, with yourself or others, you do not intend to keep",
+  "The man who blames others has a long way to go, the man who blames himself is halfway there",
+  "Do not make promises you do not intend to keep",
   "Be a good listener, encourage others to talk about themselves",
   "Become genuinely interested in other people",
   "Smile",
-  "The great pyramids were older to the Roman's, than the Roman's are to us",
-  "When faced with a decision, flip a coin. There's a split second while it's in the air, you know which choice you're hoping for",
+  "The great pyramids were older to the Romans than the Romans are to us",
+  "When faced with a decision, flip a coin. In the air, you know which choice you're hoping for",
   "Look people in the eyes",
-  "If you are distressed by anything external, the pain is not due to the thing itself, but your estimation of it",
+  "If you are distressed by anything external, the pain is not the thing itself, but your estimation of it",
   "As you are now, so once were they, as they are now, so shall you be",
   "Meditate. Find your peace",
   "If I asked people what they want they would've said faster horses",
-  "Victory did not come forth those who played by the rules; it came to the ones who made the rules and imposed them on his enemy",
+  "Victory came to those who made the rules and imposed them on the enemy",
 
-  // Additional similar motivational/philosophical quotes
+  // Additional similar motivational/philosophical quotes (3 lines max)
   "Success is not final, failure is not fatal: it is the courage to continue that counts",
   "The best time to plant a tree was 20 years ago. The second best time is now",
   "You are never too old to set another goal or to dream a new dream",
@@ -50,11 +50,11 @@ const DAILY_QUOTES = [
   "Believe you can and you're halfway there",
   "The future belongs to those who believe in the beauty of their dreams",
   "In the middle of difficulty lies opportunity",
-  "Life is what happens to you while you're busy making other plans",
+  "Life is what happens while you're busy making other plans",
   "The only impossible journey is the one you never begin",
-  "What lies behind us and what lies before us are tiny matters compared to what lies within us",
+  "What lies behind us and before us are tiny matters compared to what lies within us",
   "Be yourself; everyone else is already taken",
-  "Two things are infinite: the universe and human stupidity; and I'm not sure about the universe",
+  "Two things are infinite: the universe and human stupidity",
   "A room without books is like a body without a soul",
   "The only thing we have to fear is fear itself",
   "It takes courage to grow up and become who you really are",
@@ -235,12 +235,6 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
       {/* Daily Quote Section - NEW */}
       <View style={styles.quoteContainer}>
         <View style={styles.quoteBox}>
-          <Ionicons
-            name="chatbubble-outline"
-            size={20}
-            color="#007AFF"
-            style={styles.quoteIcon}
-          />
           <Text style={styles.quoteText}>{dailyQuote}</Text>
         </View>
       </View>
@@ -304,16 +298,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginVertical: 4,
   },
-  quoteIcon: {
-    marginRight: 12,
-    marginTop: 2,
-  },
   quoteText: {
     flex: 1,
     fontSize: 16,
     color: "#333",
     lineHeight: 22,
     fontStyle: "italic",
+    maxHeight: 66, // 3 lines max (22 * 3)
   },
   // END NEW quote styles
 
