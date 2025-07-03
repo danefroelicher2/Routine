@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,8 +11,9 @@ import {
   Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../services/supabase";
+import { Note } from "../../types/database";
 
 // Daily quotes array - includes your quotes plus additional similar ones
 const DAILY_QUOTES = [
@@ -63,19 +64,11 @@ const DAILY_QUOTES = [
   "Stay hungry, stay foolish",
 ];
 
-interface Note {
-  id: string;
-  title: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-  is_pinned: boolean;
-  is_locked: boolean;
-  user_id: string;
+interface NotesScreenProps {
+  navigation: any;
 }
 
-export default function NotesScreen() {
-  const navigation = useNavigation();
+export default function NotesScreen({ navigation }: NotesScreenProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [dailyQuote, setDailyQuote] = useState("");
@@ -117,7 +110,7 @@ export default function NotesScreen() {
   };
 
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       fetchNotes();
     }, [])
   );
@@ -131,19 +124,14 @@ export default function NotesScreen() {
   const createNewNote = () => {
     navigation.navigate("NoteDetail", {
       isNew: true,
-      onSave: () => {
-        fetchNotes();
-      },
+      onSave: fetchNotes,
     });
   };
 
   const openNote = (note: Note) => {
     navigation.navigate("NoteDetail", {
       note,
-      isNew: false,
-      onSave: () => {
-        fetchNotes();
-      },
+      onSave: fetchNotes,
     });
   };
 
