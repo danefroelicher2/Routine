@@ -158,47 +158,6 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     return content.replace(/\n/g, " ").trim().substring(0, 100);
   };
 
-  const renderNote = ({ item: note }: { item: Note }) => (
-    <TouchableOpacity onPress={() => openNote(note)}>
-      <View style={styles.noteItem}>
-        <View style={styles.noteContent}>
-          <View style={styles.noteHeader}>
-            <Text style={styles.noteTitle} numberOfLines={1}>
-              {note.title || "Untitled"}
-            </Text>
-            <View style={styles.noteActions}>
-              <TouchableOpacity
-                onPress={() => {
-                  /* Handle pin toggle */
-                }}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={note.is_pinned ? "star" : "star-outline"}
-                  size={16}
-                  color={note.is_pinned ? "#ffb347" : "#666"}
-                  style={styles.noteIcon}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => deleteNote(note)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="trash-outline" size={16} color="#ff6b6b" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <Text style={styles.notePreview} numberOfLines={2}>
-            {getPreviewText(note.content || "")}
-          </Text>
-
-          <Text style={styles.noteDate}>{formatDate(note.updated_at)}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-
   const renderNoteCard = (note: Note) => (
     <TouchableOpacity onPress={() => openNote(note)} style={styles.noteCard}>
       <View style={styles.noteCardHeader}>
@@ -252,55 +211,51 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
         </View>
       </View>
 
-      <FlatList
-        data={notes}
-        renderItem={renderNote}
-        keyExtractor={(item) => item.id}
+      <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         contentContainerStyle={
           notes.length === 0 ? styles.emptyContainer : styles.listContainer
         }
-        ListHeaderComponent={() => (
-          <View>
-            {/* Pinned Section */}
-            {pinnedNotes.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Pinned</Text>
-                <View style={styles.sectionContent}>
-                  {pinnedNotes.map((note, index) => (
-                    <View key={note.id}>
-                      {renderNoteCard(note)}
-                      {index < pinnedNotes.length - 1 && (
-                        <View style={styles.noteSeparator} />
-                      )}
-                    </View>
-                  ))}
+      >
+        {/* Pinned Section */}
+        {pinnedNotes.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Pinned</Text>
+            <View style={styles.sectionContent}>
+              {pinnedNotes.map((note, index) => (
+                <View key={note.id}>
+                  {renderNoteCard(note)}
+                  {index < pinnedNotes.length - 1 && (
+                    <View style={styles.noteSeparator} />
+                  )}
                 </View>
-              </View>
-            )}
-
-            {/* Recent Section */}
-            {regularNotes.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Recent</Text>
-                <View style={styles.sectionContent}>
-                  {regularNotes.map((note, index) => (
-                    <View key={note.id}>
-                      {renderNoteCard(note)}
-                      {index < regularNotes.length - 1 && (
-                        <View style={styles.noteSeparator} />
-                      )}
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
+              ))}
+            </View>
           </View>
         )}
-        ListEmptyComponent={renderEmpty}
-      />
+
+        {/* Recent Section */}
+        {regularNotes.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recent</Text>
+            <View style={styles.sectionContent}>
+              {regularNotes.map((note, index) => (
+                <View key={note.id}>
+                  {renderNoteCard(note)}
+                  {index < regularNotes.length - 1 && (
+                    <View style={styles.noteSeparator} />
+                  )}
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Empty State */}
+        {notes.length === 0 && renderEmpty()}
+      </ScrollView>
 
       {/* Floating Add Button - MOVED TO BOTTOM RIGHT */}
       <TouchableOpacity
@@ -404,49 +359,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#e9ecef",
-  },
-  noteItem: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
-  },
-  noteContent: {
-    flex: 1,
-  },
-  noteHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 6,
-  },
-  noteTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginRight: 10,
-  },
-  noteActions: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  noteIcon: {
-    marginLeft: 12,
-  },
-  notePreview: {
-    fontSize: 14,
-    color: "#666",
-    lineHeight: 20,
-    marginBottom: 6,
-  },
-  noteDate: {
-    fontSize: 12,
-    color: "#999",
-  },
-  separator: {
-    height: 1,
-    backgroundColor: "#f0f0f0",
-    marginLeft: 20,
   },
   emptyState: {
     alignItems: "center",
