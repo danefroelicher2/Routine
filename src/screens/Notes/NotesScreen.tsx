@@ -176,7 +176,11 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
   };
 
   const renderNoteCard = (note: Note) => (
-    <TouchableOpacity onPress={() => openNote(note)} style={styles.noteCard}>
+    <TouchableOpacity
+      onPress={() => openNote(note)}
+      style={styles.noteCard}
+      activeOpacity={0.7}
+    >
       <View style={styles.noteCardHeader}>
         <Text style={styles.noteCardTitle} numberOfLines={1}>
           {note.title || "Untitled"}
