@@ -54,19 +54,13 @@ export default function NoteDetailScreen({
 
   // Handle content input focus to ensure it's visible above keyboard
   const handleContentFocus = () => {
-    // Small delay to let keyboard animation start, then scroll to keep cursor visible
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 300);
+    // Only scroll if needed, not aggressive auto-scroll
   };
 
-  // Handle content change - auto-scroll to follow typing
+  // Handle content change - only scroll if cursor would be hidden by keyboard
   const handleContentChange = (text: string) => {
     setContent(text);
-    // Auto-scroll to bottom when typing to keep cursor visible
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: false });
-    }, 100);
+    // Don't auto-scroll on every change - let natural behavior handle it
   };
 
   useEffect(() => {
@@ -292,8 +286,10 @@ export default function NoteDetailScreen({
             placeholder="Start writing..."
             placeholderTextColor="#999"
             value={content}
-            onChangeText={handleContentChange}
-            onFocus={handleContentFocus}
+            onChangeText={setContent}
+            onFocus={() => {
+              /* Natural keyboard behavior */
+            }}
             multiline
             textAlignVertical="top"
             scrollEnabled={false}
