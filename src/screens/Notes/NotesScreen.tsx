@@ -236,7 +236,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
       <View style={styles.quoteContainer}>
         <View style={styles.quoteBox}>
           <Ionicons
-            name="quote"
+            name="chatbubble-outline"
             size={20}
             color="#007AFF"
             style={styles.quoteIcon}
