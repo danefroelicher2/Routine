@@ -43,24 +43,18 @@ interface PasswordModalProps {
   onSetPassword: (password: string) => void;
 }
 
-// Password Setup Modal Component
+// FIXED: Simplified Password Setup Modal - Single password input only
 const PasswordModal: React.FC<PasswordModalProps> = ({
   visible,
   onClose,
   onSetPassword,
 }) => {
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleSetPassword = () => {
     if (!password.trim()) {
       Alert.alert("Error", "Please enter a password");
-      return;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
       return;
     }
     if (password.length < 4) {
@@ -69,9 +63,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
     }
     onSetPassword(password);
     setPassword("");
-    setConfirmPassword("");
     setShowPassword(false);
-    setShowConfirmPassword(false);
   };
 
   return (
@@ -96,7 +88,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
             Create a password to lock this note
           </Text>
 
-          {/* Password Input */}
+          {/* FIXED: Single password input only */}
           <View style={styles.passwordInputContainer}>
             <TextInput
               style={styles.passwordInput}
@@ -106,6 +98,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
+              autoFocus
             />
             <TouchableOpacity
               style={styles.eyeButton}
@@ -113,29 +106,6 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
             >
               <Ionicons
                 name={showPassword ? "eye" : "eye-off"}
-                size={20}
-                color="#666"
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* Confirm Password Input */}
-          <View style={styles.passwordInputContainer}>
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="Confirm password"
-              placeholderTextColor="#999"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={!showConfirmPassword}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity
-              style={styles.eyeButton}
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              <Ionicons
-                name={showConfirmPassword ? "eye" : "eye-off"}
                 size={20}
                 color="#666"
               />
@@ -200,6 +170,7 @@ export default function NoteDetailScreen({
   const [title, setTitle] = useState(note?.title || "");
   const [content, setContent] = useState(note?.content || "");
   const [isLocked, setIsLocked] = useState(note?.is_locked || false);
+  const [isUnlocked, setIsUnlocked] = useState(!note?.is_locked); // FIXED: Track if note is currently unlocked
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
@@ -234,16 +205,18 @@ export default function NoteDetailScreen({
     );
   }, [title, content, isLocked, note]);
 
-  // ENHANCED: Auto-save functionality - saves after 1 second of inactivity
+  // Auto-save functionality - only when note is unlocked
   useEffect(() => {
+    if (!isUnlocked) return; // Don't auto-save when locked
+
     const saveTimer = setTimeout(() => {
       if (hasChanges && (title.trim() || content.trim())) {
         handleSave(false); // Silent auto-save
       }
-    }, 1000); // Reduced to 1 second for faster auto-save like iOS Notes
+    }, 1000);
 
     return () => clearTimeout(saveTimer);
-  }, [title, content, hasChanges]);
+  }, [title, content, hasChanges, isUnlocked]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("beforeRemove", (e: any) => {
@@ -270,17 +243,18 @@ export default function NoteDetailScreen({
     return unsubscribe;
   }, [navigation, hasChanges]);
 
-  // ENHANCED: Face ID and Password Lock functionality
+  // FIXED: Handle lock/unlock toggle from header button
   const handleLockToggle = async () => {
-    if (isLocked) {
-      // Unlock the note
+    if (isLocked && !isUnlocked) {
+      // Note is locked, try to unlock it
       await unlockNote();
-    } else {
-      // Lock the note - show modal to choose method
+    } else if (isUnlocked) {
+      // Note is unlocked, lock it
       setShowLockModal(true);
     }
   };
 
+  // FIXED: Unified unlock function for both unlock button and header button
   const unlockNote = async () => {
     try {
       // First try to get the stored password for this note
@@ -299,8 +273,7 @@ export default function NoteDetailScreen({
               text: "Unlock",
               onPress: async (inputPassword) => {
                 if (inputPassword === storedPassword) {
-                  await updateNoteLockStatus(false);
-                  setIsLocked(false);
+                  setIsUnlocked(true);
                 } else {
                   Alert.alert("Error", "Incorrect password");
                 }
@@ -317,8 +290,7 @@ export default function NoteDetailScreen({
         });
 
         if (result.success) {
-          await updateNoteLockStatus(false);
-          setIsLocked(false);
+          setIsUnlocked(true);
         } else {
           Alert.alert("Authentication Failed", "Could not unlock note");
         }
@@ -357,6 +329,7 @@ export default function NoteDetailScreen({
 
         await updateNoteLockStatus(true);
         setIsLocked(true);
+        setIsUnlocked(false);
         setShowLockModal(false);
         Alert.alert("Success", "Note locked with biometric authentication");
       }
@@ -383,6 +356,7 @@ export default function NoteDetailScreen({
 
       await updateNoteLockStatus(true);
       setIsLocked(true);
+      setIsUnlocked(false);
       setShowPasswordModal(false);
       Alert.alert("Success", "Note locked with password");
     } catch (error) {
@@ -502,6 +476,22 @@ export default function NoteDetailScreen({
     ]);
   };
 
+  // FIXED: Show unlock screen when note is locked and not unlocked
+  const renderUnlockScreen = () => (
+    <View style={styles.unlockContainer}>
+      <Ionicons name="lock-closed" size={64} color="#007AFF" />
+      <Text style={styles.unlockTitle}>Note is Locked</Text>
+      <Text style={styles.unlockSubtitle}>
+        This note is protected. Unlock to view its contents.
+      </Text>
+
+      <TouchableOpacity style={styles.unlockButton} onPress={unlockNote}>
+        <Ionicons name="lock-open" size={20} color="#fff" />
+        <Text style={styles.unlockButtonText}>Unlock Note</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -509,7 +499,7 @@ export default function NoteDetailScreen({
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        {/* UPDATED: Header without Save button - Auto-save only */}
+        {/* Header - always visible */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity
@@ -527,61 +517,70 @@ export default function NoteDetailScreen({
               onPress={handleLockToggle}
             >
               <Ionicons
-                name={isLocked ? "lock-closed" : "lock-open-outline"}
+                name={
+                  isLocked && !isUnlocked ? "lock-closed" : "lock-open-outline"
+                }
                 size={20}
                 color="#007AFF"
               />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.headerActionButton}
-              onPress={handleDelete}
-            >
-              <Ionicons name="trash-outline" size={20} color="#ff6b6b" />
-            </TouchableOpacity>
+            {/* Only show delete button if note is unlocked */}
+            {isUnlocked && (
+              <TouchableOpacity
+                style={styles.headerActionButton}
+                onPress={handleDelete}
+              >
+                <Ionicons name="trash-outline" size={20} color="#ff6b6b" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.content}
-          keyboardShouldPersistTaps="handled"
-          onScrollBeginDrag={handleScroll}
-          onMomentumScrollBegin={handleScroll}
-          showsVerticalScrollIndicator={false}
-        >
-          <TextInput
-            ref={titleInputRef}
-            style={styles.titleInput}
-            placeholder="Title"
-            placeholderTextColor="#999"
-            value={title}
-            onChangeText={setTitle}
-            returnKeyType="next"
-            onSubmitEditing={() => contentInputRef.current?.focus()}
-          />
+        {/* FIXED: Conditional rendering - unlock screen OR note content */}
+        {isLocked && !isUnlocked ? (
+          renderUnlockScreen()
+        ) : (
+          <>
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.content}
+              keyboardShouldPersistTaps="handled"
+              onScrollBeginDrag={handleScroll}
+              onMomentumScrollBegin={handleScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              <TextInput
+                ref={titleInputRef}
+                style={styles.titleInput}
+                placeholder="Title"
+                placeholderTextColor="#999"
+                value={title}
+                onChangeText={setTitle}
+                returnKeyType="next"
+                onSubmitEditing={() => contentInputRef.current?.focus()}
+              />
 
-          <TextInput
-            ref={contentInputRef}
-            style={styles.contentInput}
-            placeholder="Start writing..."
-            placeholderTextColor="#999"
-            value={content}
-            onChangeText={handleContentChange}
-            onFocus={() => {
-              /* Natural keyboard behavior */
-            }}
-            multiline
-            textAlignVertical="top"
-            scrollEnabled={false}
-          />
-        </ScrollView>
+              <TextInput
+                ref={contentInputRef}
+                style={styles.contentInput}
+                placeholder="Start writing..."
+                placeholderTextColor="#999"
+                value={content}
+                onChangeText={handleContentChange}
+                multiline
+                textAlignVertical="top"
+                scrollEnabled={false}
+              />
+            </ScrollView>
 
-        {/* ENHANCED: Better auto-save indicator */}
-        {saving && (
-          <View style={styles.savingIndicator}>
-            <Text style={styles.savingIndicatorText}>Saving...</Text>
-          </View>
+            {/* Auto-save indicator */}
+            {saving && (
+              <View style={styles.savingIndicator}>
+                <Text style={styles.savingIndicatorText}>Saving...</Text>
+              </View>
+            )}
+          </>
         )}
       </KeyboardAvoidingView>
 
@@ -672,6 +671,51 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "500",
+  },
+  // FIXED: Unlock Screen Styles
+  unlockContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 40,
+    backgroundColor: "#fff",
+  },
+  unlockTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#333",
+    marginTop: 24,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  unlockSubtitle: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 32,
+  },
+  unlockButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#007AFF",
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 25,
+    shadowColor: "#007AFF",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  unlockButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "600",
+    marginLeft: 8,
   },
   // Lock Modal Styles
   overlayContainer: {
