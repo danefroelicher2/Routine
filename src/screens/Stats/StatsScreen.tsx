@@ -56,30 +56,46 @@ export default function StatsScreen() {
       const firstDay = new Date(year, month, 1);
       const lastDay = new Date(year, month + 1, 0);
 
-      // UPDATED: Get both completions and total routines for success tracking
-      const [completionsResult, routinesResult] = await Promise.all([
-        // Get completions for the month
-        supabase
-          .from("routine_completions")
-          .select("completion_date, routine_id")
-          .eq("user_id", user.id)
-          .gte("completion_date", firstDay.toISOString().split("T")[0])
-          .lte("completion_date", lastDay.toISOString().split("T")[0]),
-        // Get all active routines for the user
-        supabase
-          .from("routines")
-          .select("id, days, is_weekly")
-          .eq("user_id", user.id)
-          .eq("is_active", true),
-      ]);
+      // FIXED: Get both completions and user routines (not "routines" table)
+      const [completionsResult, userRoutinesResult, dayRoutinesResult] =
+        await Promise.all([
+          // Get completions for the month
+          supabase
+            .from("routine_completions")
+            .select("completion_date, routine_id")
+            .eq("user_id", user.id)
+            .gte("completion_date", firstDay.toISOString().split("T")[0])
+            .lte("completion_date", lastDay.toISOString().split("T")[0]),
+          // Get all active user routines
+          supabase
+            .from("user_routines")
+            .select("id, is_weekly")
+            .eq("user_id", user.id),
+          // Get day-specific routine assignments
+          supabase
+            .from("user_day_routines")
+            .select("routine_id, day_of_week")
+            .eq("user_id", user.id),
+        ]);
 
       if (completionsResult.error) throw completionsResult.error;
-      if (routinesResult.error) throw routinesResult.error;
+      if (userRoutinesResult.error) throw userRoutinesResult.error;
+      if (dayRoutinesResult.error) throw dayRoutinesResult.error;
 
       const completions = completionsResult.data || [];
-      const routines = routinesResult.data || [];
+      const userRoutines = userRoutinesResult.data || [];
+      const dayAssignments = dayRoutinesResult.data || [];
 
-      // UPDATED: Process success data (all routines completed = success)
+      // FIXED: Build day-specific routines mapping
+      const dayRoutineMap: Record<number, string[]> = {};
+      dayAssignments.forEach((assignment) => {
+        if (!dayRoutineMap[assignment.day_of_week]) {
+          dayRoutineMap[assignment.day_of_week] = [];
+        }
+        dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
+      });
+
+      // UPDATED: Process success data using the correct table structure
       const successData: CompletionData[] = [];
 
       for (
@@ -90,12 +106,11 @@ export default function StatsScreen() {
         const dateStr = d.toISOString().split("T")[0];
         const dayOfWeek = d.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
-        // Get routines that should be active on this day
-        const dailyRoutines = routines.filter(
+        // Get routines that should be active on this day (daily routines only)
+        const dailyRoutineIds = dayRoutineMap[dayOfWeek] || [];
+        const dailyRoutines = userRoutines.filter(
           (routine) =>
-            !routine.is_weekly &&
-            routine.days &&
-            routine.days.includes(dayOfWeek)
+            !routine.is_weekly && dailyRoutineIds.includes(routine.id)
         );
 
         // Get completions for this date
@@ -131,27 +146,33 @@ export default function StatsScreen() {
 
   const calculateStreaks = async (userId: string) => {
     try {
-      // UPDATED: Get all completions and routines for success-based streak calculation
-      const [completionsResult, routinesResult] = await Promise.all([
-        supabase
-          .from("routine_completions")
-          .select("completion_date, routine_id")
-          .eq("user_id", userId)
-          .order("completion_date", { ascending: false }),
-        supabase
-          .from("routines")
-          .select("id, days, is_weekly")
-          .eq("user_id", userId)
-          .eq("is_active", true),
-      ]);
+      // FIXED: Get all completions and user routines for success-based streak calculation
+      const [completionsResult, userRoutinesResult, dayRoutinesResult] =
+        await Promise.all([
+          supabase
+            .from("routine_completions")
+            .select("completion_date, routine_id")
+            .eq("user_id", userId)
+            .order("completion_date", { ascending: false }),
+          supabase
+            .from("user_routines")
+            .select("id, is_weekly")
+            .eq("user_id", userId),
+          supabase
+            .from("user_day_routines")
+            .select("routine_id, day_of_week")
+            .eq("user_id", userId),
+        ]);
 
       if (completionsResult.error) throw completionsResult.error;
-      if (routinesResult.error) throw routinesResult.error;
+      if (userRoutinesResult.error) throw userRoutinesResult.error;
+      if (dayRoutinesResult.error) throw dayRoutinesResult.error;
 
       const completions = completionsResult.data || [];
-      const routines = routinesResult.data || [];
+      const userRoutines = userRoutinesResult.data || [];
+      const dayAssignments = dayRoutinesResult.data || [];
 
-      if (completions.length === 0 || routines.length === 0) {
+      if (completions.length === 0 || userRoutines.length === 0) {
         setCurrentStreak(0);
         setLongestStreak({
           length: 0,
@@ -161,6 +182,15 @@ export default function StatsScreen() {
         });
         return;
       }
+
+      // FIXED: Build day-specific routines mapping
+      const dayRoutineMap: Record<number, string[]> = {};
+      dayAssignments.forEach((assignment) => {
+        if (!dayRoutineMap[assignment.day_of_week]) {
+          dayRoutineMap[assignment.day_of_week] = [];
+        }
+        dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
+      });
 
       // UPDATED: Create success days map (days where ALL routines were completed)
       const successDays = new Set<string>();
@@ -178,11 +208,10 @@ export default function StatsScreen() {
       // Check each date to see if all routines were completed
       completionsByDate.forEach((completedRoutineIds, date) => {
         const dayOfWeek = new Date(date).getDay();
-        const dailyRoutines = routines.filter(
+        const dailyRoutineIds = dayRoutineMap[dayOfWeek] || [];
+        const dailyRoutines = userRoutines.filter(
           (routine) =>
-            !routine.is_weekly &&
-            routine.days &&
-            routine.days.includes(dayOfWeek)
+            !routine.is_weekly && dailyRoutineIds.includes(routine.id)
         );
 
         // If all daily routines were completed, mark as success day
