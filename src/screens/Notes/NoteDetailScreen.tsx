@@ -286,13 +286,19 @@ export default function NoteDetailScreen({
         // This note was locked with biometric authentication
         const result = await LocalAuthentication.authenticateAsync({
           promptMessage: "Unlock note with Face ID or Touch ID",
-          fallbackLabel: "Use password instead",
+          disableDeviceFallback: true, // FIXED: Disable device passcode fallback
+          fallbackLabel: "", // FIXED: Remove fallback label
+          cancelLabel: "Cancel",
         });
 
         if (result.success) {
           setIsUnlocked(true);
         } else {
-          Alert.alert("Authentication Failed", "Could not unlock note");
+          // FIXED: Simplified error handling - just check if not successful
+          Alert.alert(
+            "Authentication Failed",
+            "Face ID authentication failed. Please try again."
+          );
         }
       }
     } catch (error) {
@@ -316,9 +322,12 @@ export default function NoteDetailScreen({
         return;
       }
 
+      // FIXED: Proper Face ID configuration - no fallback to device passcode
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: "Authenticate to lock this note",
-        fallbackLabel: "Use password instead",
+        disableDeviceFallback: true, // FIXED: Disable device passcode fallback
+        fallbackLabel: "", // FIXED: Remove fallback label to prevent passcode option
+        cancelLabel: "Cancel",
       });
 
       if (result.success) {
@@ -331,7 +340,13 @@ export default function NoteDetailScreen({
         setIsLocked(true);
         setIsUnlocked(false);
         setShowLockModal(false);
-        Alert.alert("Success", "Note locked with biometric authentication");
+        Alert.alert("Success", "Note locked with Face ID");
+      } else {
+        // FIXED: Simplified error handling - just check if not successful
+        Alert.alert(
+          "Authentication Failed",
+          "Face ID authentication failed. Please try again or use password instead."
+        );
       }
     } catch (error) {
       console.error("Error setting up Face ID lock:", error);
