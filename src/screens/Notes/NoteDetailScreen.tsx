@@ -286,10 +286,9 @@ export default function NoteDetailScreen({
         // This note was locked with biometric authentication
         console.log("Attempting Face ID unlock...");
 
+        // SIMPLIFIED: Try basic Face ID authentication
         const result = await LocalAuthentication.authenticateAsync({
           promptMessage: "Use Face ID to unlock this note",
-          disableDeviceFallback: true,
-          cancelLabel: "Cancel",
         });
 
         console.log("Face ID Unlock Result:", result);
@@ -311,41 +310,10 @@ export default function NoteDetailScreen({
 
   const lockWithFaceID = async () => {
     try {
-      // ENHANCED: Better Face ID availability checking
-      const isAvailable = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      const supportedTypes =
-        await LocalAuthentication.supportedAuthenticationTypesAsync();
-
-      console.log("Face ID Debug:", {
-        isAvailable,
-        isEnrolled,
-        supportedTypes,
-      });
-
-      if (!isAvailable) {
-        Alert.alert(
-          "Biometric Hardware Unavailable",
-          "This device does not support biometric authentication.",
-          [{ text: "OK" }]
-        );
-        return;
-      }
-
-      if (!isEnrolled) {
-        Alert.alert(
-          "Biometric Authentication Not Set Up",
-          "Please set up Face ID or Touch ID in your device settings first.",
-          [{ text: "OK" }]
-        );
-        return;
-      }
-
-      // FIXED: Try authentication with minimal configuration first
+      // SIMPLIFIED: Try the most basic Face ID configuration first
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: "Use Face ID to lock this note",
-        disableDeviceFallback: true,
-        cancelLabel: "Cancel",
+        // REMOVED: disableDeviceFallback - let's allow fallback for now to test
       });
 
       console.log("Face ID Result:", result);
@@ -366,11 +334,17 @@ export default function NoteDetailScreen({
         setShowLockModal(false);
         Alert.alert("Success", "Note locked with Face ID");
       } else {
-        // ENHANCED: More helpful error message
+        // If direct Face ID fails, try a different approach
         Alert.alert(
-          "Face ID Authentication Failed",
-          "Face ID authentication was not successful. Please try again or use the password option.",
-          [{ text: "OK" }]
+          "Face ID Setup",
+          "Would you like to try an alternative Face ID setup?",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Try Alternative",
+              onPress: () => tryAlternativeFaceID(),
+            },
+          ]
         );
       }
     } catch (error) {
@@ -379,6 +353,40 @@ export default function NoteDetailScreen({
         "Face ID Error",
         "There was an error with Face ID authentication. Please try using the password option instead."
       );
+    }
+  };
+
+  // NEW: Alternative Face ID approach using a different strategy
+  const tryAlternativeFaceID = async () => {
+    try {
+      // Try with minimal options - sometimes less is more
+      const result = await LocalAuthentication.authenticateAsync();
+
+      console.log("Alternative Face ID Result:", result);
+
+      if (result.success) {
+        if (note?.id) {
+          try {
+            await SecureStore.deleteItemAsync(`note_password_${note.id}`);
+          } catch (e) {
+            // Password didn't exist, that's fine
+          }
+        }
+
+        await updateNoteLockStatus(true);
+        setIsLocked(true);
+        setIsUnlocked(false);
+        setShowLockModal(false);
+        Alert.alert("Success", "Note locked with Face ID");
+      } else {
+        Alert.alert(
+          "Face ID Not Working",
+          "Face ID authentication is not working properly. Please use the password option instead."
+        );
+      }
+    } catch (error) {
+      console.error("Alternative Face ID Error:", error);
+      Alert.alert("Error", "Face ID setup failed. Please use password option.");
     }
   };
 
