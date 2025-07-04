@@ -284,20 +284,22 @@ export default function NoteDetailScreen({
         );
       } else {
         // This note was locked with biometric authentication
+        console.log("Attempting Face ID unlock...");
+
         const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: "Unlock note with Face ID or Touch ID",
-          disableDeviceFallback: true, // FIXED: Disable device passcode fallback
-          fallbackLabel: "", // FIXED: Remove fallback label
+          promptMessage: "Use Face ID to unlock this note",
+          disableDeviceFallback: true,
           cancelLabel: "Cancel",
         });
+
+        console.log("Face ID Unlock Result:", result);
 
         if (result.success) {
           setIsUnlocked(true);
         } else {
-          // FIXED: Simplified error handling - just check if not successful
           Alert.alert(
-            "Authentication Failed",
-            "Face ID authentication failed. Please try again."
+            "Face ID Authentication Failed",
+            "Face ID authentication was not successful. Please try again."
           );
         }
       }
@@ -309,31 +311,53 @@ export default function NoteDetailScreen({
 
   const lockWithFaceID = async () => {
     try {
-      // Check if biometric authentication is available
+      // ENHANCED: Better Face ID availability checking
       const isAvailable = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      const supportedTypes =
+        await LocalAuthentication.supportedAuthenticationTypesAsync();
 
-      if (!isAvailable || !isEnrolled) {
+      console.log("Face ID Debug:", {
+        isAvailable,
+        isEnrolled,
+        supportedTypes,
+      });
+
+      if (!isAvailable) {
         Alert.alert(
-          "Biometric Authentication Unavailable",
-          "Face ID or Touch ID is not set up on this device. Please use password instead.",
+          "Biometric Hardware Unavailable",
+          "This device does not support biometric authentication.",
           [{ text: "OK" }]
         );
         return;
       }
 
-      // FIXED: Proper Face ID configuration - no fallback to device passcode
+      if (!isEnrolled) {
+        Alert.alert(
+          "Biometric Authentication Not Set Up",
+          "Please set up Face ID or Touch ID in your device settings first.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
+      // FIXED: Try authentication with minimal configuration first
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Authenticate to lock this note",
-        disableDeviceFallback: true, // FIXED: Disable device passcode fallback
-        fallbackLabel: "", // FIXED: Remove fallback label to prevent passcode option
+        promptMessage: "Use Face ID to lock this note",
+        disableDeviceFallback: true,
         cancelLabel: "Cancel",
       });
+
+      console.log("Face ID Result:", result);
 
       if (result.success) {
         // Remove any existing password for this note
         if (note?.id) {
-          await SecureStore.deleteItemAsync(`note_password_${note.id}`);
+          try {
+            await SecureStore.deleteItemAsync(`note_password_${note.id}`);
+          } catch (e) {
+            // Password didn't exist, that's fine
+          }
         }
 
         await updateNoteLockStatus(true);
@@ -342,15 +366,19 @@ export default function NoteDetailScreen({
         setShowLockModal(false);
         Alert.alert("Success", "Note locked with Face ID");
       } else {
-        // FIXED: Simplified error handling - just check if not successful
+        // ENHANCED: More helpful error message
         Alert.alert(
-          "Authentication Failed",
-          "Face ID authentication failed. Please try again or use password instead."
+          "Face ID Authentication Failed",
+          "Face ID authentication was not successful. Please try again or use the password option.",
+          [{ text: "OK" }]
         );
       }
     } catch (error) {
-      console.error("Error setting up Face ID lock:", error);
-      Alert.alert("Error", "Failed to set up biometric lock");
+      console.error("Face ID Error:", error);
+      Alert.alert(
+        "Face ID Error",
+        "There was an error with Face ID authentication. Please try using the password option instead."
+      );
     }
   };
 
