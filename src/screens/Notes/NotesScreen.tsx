@@ -175,7 +175,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     return content.replace(/\n/g, " ").trim().substring(0, 100);
   };
 
-  // FIXED: Updated renderNoteCard function with lock indicator
+  // UPDATED: renderNoteCard with lock indicator
   const renderNoteCard = (note: Note) => (
     <TouchableOpacity
       onPress={() => openNote(note)}
@@ -194,10 +194,10 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
             </View>
           )}
 
-          {/* FIXED: Working pin/star button */}
+          {/* Working pin/star button */}
           <TouchableOpacity
             onPress={() => {
-              togglePinNote(note); // FIXED: Actually call the function
+              togglePinNote(note);
             }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -216,14 +216,6 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     </TouchableOpacity>
   );
 
-  // ADD this new style to your existing styles object:
-  const additionalStyles = {
-    lockIndicator: {
-      marginRight: 8, // Space between lock and star
-      opacity: 0.8,
-    },
-  };
-
   const renderEmpty = () => (
     <View style={styles.emptyState}>
       <Ionicons name="document-text-outline" size={64} color="#ccc" />
@@ -240,7 +232,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Daily Quote Section - NEW */}
+      {/* Daily Quote Section */}
       <View style={styles.quoteContainer}>
         <View style={styles.quoteBox}>
           <Text style={styles.quoteText}>{dailyQuote}</Text>
@@ -293,7 +285,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
         {notes.length === 0 && renderEmpty()}
       </ScrollView>
 
-      {/* Floating Add Button - MOVED TO BOTTOM RIGHT */}
+      {/* Floating Add Button */}
       <TouchableOpacity
         style={styles.floatingAddButton}
         onPress={createNewNote}
@@ -309,7 +301,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
-  // NEW: Quote container styles
+  // Quote container styles
   quoteContainer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -332,8 +324,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontStyle: "italic",
   },
-  // END NEW quote styles
-
   listContainer: {
     paddingVertical: 0,
   },
@@ -379,6 +369,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  // NEW: Lock indicator style
+  lockIndicator: {
+    marginRight: 8,
+    opacity: 0.8,
+  },
   noteCardDate: {
     fontSize: 15,
     color: "#8e8e93",
@@ -413,7 +408,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
   },
-  // NEW: Floating add button styles
+  // Floating add button styles
   floatingAddButton: {
     position: "absolute",
     bottom: 30,
