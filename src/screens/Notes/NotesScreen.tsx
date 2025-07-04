@@ -175,6 +175,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     return content.replace(/\n/g, " ").trim().substring(0, 100);
   };
 
+  // FIXED: Updated renderNoteCard function with working pin functionality
   const renderNoteCard = (note: Note) => (
     <TouchableOpacity
       onPress={() => openNote(note)}
@@ -188,7 +189,8 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
         <View style={styles.noteCardActions}>
           <TouchableOpacity
             onPress={() => {
-              /* Handle pin toggle */
+              // FIXED: Actually call the togglePinNote function instead of empty comment
+              togglePinNote(note);
             }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
