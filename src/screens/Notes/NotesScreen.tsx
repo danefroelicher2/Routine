@@ -175,7 +175,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     return content.replace(/\n/g, " ").trim().substring(0, 100);
   };
 
-  // FIXED: Updated renderNoteCard function with working pin functionality
+  // FIXED: Updated renderNoteCard function with lock indicator
   const renderNoteCard = (note: Note) => (
     <TouchableOpacity
       onPress={() => openNote(note)}
@@ -187,10 +187,17 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
           {note.title || "Untitled"}
         </Text>
         <View style={styles.noteCardActions}>
+          {/* NEW: Lock indicator - shows when note is locked, not clickable */}
+          {note.is_locked && (
+            <View style={styles.lockIndicator}>
+              <Ionicons name="lock-closed" size={14} color="#FF6B6B" />
+            </View>
+          )}
+
+          {/* FIXED: Working pin/star button */}
           <TouchableOpacity
             onPress={() => {
-              // FIXED: Actually call the togglePinNote function instead of empty comment
-              togglePinNote(note);
+              togglePinNote(note); // FIXED: Actually call the function
             }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -208,6 +215,14 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
       </Text>
     </TouchableOpacity>
   );
+
+  // ADD this new style to your existing styles object:
+  const additionalStyles = {
+    lockIndicator: {
+      marginRight: 8, // Space between lock and star
+      opacity: 0.8,
+    },
+  };
 
   const renderEmpty = () => (
     <View style={styles.emptyState}>
