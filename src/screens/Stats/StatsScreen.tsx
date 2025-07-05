@@ -54,9 +54,9 @@ export default function StatsScreen() {
   // NEW: Achievement state
   const [achievements, setAchievements] = useState<Achievement[]>([]);
 
-  // NEW: Achievement targets (in days)
+  // NEW: Achievement targets (in days) - 12 total achievements
   const ACHIEVEMENT_TARGETS = [
-    3, 5, 7, 14, 30, 60, 90, 120, 150, 200, 250, 300, 365,
+    3, 5, 7, 14, 30, 60, 100, 150, 200, 250, 300, 365,
   ];
 
   // ADDED: Load data when screen comes into focus (real-time updates)
@@ -628,8 +628,8 @@ export default function StatsScreen() {
   const renderAchievements = () => {
     const getBadgeDesign = (target: number, isUnlocked: boolean) => {
       // Define badge tiers with increasingly impressive designs
-      if (target <= 7) {
-        // Basic badges - simple circles with stars
+      if (target <= 30) {
+        // Starter badges - simple circles with stars (3, 5, 7, 14, 30 days)
         return {
           type: "basic",
           backgroundColor: isUnlocked ? "#10b981" : "#d1d5db",
@@ -642,8 +642,8 @@ export default function StatsScreen() {
           hasCrown: false,
           hasGems: false,
         };
-      } else if (target <= 30) {
-        // Shield badges with ribbons
+      } else if (target <= 150) {
+        // Builder badges with ribbons (60, 100, 150 days)
         return {
           type: "shield",
           backgroundColor: isUnlocked ? "#3b82f6" : "#d1d5db",
@@ -656,8 +656,8 @@ export default function StatsScreen() {
           hasCrown: false,
           hasGems: false,
         };
-      } else if (target <= 90) {
-        // Premium badges with wings
+      } else if (target <= 300) {
+        // Champion badges with wings (200, 250, 300 days)
         return {
           type: "premium",
           backgroundColor: isUnlocked ? "#8b5cf6" : "#d1d5db",
@@ -671,7 +671,7 @@ export default function StatsScreen() {
           hasGems: true,
         };
       } else {
-        // Ultimate badges with crown, wings, and gems
+        // Legend badges with crown, wings, and gems (365 days)
         return {
           type: "ultimate",
           backgroundColor: isUnlocked ? "#f59e0b" : "#d1d5db",
@@ -808,11 +808,11 @@ export default function StatsScreen() {
                         ]}
                       >
                         <Text style={styles.badgeRibbonText}>
-                          {achievement.target <= 7
+                          {achievement.target <= 30
                             ? "STARTER"
-                            : achievement.target <= 30
+                            : achievement.target <= 150
                             ? "BUILDER"
-                            : achievement.target <= 90
+                            : achievement.target <= 300
                             ? "CHAMPION"
                             : "LEGEND"}
                         </Text>
