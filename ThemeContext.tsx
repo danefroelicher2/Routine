@@ -5,7 +5,7 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
-import { supabase } from "../services/supabase";
+import { supabase } from "./src/services/supabase";
 
 interface ThemeColors {
   // Background colors

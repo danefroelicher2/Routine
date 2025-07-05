@@ -11,7 +11,7 @@ import "react-native-url-polyfill/auto";
 import { supabase } from "./src/services/supabase";
 
 // NEW: Theme Provider
-import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
+import { ThemeProvider, useTheme } from "./ThemeContext";
 
 // Auth Screens
 import LoginScreen from "./src/screens/Auth/LoginScreen";
