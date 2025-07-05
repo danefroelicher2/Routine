@@ -1004,12 +1004,13 @@ const styles = StyleSheet.create({
   },
   heatmapGrid: {
     alignItems: "center",
+    width: "100%", // Ensure full width
   },
   dayLabels: {
     flexDirection: "row",
     marginBottom: 10,
-    width: width - 80,
-    justifyContent: "space-between", // Added to ensure equal spacing
+    width: "100%", // Changed from width - 80 to 100%
+    paddingHorizontal: 0,
   },
   dayLabel: {
     flex: 1,
@@ -1017,17 +1018,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     fontWeight: "500",
-    minWidth: (width - 80) / 7, // Ensure each day gets equal width
   },
   calendarGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    width: width - 80,
+    width: "100%", // Changed from width - 80 to 100%
   },
   heatmapCell: {
-    width: (width - 80) / 7,
-    height: (width - 80) / 7,
-    margin: 1,
+    width: "14.28%", // 100% / 7 days = 14.28% per day
+    aspectRatio: 1, // Keep square cells
+    padding: 1,
   },
   heatmapDay: {
     flex: 1,
@@ -1119,14 +1119,14 @@ const styles = StyleSheet.create({
   achievementsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 8, // Reduced gap
+    gap: 8, // Smaller gap
   },
   achievementCard: {
-    width: (width - 88) / 3, // Fixed calculation: 3 cards per row, accounting for margins and gaps
+    width: "31%", // 3 cards per row: 31% each with gaps = ~100%
     borderRadius: 16,
     overflow: "hidden",
     position: "relative",
+    marginBottom: 8,
   },
   achievementCardUnlocked: {
     backgroundColor: "#f0fdf4",
