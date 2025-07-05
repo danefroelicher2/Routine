@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, View, StyleSheet } from "react-native";
+import { ActivityIndicator, View, StyleSheet, StatusBar } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -9,6 +9,9 @@ import "react-native-url-polyfill/auto";
 
 // Services
 import { supabase } from "./src/services/supabase";
+
+// NEW: Theme Provider
+import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 
 // Auth Screens
 import LoginScreen from "./src/screens/Auth/LoginScreen";
@@ -65,8 +68,20 @@ function NotesStack() {
 
 // Stack Navigator for Profile (includes settings) - HEADERS KEPT
 function ProfileStack() {
+  const { colors } = useTheme();
+
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: colors.surface,
+        },
+        headerTintColor: "#007AFF",
+        headerTitleStyle: {
+          color: colors.text,
+        },
+      }}
+    >
       <Stack.Screen
         name="ProfileMain"
         component={ProfileScreen}
@@ -96,8 +111,10 @@ function AuthStack() {
   );
 }
 
-// Main App Tabs
+// Main App Tabs with Theme
 function MainTabs() {
+  const { colors } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -119,7 +136,11 @@ function MainTabs() {
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: "#007AFF",
-        tabBarInactiveTintColor: "gray",
+        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+        },
         headerShown: false,
       })}
     >
@@ -131,9 +152,11 @@ function MainTabs() {
   );
 }
 
-export default function App() {
+// App Content (needs to be wrapped in ThemeProvider)
+function AppContent() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const { colors } = useTheme();
 
   useEffect(() => {
     // Get initial session
@@ -155,16 +178,36 @@ export default function App() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View
+        style={[
+          styles.loadingContainer,
+          { backgroundColor: colors.background },
+        ]}
+      >
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }
 
   return (
-    <NavigationContainer>
-      {session ? <MainTabs /> : <AuthStack />}
-    </NavigationContainer>
+    <>
+      <StatusBar
+        barStyle={colors.statusBar}
+        backgroundColor={colors.background}
+      />
+      <NavigationContainer>
+        {session ? <MainTabs /> : <AuthStack />}
+      </NavigationContainer>
+    </>
+  );
+}
+
+// Main App Component with ThemeProvider
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 
@@ -173,6 +216,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
   },
 });
