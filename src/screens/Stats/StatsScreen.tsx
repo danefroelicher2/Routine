@@ -156,17 +156,33 @@ export default function StatsScreen() {
 
   const calculateStreaks = async (userId: string) => {
     try {
-      // SIMPLIFIED: Let's use the same logic as the loadStatsData function that works for calendar
-      // Get all completion dates first and use simple completion-based streaks for now
-      const { data: completions, error } = await supabase
-        .from("routine_completions")
-        .select("completion_date")
-        .eq("user_id", userId)
-        .order("completion_date", { ascending: false });
+      // FIXED: Use the SAME success logic as the calendar (copy from loadStatsData)
+      const [completionsResult, userRoutinesResult, dayRoutinesResult] =
+        await Promise.all([
+          supabase
+            .from("routine_completions")
+            .select("completion_date, routine_id")
+            .eq("user_id", userId)
+            .order("completion_date", { ascending: false }),
+          supabase
+            .from("user_routines")
+            .select("id, is_weekly")
+            .eq("user_id", userId),
+          supabase
+            .from("user_day_routines")
+            .select("routine_id, day_of_week")
+            .eq("user_id", userId),
+        ]);
 
-      if (error) throw error;
+      if (completionsResult.error) throw completionsResult.error;
+      if (userRoutinesResult.error) throw userRoutinesResult.error;
+      if (dayRoutinesResult.error) throw dayRoutinesResult.error;
 
-      if (!completions || completions.length === 0) {
+      const completions = completionsResult.data || [];
+      const userRoutines = userRoutinesResult.data || [];
+      const dayAssignments = dayRoutinesResult.data || [];
+
+      if (completions.length === 0 || userRoutines.length === 0) {
         setCurrentStreak(0);
         setLongestStreak({
           length: 0,
@@ -177,90 +193,103 @@ export default function StatsScreen() {
         return;
       }
 
-      // Get unique completion dates and sort them
-      const uniqueDates = [
-        ...new Set(completions.map((c) => c.completion_date)),
-      ].sort();
+      // COPIED: Same day-routine mapping as calendar
+      const dayRoutineMap: Record<number, string[]> = {};
+      dayAssignments.forEach((assignment) => {
+        if (!dayRoutineMap[assignment.day_of_week]) {
+          dayRoutineMap[assignment.day_of_week] = [];
+        }
+        dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
+      });
 
-      console.log("Unique completion dates:", uniqueDates);
+      // COPIED: Same success day logic as calendar
+      const successDays = new Set<string>();
 
-      // Calculate current streak - consecutive days with ANY activity
+      // Group completions by date
+      const completionsByDate = new Map<string, string[]>();
+      completions.forEach((completion) => {
+        const date = completion.completion_date;
+        if (!completionsByDate.has(date)) {
+          completionsByDate.set(date, []);
+        }
+        completionsByDate.get(date)!.push(completion.routine_id);
+      });
+
+      // COPIED: Same success check as calendar
+      completionsByDate.forEach((completedRoutineIds, date) => {
+        const dayOfWeek = new Date(date).getDay();
+        const dailyRoutineIds = dayRoutineMap[dayOfWeek] || [];
+        const dailyRoutines = userRoutines.filter(
+          (routine) =>
+            !routine.is_weekly && dailyRoutineIds.includes(routine.id)
+        );
+
+        // COPIED: Same logic as calendar - ALL daily routines must be completed
+        const allCompleted =
+          dailyRoutines.length > 0 &&
+          dailyRoutines.every((routine) =>
+            completedRoutineIds.includes(routine.id)
+          );
+
+        if (allCompleted) {
+          successDays.add(date);
+        }
+      });
+
+      const successDatesArray = Array.from(successDays).sort();
+
+      // Calculate current streak based on success days (same as calendar)
       let currentStreakCount = 0;
       const today = new Date().toISOString().split("T")[0];
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
         .toISOString()
         .split("T")[0];
 
-      console.log("Today:", today, "Yesterday:", yesterday);
+      // Check if there's success today or yesterday to start counting
+      if (successDays.has(today) || successDays.has(yesterday)) {
+        let currentDate = successDays.has(today) ? today : yesterday;
 
-      // Check if there's activity today or yesterday to start counting
-      if (uniqueDates.includes(today) || uniqueDates.includes(yesterday)) {
-        let currentDate = uniqueDates.includes(today) ? today : yesterday;
-        let currentIndex = uniqueDates.indexOf(currentDate);
-
-        console.log(
-          "Starting streak from:",
-          currentDate,
-          "at index:",
-          currentIndex
-        );
-
-        // Count consecutive days backwards
-        while (currentIndex >= 0) {
-          const expectedDate = new Date(currentDate);
-          if (
-            uniqueDates[currentIndex] ===
-            expectedDate.toISOString().split("T")[0]
-          ) {
-            currentStreakCount++;
-            currentIndex--;
-            expectedDate.setDate(expectedDate.getDate() - 1);
-            currentDate = expectedDate.toISOString().split("T")[0];
-            console.log(
-              "Streak day:",
-              uniqueDates[currentIndex + 1],
-              "Count:",
-              currentStreakCount
-            );
-          } else {
-            break;
-          }
+        // Count consecutive success days backwards
+        while (successDays.has(currentDate)) {
+          currentStreakCount++;
+          const prevDate = new Date(currentDate);
+          prevDate.setDate(prevDate.getDate() - 1);
+          currentDate = prevDate.toISOString().split("T")[0];
         }
       }
 
-      console.log("Final current streak:", currentStreakCount);
       setCurrentStreak(currentStreakCount);
 
-      // Calculate longest streak
+      // Calculate longest streak based on success days (same as calendar)
       let maxStreak = 0;
       let maxStreakStart = "";
       let maxStreakEnd = "";
       let isMaxStreakOngoing = false;
 
-      if (uniqueDates.length > 0) {
+      if (successDatesArray.length > 0) {
         let tempStreak = 1;
-        let tempStart = uniqueDates[0];
+        let tempStart = successDatesArray[0];
 
-        for (let i = 1; i < uniqueDates.length; i++) {
-          const prevDate = new Date(uniqueDates[i - 1]);
-          const currDate = new Date(uniqueDates[i]);
+        for (let i = 1; i < successDatesArray.length; i++) {
+          const prevDate = new Date(successDatesArray[i - 1]);
+          const currDate = new Date(successDatesArray[i]);
           const dayDiff =
             (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
 
           if (dayDiff === 1) {
-            // Consecutive day
+            // Consecutive success day
             tempStreak++;
           } else {
             // Streak broken, check if it's the longest
             if (tempStreak > maxStreak) {
               maxStreak = tempStreak;
               maxStreakStart = tempStart;
-              maxStreakEnd = uniqueDates[i - 1];
+              maxStreakEnd = successDatesArray[i - 1];
               isMaxStreakOngoing = false;
             }
             // Start new streak
             tempStreak = 1;
-            tempStart = uniqueDates[i];
+            tempStart = successDatesArray[i];
           }
         }
 
@@ -268,14 +297,12 @@ export default function StatsScreen() {
         if (tempStreak > maxStreak) {
           maxStreak = tempStreak;
           maxStreakStart = tempStart;
-          maxStreakEnd = uniqueDates[uniqueDates.length - 1];
+          maxStreakEnd = successDatesArray[successDatesArray.length - 1];
           // Check if this streak is ongoing (ends today or yesterday)
           isMaxStreakOngoing =
             maxStreakEnd === today || maxStreakEnd === yesterday;
         }
       }
-
-      console.log("Final longest streak:", maxStreak);
 
       setLongestStreak({
         length: maxStreak,
