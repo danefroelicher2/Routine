@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Dimensions,
   Modal,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -401,6 +402,30 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     setShowHelpModal(true);
   };
 
+  // NEW: Handle email tap to open email app
+  const handleEmailPress = async () => {
+    const emailUrl = "mailto:askroutine@gmail.com";
+
+    try {
+      const canOpen = await Linking.canOpenURL(emailUrl);
+      if (canOpen) {
+        await Linking.openURL(emailUrl);
+      } else {
+        Alert.alert(
+          "Email Not Available",
+          "Please manually send an email to askroutine@gmail.com",
+          [{ text: "OK" }]
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        "Unable to open email app. Please manually send an email to askroutine@gmail.com",
+        [{ text: "OK" }]
+      );
+    }
+  };
+
   const menuItems = [
     {
       title: "Settings",
@@ -521,7 +546,9 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
             <View style={styles.modalContent}>
               <View style={styles.contactInfo}>
                 <Text style={styles.contactLabel}>Email:</Text>
-                <Text style={styles.contactEmail}>askroutine@gmail.com</Text>
+                <TouchableOpacity onPress={handleEmailPress}>
+                  <Text style={styles.contactEmail}>askroutine@gmail.com</Text>
+                </TouchableOpacity>
               </View>
 
               <Text style={styles.contactMessage}>
@@ -816,6 +843,7 @@ const styles = StyleSheet.create({
     color: "#007AFF",
     fontWeight: "500",
     marginBottom: 16,
+    textDecorationLine: "underline", // Makes it look more clickable
   },
   contactMessage: {
     fontSize: 15,
