@@ -119,11 +119,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           text: "Send Reset Email",
           onPress: async () => {
             try {
+              // Use Supabase's default password reset flow without custom redirect
               const { error } = await supabase.auth.resetPasswordForEmail(
-                userEmail,
-                {
-                  redirectTo: "your-app://reset-password", // You can customize this
-                }
+                userEmail
               );
 
               if (error) {
@@ -132,7 +130,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
               Alert.alert(
                 "Email Sent",
-                `A password reset link has been sent to ${userEmail}. Please check your email and follow the instructions to change your password.`,
+                `A password reset link has been sent to ${userEmail}. Please check your email and follow the instructions to change your password.\n\nNote: The reset link will open in your web browser where you can securely set your new password.`,
                 [{ text: "OK" }]
               );
             } catch (error: any) {
