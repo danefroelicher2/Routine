@@ -9,6 +9,7 @@ import {
   ScrollView,
   RefreshControl,
   Dimensions,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -38,6 +39,9 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
   // NEW: Achievement state (same as StatsScreen)
   const [achievements, setAchievements] = useState<Achievement[]>([]);
+
+  // NEW: Help popup state
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   // NEW: Achievement targets (same as StatsScreen)
   const ACHIEVEMENT_TARGETS = [
@@ -392,13 +396,12 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     );
   };
 
+  // NEW: Help & Support popup
+  const showHelpSupport = () => {
+    setShowHelpModal(true);
+  };
+
   const menuItems = [
-    {
-      title: "Manage Routines",
-      subtitle: "Add, edit, or remove your routines",
-      icon: "list",
-      onPress: () => navigation.navigate("RoutineManager"),
-    },
     {
       title: "Settings",
       subtitle: "Notifications, preferences, and more",
@@ -406,10 +409,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       onPress: () => navigation.navigate("Settings"),
     },
     {
-      title: "View Statistics",
-      subtitle: "See your progress and achievements",
-      icon: "stats-chart",
-      onPress: () => navigation.navigate("Stats"),
+      title: "Help & Support",
+      subtitle: "Get help or contact us",
+      icon: "help-circle",
+      onPress: showHelpSupport,
     },
   ];
 
@@ -494,6 +497,48 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* NEW: Help & Support Modal */}
+      <Modal
+        visible={showHelpModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowHelpModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Ionicons name="help-circle" size={24} color="#007AFF" />
+              <Text style={styles.modalTitle}>Help & Support</Text>
+              <TouchableOpacity
+                onPress={() => setShowHelpModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalContent}>
+              <View style={styles.contactInfo}>
+                <Text style={styles.contactLabel}>Email:</Text>
+                <Text style={styles.contactEmail}>askroutine@gmail.com</Text>
+              </View>
+
+              <Text style={styles.contactMessage}>
+                Please reach out with any recommendations, comments, or
+                concerns.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setShowHelpModal(false)}
+            >
+              <Text style={styles.modalButtonText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -715,5 +760,80 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#ff6b6b",
     marginLeft: 8,
+  },
+  // NEW: Help & Support Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  modalContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    width: "100%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    flex: 1,
+    marginLeft: 12,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+  },
+  contactInfo: {
+    marginBottom: 20,
+  },
+  contactLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+  },
+  contactEmail: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "500",
+    marginBottom: 16,
+  },
+  contactMessage: {
+    fontSize: 15,
+    color: "#666",
+    lineHeight: 22,
+    textAlign: "left",
+  },
+  modalButton: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: "#007AFF",
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
   },
 });
