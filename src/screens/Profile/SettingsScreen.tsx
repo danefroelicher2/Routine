@@ -119,7 +119,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           text: "Send Reset Email",
           onPress: async () => {
             try {
-              // Use Supabase's default password reset flow without custom redirect
+              // Use Supabase's default password reset without custom redirect
               const { error } = await supabase.auth.resetPasswordForEmail(
                 userEmail
               );
@@ -130,7 +130,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
               Alert.alert(
                 "Email Sent",
-                `A password reset link has been sent to ${userEmail}. Please check your email and follow the instructions to change your password.\n\nNote: The reset link will open in your web browser where you can securely set your new password.`,
+                `A password reset link has been sent to ${userEmail}. Please check your email and follow the instructions.\n\nThe link will open a secure page where you can set your new password.`,
                 [{ text: "OK" }]
               );
             } catch (error: any) {
@@ -184,13 +184,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color="#007AFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Settings</Text>
-          <View style={{ width: 24 }} />
-        </View>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
@@ -200,14 +193,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
       <ScrollView style={styles.scrollView}>
         {/* App Preferences */}
         <View style={styles.section}>
@@ -320,21 +305,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#333",
   },
   scrollView: {
     flex: 1,
