@@ -29,6 +29,15 @@ interface StreakInfo {
   isOngoing: boolean;
 }
 
+// NEW: Achievement interface
+interface Achievement {
+  id: string;
+  name: string;
+  target: number;
+  unlocked: boolean;
+  unlockedDate?: string;
+}
+
 export default function StatsScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [completionData, setCompletionData] = useState<CompletionData[]>([]);
@@ -41,6 +50,14 @@ export default function StatsScreen() {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // NEW: Achievement state
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+
+  // NEW: Achievement targets (in days)
+  const ACHIEVEMENT_TARGETS = [
+    3, 5, 7, 14, 30, 60, 90, 120, 150, 200, 250, 300, 365,
+  ];
 
   // ADDED: Load data when screen comes into focus (real-time updates)
   useFocusEffect(
@@ -146,6 +163,9 @@ export default function StatsScreen() {
 
       // Calculate streaks based on success days
       await calculateStreaks(user.id);
+
+      // NEW: Calculate achievements
+      await calculateAchievements(user.id);
     } catch (error) {
       console.error("Error loading stats:", error);
       Alert.alert("Error", "Failed to load statistics");
@@ -352,6 +372,146 @@ export default function StatsScreen() {
     }
   };
 
+  // NEW: Calculate achievements based on streak data
+  const calculateAchievements = useCallback(async (userId: string) => {
+    try {
+      // Get all historical streak data to check for past achievements
+      const [completionsResult, userRoutinesResult, dayRoutinesResult] =
+        await Promise.all([
+          supabase
+            .from("routine_completions")
+            .select("completion_date, routine_id")
+            .eq("user_id", userId)
+            .order("completion_date", { ascending: true }),
+          supabase
+            .from("user_routines")
+            .select("id, is_weekly")
+            .eq("user_id", userId),
+          supabase
+            .from("user_day_routines")
+            .select("routine_id, day_of_week")
+            .eq("user_id", userId),
+        ]);
+
+      if (
+        completionsResult.error ||
+        userRoutinesResult.error ||
+        dayRoutinesResult.error
+      ) {
+        throw new Error("Failed to fetch achievement data");
+      }
+
+      const completions = completionsResult.data || [];
+      const userRoutines = userRoutinesResult.data || [];
+      const dayAssignments = dayRoutinesResult.data || [];
+
+      // Build day-routine mapping (same logic as streak calculation)
+      const dayRoutineMap: Record<number, string[]> = {};
+      dayAssignments.forEach((assignment) => {
+        if (!dayRoutineMap[assignment.day_of_week]) {
+          dayRoutineMap[assignment.day_of_week] = [];
+        }
+        dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
+      });
+
+      // Create success days map
+      const successDays = new Set<string>();
+      const completionsByDate = new Map<string, string[]>();
+
+      completions.forEach((completion) => {
+        const date = completion.completion_date;
+        if (!completionsByDate.has(date)) {
+          completionsByDate.set(date, []);
+        }
+        completionsByDate.get(date)!.push(completion.routine_id);
+      });
+
+      // Check each date for success (same logic as streak calculation)
+      completionsByDate.forEach((completedRoutineIds, date) => {
+        const dayOfWeek = new Date(date).getDay();
+        const dailyRoutineIds = dayRoutineMap[dayOfWeek] || [];
+        const dailyRoutines = userRoutines.filter(
+          (routine) =>
+            !routine.is_weekly && dailyRoutineIds.includes(routine.id)
+        );
+
+        const allCompleted =
+          dailyRoutines.length > 0 &&
+          dailyRoutines.every((routine) =>
+            completedRoutineIds.includes(routine.id)
+          );
+
+        if (allCompleted) {
+          successDays.add(date);
+        }
+      });
+
+      const successDatesArray = Array.from(successDays).sort();
+
+      // Find all streaks that have occurred
+      const allStreaks: {
+        length: number;
+        startDate: string;
+        endDate: string;
+      }[] = [];
+
+      if (successDatesArray.length > 0) {
+        let currentStreakLength = 1;
+        let currentStreakStart = successDatesArray[0];
+
+        for (let i = 1; i < successDatesArray.length; i++) {
+          const prevDate = new Date(successDatesArray[i - 1]);
+          const currDate = new Date(successDatesArray[i]);
+          const dayDiff =
+            (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
+
+          if (dayDiff === 1) {
+            // Consecutive day
+            currentStreakLength++;
+          } else {
+            // Streak broken, record the streak
+            allStreaks.push({
+              length: currentStreakLength,
+              startDate: currentStreakStart,
+              endDate: successDatesArray[i - 1],
+            });
+            currentStreakLength = 1;
+            currentStreakStart = successDatesArray[i];
+          }
+        }
+
+        // Don't forget the last streak
+        allStreaks.push({
+          length: currentStreakLength,
+          startDate: currentStreakStart,
+          endDate: successDatesArray[successDatesArray.length - 1],
+        });
+      }
+
+      // Create achievements array
+      const newAchievements: Achievement[] = ACHIEVEMENT_TARGETS.map(
+        (target) => {
+          // Check if any streak has reached this target
+          const unlockedStreak = allStreaks.find(
+            (streak) => streak.length >= target
+          );
+
+          return {
+            id: `streak_${target}`,
+            name: `${target} Day${target > 1 ? "s" : ""} in a Row`,
+            target,
+            unlocked: !!unlockedStreak,
+            unlockedDate: unlockedStreak?.endDate,
+          };
+        }
+      );
+
+      setAchievements(newAchievements);
+    } catch (error) {
+      console.error("Error calculating achievements:", error);
+    }
+  }, []);
+
   const formatStreakDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -464,6 +624,68 @@ export default function StatsScreen() {
     }
   };
 
+  // NEW: Render achievements section
+  const renderAchievements = () => {
+    return (
+      <View style={styles.achievementsSection}>
+        <View style={styles.achievementsHeader}>
+          <Ionicons name="trophy" size={24} color="#ffd700" />
+          <Text style={styles.achievementsTitle}>Achievements</Text>
+        </View>
+
+        <View style={styles.achievementsGrid}>
+          {achievements.map((achievement, index) => (
+            <View
+              key={achievement.id}
+              style={[
+                styles.achievementBadge,
+                achievement.unlocked
+                  ? styles.achievementUnlocked
+                  : styles.achievementLocked,
+              ]}
+            >
+              <View
+                style={[
+                  styles.achievementCircle,
+                  achievement.unlocked
+                    ? styles.achievementCircleUnlocked
+                    : styles.achievementCircleLocked,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.achievementNumber,
+                    achievement.unlocked
+                      ? styles.achievementNumberUnlocked
+                      : styles.achievementNumberLocked,
+                  ]}
+                >
+                  {achievement.target}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.achievementText,
+                  achievement.unlocked
+                    ? styles.achievementTextUnlocked
+                    : styles.achievementTextLocked,
+                ]}
+              >
+                {achievement.name}
+              </Text>
+              {achievement.unlocked && achievement.unlockedDate && (
+                <Text style={styles.achievementUnlockedDate}>
+                  Unlocked{" "}
+                  {new Date(achievement.unlockedDate).toLocaleDateString()}
+                </Text>
+              )}
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -558,6 +780,9 @@ export default function StatsScreen() {
             <Text style={styles.legendLabel}>All Complete</Text>
           </View>
         </View>
+
+        {/* NEW: Achievements Section */}
+        {renderAchievements()}
       </ScrollView>
     </SafeAreaView>
   );
@@ -737,5 +962,98 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 2,
+  },
+  // NEW: Achievements Section Styles
+  achievementsSection: {
+    backgroundColor: "#fff",
+    marginTop: 20,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  achievementsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    gap: 8,
+  },
+  achievementsTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+  },
+  achievementsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  achievementBadge: {
+    width: (width - 80) / 3, // 3 badges per row with margins
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  achievementUnlocked: {
+    backgroundColor: "#f8fffe",
+    borderWidth: 2,
+    borderColor: "#00d4aa",
+  },
+  achievementLocked: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 2,
+    borderColor: "#e9ecef",
+  },
+  achievementCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  achievementCircleUnlocked: {
+    backgroundColor: "#00d4aa",
+  },
+  achievementCircleLocked: {
+    backgroundColor: "#ccc",
+  },
+  achievementNumber: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  achievementNumberUnlocked: {
+    color: "#fff",
+  },
+  achievementNumberLocked: {
+    color: "#999",
+  },
+  achievementText: {
+    fontSize: 12,
+    textAlign: "center",
+    fontWeight: "500",
+    lineHeight: 16,
+  },
+  achievementTextUnlocked: {
+    color: "#00d4aa",
+  },
+  achievementTextLocked: {
+    color: "#999",
+  },
+  achievementUnlockedDate: {
+    fontSize: 10,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 4,
   },
 });
