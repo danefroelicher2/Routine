@@ -624,63 +624,158 @@ export default function StatsScreen() {
     }
   };
 
-  // NEW: Render achievements section
+  // NEW: Render achievements section with enhanced UI
   const renderAchievements = () => {
     return (
       <View style={styles.achievementsSection}>
         <View style={styles.achievementsHeader}>
-          <Ionicons name="trophy" size={24} color="#ffd700" />
-          <Text style={styles.achievementsTitle}>Achievements</Text>
+          <View style={styles.achievementsHeaderLeft}>
+            <View style={styles.trophyContainer}>
+              <Ionicons name="trophy" size={20} color="#ffd700" />
+            </View>
+            <Text style={styles.achievementsTitle}>Achievements</Text>
+          </View>
+          <View style={styles.achievementsStats}>
+            <Text style={styles.achievementsCount}>
+              {achievements.filter((a) => a.unlocked).length}/
+              {achievements.length}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.achievementsGrid}>
-          {achievements.map((achievement, index) => (
-            <View
-              key={achievement.id}
-              style={[
-                styles.achievementBadge,
-                achievement.unlocked
-                  ? styles.achievementUnlocked
-                  : styles.achievementLocked,
-              ]}
-            >
+          {achievements.map((achievement, index) => {
+            const isUnlocked = achievement.unlocked;
+            const getBadgeStyle = () => {
+              if (achievement.target <= 7) return "beginner";
+              if (achievement.target <= 30) return "intermediate";
+              if (achievement.target <= 90) return "advanced";
+              return "master";
+            };
+            const badgeType = getBadgeStyle();
+
+            return (
               <View
+                key={achievement.id}
                 style={[
-                  styles.achievementCircle,
-                  achievement.unlocked
-                    ? styles.achievementCircleUnlocked
-                    : styles.achievementCircleLocked,
+                  styles.achievementCard,
+                  isUnlocked
+                    ? styles.achievementCardUnlocked
+                    : styles.achievementCardLocked,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.achievementNumber,
-                    achievement.unlocked
-                      ? styles.achievementNumberUnlocked
-                      : styles.achievementNumberLocked,
-                  ]}
-                >
-                  {achievement.target}
-                </Text>
+                <View style={styles.achievementCardInner}>
+                  {/* Badge with glow effect */}
+                  <View
+                    style={[
+                      styles.achievementBadge,
+                      isUnlocked && styles.achievementBadgeGlow,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.achievementBadgeInner,
+                        styles[
+                          `badge${
+                            badgeType.charAt(0).toUpperCase() +
+                            badgeType.slice(1)
+                          }${isUnlocked ? "Unlocked" : "Locked"}`
+                        ],
+                      ]}
+                    >
+                      {isUnlocked ? (
+                        <Ionicons
+                          name="checkmark"
+                          size={16}
+                          color="#fff"
+                          style={styles.achievementCheck}
+                        />
+                      ) : (
+                        <Ionicons name="lock-closed" size={14} color="#999" />
+                      )}
+                      <Text
+                        style={[
+                          styles.achievementNumber,
+                          isUnlocked
+                            ? styles.achievementNumberUnlocked
+                            : styles.achievementNumberLocked,
+                        ]}
+                      >
+                        {achievement.target}
+                      </Text>
+                    </View>
+
+                    {/* Sparkle effects for unlocked achievements */}
+                    {isUnlocked && (
+                      <>
+                        <View style={[styles.sparkle, styles.sparkle1]} />
+                        <View style={[styles.sparkle, styles.sparkle2]} />
+                        <View style={[styles.sparkle, styles.sparkle3]} />
+                      </>
+                    )}
+                  </View>
+
+                  {/* Achievement info */}
+                  <View style={styles.achievementInfo}>
+                    <Text
+                      style={[
+                        styles.achievementText,
+                        isUnlocked
+                          ? styles.achievementTextUnlocked
+                          : styles.achievementTextLocked,
+                      ]}
+                    >
+                      {achievement.target} Day
+                      {achievement.target > 1 ? "s" : ""}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.achievementSubtext,
+                        isUnlocked
+                          ? styles.achievementSubtextUnlocked
+                          : styles.achievementSubtextLocked,
+                      ]}
+                    >
+                      Streak
+                    </Text>
+
+                    {isUnlocked && achievement.unlockedDate && (
+                      <View style={styles.achievementUnlockedContainer}>
+                        <Ionicons name="calendar" size={10} color="#00d4aa" />
+                        <Text style={styles.achievementUnlockedDate}>
+                          {new Date(
+                            achievement.unlockedDate
+                          ).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Progress indicator */}
+                {!isUnlocked && (
+                  <View style={styles.achievementProgress}>
+                    <View style={styles.achievementProgressBg}>
+                      <View
+                        style={[
+                          styles.achievementProgressFill,
+                          {
+                            width: `${Math.min(
+                              (currentStreak / achievement.target) * 100,
+                              100
+                            )}%`,
+                          },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                )}
               </View>
-              <Text
-                style={[
-                  styles.achievementText,
-                  achievement.unlocked
-                    ? styles.achievementTextUnlocked
-                    : styles.achievementTextLocked,
-                ]}
-              >
-                {achievement.name}
-              </Text>
-              {achievement.unlocked && achievement.unlockedDate && (
-                <Text style={styles.achievementUnlockedDate}>
-                  Unlocked{" "}
-                  {new Date(achievement.unlockedDate).toLocaleDateString()}
-                </Text>
-              )}
-            </View>
-          ))}
+            );
+          })}
         </View>
       </View>
     );
@@ -914,6 +1009,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginBottom: 10,
     width: width - 80,
+    justifyContent: "space-between", // Added to ensure equal spacing
   },
   dayLabel: {
     flex: 1,
@@ -921,6 +1017,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     fontWeight: "500",
+    minWidth: (width - 80) / 7, // Ensure each day gets equal width
   },
   calendarGrid: {
     flexDirection: "row",
@@ -963,97 +1060,271 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 2,
   },
-  // NEW: Achievements Section Styles
+  // NEW: Achievements Section Styles - Completely redesigned
   achievementsSection: {
     backgroundColor: "#fff",
     marginTop: 20,
     marginHorizontal: 20,
     marginBottom: 20,
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
   },
   achievementsHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
-    gap: 8,
+    justifyContent: "space-between",
+    marginBottom: 24,
+  },
+  achievementsHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  trophyContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#fff8e1",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#ffd700",
   },
   achievementsTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 20,
+    fontWeight: "700",
     color: "#333",
+  },
+  achievementsStats: {
+    backgroundColor: "#f0f9ff",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#007AFF",
+  },
+  achievementsCount: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#007AFF",
   },
   achievementsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 8, // Reduced gap
   },
-  achievementBadge: {
-    width: (width - 80) / 3, // 3 badges per row with margins
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
+  achievementCard: {
+    width: (width - 88) / 3, // Fixed calculation: 3 cards per row, accounting for margins and gaps
+    borderRadius: 16,
+    overflow: "hidden",
+    position: "relative",
   },
-  achievementUnlocked: {
-    backgroundColor: "#f8fffe",
+  achievementCardUnlocked: {
+    backgroundColor: "#f0fdf4",
     borderWidth: 2,
     borderColor: "#00d4aa",
+    shadowColor: "#00d4aa",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  achievementLocked: {
-    backgroundColor: "#f8f9fa",
+  achievementCardLocked: {
+    backgroundColor: "#fafafa",
     borderWidth: 2,
-    borderColor: "#e9ecef",
+    borderColor: "#e5e7eb",
   },
-  achievementCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  achievementCardInner: {
+    padding: 16,
+    alignItems: "center",
+    minHeight: 120,
+    justifyContent: "space-between",
+  },
+  achievementBadge: {
+    position: "relative",
+    marginBottom: 12,
+  },
+  achievementBadgeGlow: {
+    shadowColor: "#00d4aa",
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  achievementBadgeInner: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 8,
+    position: "relative",
   },
-  achievementCircleUnlocked: {
-    backgroundColor: "#00d4aa",
+  // Badge tier styles
+  badgeBeginnerUnlocked: {
+    backgroundColor: "#10b981",
+    borderWidth: 3,
+    borderColor: "#059669",
   },
-  achievementCircleLocked: {
-    backgroundColor: "#ccc",
+  badgeBeginnerLocked: {
+    backgroundColor: "#d1d5db",
+    borderWidth: 3,
+    borderColor: "#9ca3af",
+  },
+  badgeIntermediateUnlocked: {
+    backgroundColor: "#3b82f6",
+    borderWidth: 3,
+    borderColor: "#2563eb",
+  },
+  badgeIntermediateLocked: {
+    backgroundColor: "#d1d5db",
+    borderWidth: 3,
+    borderColor: "#9ca3af",
+  },
+  badgeAdvancedUnlocked: {
+    backgroundColor: "#8b5cf6",
+    borderWidth: 3,
+    borderColor: "#7c3aed",
+  },
+  badgeAdvancedLocked: {
+    backgroundColor: "#d1d5db",
+    borderWidth: 3,
+    borderColor: "#9ca3af",
+  },
+  badgeMasterUnlocked: {
+    backgroundColor: "#f59e0b",
+    borderWidth: 3,
+    borderColor: "#d97706",
+  },
+  badgeMasterLocked: {
+    backgroundColor: "#d1d5db",
+    borderWidth: 3,
+    borderColor: "#9ca3af",
+  },
+  achievementCheck: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: "#059669",
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    textAlign: "center",
+    textAlignVertical: "center",
   },
   achievementNumber: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 14,
+    fontWeight: "800",
+    marginTop: 2,
   },
   achievementNumberUnlocked: {
     color: "#fff",
   },
   achievementNumberLocked: {
-    color: "#999",
+    color: "#6b7280",
+  },
+  achievementInfo: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
   },
   achievementText: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: "700",
     textAlign: "center",
-    fontWeight: "500",
-    lineHeight: 16,
+    lineHeight: 14,
   },
   achievementTextUnlocked: {
-    color: "#00d4aa",
+    color: "#059669",
   },
   achievementTextLocked: {
-    color: "#999",
+    color: "#6b7280",
+  },
+  achievementSubtext: {
+    fontSize: 10,
+    fontWeight: "500",
+    textAlign: "center",
+    marginTop: 2,
+  },
+  achievementSubtextUnlocked: {
+    color: "#10b981",
+  },
+  achievementSubtextLocked: {
+    color: "#9ca3af",
+  },
+  achievementUnlockedContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+    backgroundColor: "#ecfdf5",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 3,
   },
   achievementUnlockedDate: {
-    fontSize: 10,
-    color: "#666",
-    textAlign: "center",
-    marginTop: 4,
+    fontSize: 9,
+    color: "#059669",
+    fontWeight: "600",
+  },
+  achievementProgress: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+  },
+  achievementProgressBg: {
+    flex: 1,
+    backgroundColor: "#e5e7eb",
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+  },
+  achievementProgressFill: {
+    height: "100%",
+    backgroundColor: "#10b981",
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+  },
+  // Sparkle effects
+  sparkle: {
+    position: "absolute",
+    width: 4,
+    height: 4,
+    backgroundColor: "#fbbf24",
+    borderRadius: 2,
+  },
+  sparkle1: {
+    top: 2,
+    right: 8,
+    transform: [{ rotate: "45deg" }],
+  },
+  sparkle2: {
+    bottom: 6,
+    left: 4,
+    width: 3,
+    height: 3,
+    backgroundColor: "#60a5fa",
+  },
+  sparkle3: {
+    top: 8,
+    left: 2,
+    width: 2,
+    height: 2,
+    backgroundColor: "#f472b6",
   },
 });
