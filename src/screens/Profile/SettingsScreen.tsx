@@ -12,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
 import { UserSettings } from "../../types/database";
+import { useTheme } from "../../context/ThemeContext";
 
 interface SettingsScreenProps {
   navigation: any;
@@ -21,6 +22,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string>("");
+
+  // NEW: Use theme context
+  const { isDarkMode, colors, setDarkMode } = useTheme();
 
   useEffect(() => {
     loadSettings();
@@ -97,6 +101,11 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       if (error) throw error;
 
       setSettings({ ...settings, [key]: value });
+
+      // NEW: Update theme context when dark mode changes
+      if (key === "dark_mode") {
+        setDarkMode(value);
+      }
     } catch (error) {
       console.error("Error updating setting:", error);
       Alert.alert("Error", "Failed to update setting");
@@ -155,27 +164,39 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     type: "switch" | "button" = "button"
   ) => (
     <TouchableOpacity
-      style={styles.settingItem}
+      style={[styles.settingItem, { borderBottomColor: colors.separator }]}
       onPress={type === "button" ? onPress : undefined}
       disabled={type === "switch"}
     >
       <View style={styles.settingContent}>
-        <Text style={styles.settingTitle}>{title}</Text>
-        <Text style={styles.settingSubtitle}>{subtitle}</Text>
+        <Text style={[styles.settingTitle, { color: colors.text }]}>
+          {title}
+        </Text>
+        <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>
+          {subtitle}
+        </Text>
       </View>
       {type === "switch" ? (
         <Switch
           value={value}
           onValueChange={onPress}
-          trackColor={{ false: "#e9ecef", true: "#007AFF" }}
+          trackColor={{ false: colors.border, true: "#007AFF" }}
           thumbColor={value ? "#fff" : "#f4f3f4"}
         />
       ) : (
         <View style={styles.settingValue}>
           {typeof value === "string" && value !== "" && (
-            <Text style={styles.settingValueText}>{value}</Text>
+            <Text
+              style={[styles.settingValueText, { color: colors.textSecondary }]}
+            >
+              {value}
+            </Text>
           )}
-          <Ionicons name="chevron-forward" size={16} color="#ccc" />
+          <Ionicons
+            name="chevron-forward"
+            size={16}
+            color={colors.textTertiary}
+          />
         </View>
       )}
     </TouchableOpacity>
@@ -183,33 +204,61 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+      >
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={[styles.loadingText, { color: colors.text }]}>
+            Loading...
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       <ScrollView style={styles.scrollView}>
         {/* App Preferences */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App Preferences</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              {
+                backgroundColor: colors.background,
+                color: colors.text,
+                borderBottomColor: colors.border,
+              },
+            ]}
+          >
+            App Preferences
+          </Text>
 
           {renderSettingItem(
             "Dark Mode",
             "Switch between light and dark theme",
-            settings?.dark_mode || false,
-            () => updateSetting("dark_mode", !settings?.dark_mode),
+            isDarkMode,
+            () => updateSetting("dark_mode", !isDarkMode),
             "switch"
           )}
         </View>
 
         {/* Notifications */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              {
+                backgroundColor: colors.background,
+                color: colors.text,
+                borderBottomColor: colors.border,
+              },
+            ]}
+          >
+            Notifications
+          </Text>
 
           {renderSettingItem(
             "Enable Notifications",
@@ -223,23 +272,57 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             "switch"
           )}
 
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity
+            style={[
+              styles.settingItem,
+              { borderBottomColor: colors.separator },
+            ]}
+          >
             <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Notification Schedule</Text>
-              <Text style={styles.settingSubtitle}>
+              <Text style={[styles.settingTitle, { color: colors.text }]}>
+                Notification Schedule
+              </Text>
+              <Text
+                style={[
+                  styles.settingSubtitle,
+                  { color: colors.textSecondary },
+                ]}
+              >
                 Set when to receive reminders
               </Text>
             </View>
             <View style={styles.settingValue}>
-              <Text style={styles.settingValueText}>Coming Soon</Text>
-              <Ionicons name="chevron-forward" size={16} color="#ccc" />
+              <Text
+                style={[
+                  styles.settingValueText,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                Coming Soon
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={colors.textTertiary}
+              />
             </View>
           </TouchableOpacity>
         </View>
 
         {/* Account & Security */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account & Security</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              {
+                backgroundColor: colors.background,
+                color: colors.text,
+                borderBottomColor: colors.border,
+              },
+            ]}
+          >
+            Account & Security
+          </Text>
 
           {renderSettingItem(
             "Change Password",
@@ -249,7 +332,10 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           )}
 
           <TouchableOpacity
-            style={styles.settingItem}
+            style={[
+              styles.settingItem,
+              { borderBottomColor: colors.separator },
+            ]}
             onPress={() => {
               Alert.alert(
                 "Delete Account",
@@ -287,7 +373,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               <Text style={[styles.settingTitle, styles.dangerText]}>
                 Delete Account
               </Text>
-              <Text style={styles.settingSubtitle}>
+              <Text
+                style={[
+                  styles.settingSubtitle,
+                  { color: colors.textSecondary },
+                ]}
+              >
                 Permanently delete your account and data
               </Text>
             </View>
@@ -304,7 +395,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
   },
   scrollView: {
     flex: 1,
@@ -316,22 +406,17 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: "#666",
   },
   section: {
-    backgroundColor: "#fff",
     marginTop: 20,
     paddingVertical: 10,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: "#f8f9fa",
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
   },
   settingItem: {
     flexDirection: "row",
@@ -340,7 +425,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   settingContent: {
     flex: 1,
@@ -348,12 +432,10 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
     marginBottom: 2,
   },
   settingSubtitle: {
     fontSize: 14,
-    color: "#666",
   },
   settingValue: {
     flexDirection: "row",
@@ -361,7 +443,6 @@ const styles = StyleSheet.create({
   },
   settingValueText: {
     fontSize: 14,
-    color: "#666",
     marginRight: 8,
   },
   dangerText: {
