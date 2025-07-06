@@ -1,43 +1,3 @@
-import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  Alert,
-  Dimensions,
-  RefreshControl,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
-import { supabase } from "../../services/supabase";
-import { RoutineCompletion } from "../../types/database";
-
-const { width } = Dimensions.get("window");
-
-interface CompletionData {
-  date: string;
-  completionCount: number;
-}
-
-interface StreakInfo {
-  length: number;
-  startDate: string;
-  endDate: string;
-  isOngoing: boolean;
-}
-
-// NEW: Achievement interface
-interface Achievement {
-  id: string;
-  name: string;
-  target: number;
-  unlocked: boolean;
-  unlockedDate?: string;
-}
-
 export default function StatsScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [completionData, setCompletionData] = useState<CompletionData[]>([]);
@@ -51,15 +11,18 @@ export default function StatsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // NEW: Achievement state
+  // Achievement state
   const [achievements, setAchievements] = useState<Achievement[]>([]);
 
-  // NEW: Achievement targets (in days) - 12 total achievements
+  // Theme context
+  const { colors } = useTheme();
+
+  // Achievement targets (in days) - 12 total achievements
   const ACHIEVEMENT_TARGETS = [
     3, 5, 7, 14, 30, 60, 100, 150, 200, 250, 300, 365,
   ];
 
-  // ADDED: Load data when screen comes into focus (real-time updates)
+  // Load data when screen comes into focus (real-time updates)
   useFocusEffect(
     useCallback(() => {
       loadStatsData();
@@ -83,7 +46,7 @@ export default function StatsScreen() {
       const firstDay = new Date(year, month, 1);
       const lastDay = new Date(year, month + 1, 0);
 
-      // FIXED: Get both completions and user routines (not "routines" table)
+      // Get both completions and user routines
       const [completionsResult, userRoutinesResult, dayRoutinesResult] =
         await Promise.all([
           // Get completions for the month
@@ -113,7 +76,7 @@ export default function StatsScreen() {
       const userRoutines = userRoutinesResult.data || [];
       const dayAssignments = dayRoutinesResult.data || [];
 
-      // FIXED: Build day-specific routines mapping
+      // Build day-specific routines mapping
       const dayRoutineMap: Record<number, string[]> = {};
       dayAssignments.forEach((assignment) => {
         if (!dayRoutineMap[assignment.day_of_week]) {
@@ -122,7 +85,7 @@ export default function StatsScreen() {
         dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
       });
 
-      // UPDATED: Process success data using the correct table structure
+      // Process success data using the correct table structure
       const successData: CompletionData[] = [];
 
       for (
@@ -164,7 +127,7 @@ export default function StatsScreen() {
       // Calculate streaks based on success days
       await calculateStreaks(user.id);
 
-      // NEW: Calculate achievements
+      // Calculate achievements
       await calculateAchievements(user.id);
     } catch (error) {
       console.error("Error loading stats:", error);
@@ -320,7 +283,7 @@ export default function StatsScreen() {
       console.log("FINAL CURRENT STREAK:", currentStreakCount);
       setCurrentStreak(currentStreakCount);
 
-      // Calculate longest streak (simplified for now)
+      // Calculate longest streak
       let maxStreak = 0;
       let maxStreakStart = "";
       let maxStreakEnd = "";
@@ -372,7 +335,7 @@ export default function StatsScreen() {
     }
   };
 
-  // NEW: Calculate achievements based on streak data
+  // Calculate achievements based on streak data
   const calculateAchievements = useCallback(async (userId: string) => {
     try {
       // Get all historical streak data to check for past achievements
@@ -529,7 +492,7 @@ export default function StatsScreen() {
     }
   };
 
-  // ADDED: Pull-to-refresh handler
+  // Pull-to-refresh handler
   const onRefresh = async () => {
     setRefreshing(true);
     await loadStatsData();
@@ -547,7 +510,7 @@ export default function StatsScreen() {
   };
 
   const getIntensityColor = (isSuccess: number) => {
-    // UPDATED: Binary success tracking - only light green for complete success, transparent otherwise
+    // Binary success tracking - only light green for complete success, transparent otherwise
     return isSuccess === 1 ? "#c6e48b" : "transparent";
   };
 
@@ -590,7 +553,9 @@ export default function StatsScreen() {
               { backgroundColor: getIntensityColor(completionCount) },
             ]}
           >
-            <Text style={styles.heatmapDayText}>{day}</Text>
+            <Text style={[styles.heatmapDayText, { color: colors.text }]}>
+              {day}
+            </Text>
           </View>
         </View>
       );
@@ -600,7 +565,10 @@ export default function StatsScreen() {
       <View style={styles.heatmapGrid}>
         <View style={styles.dayLabels}>
           {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
-            <Text key={index} style={styles.dayLabel}>
+            <Text
+              key={index}
+              style={[styles.dayLabel, { color: colors.textSecondary }]}
+            >
               {day}
             </Text>
           ))}
@@ -624,7 +592,7 @@ export default function StatsScreen() {
     }
   };
 
-  // NEW: Render achievements section with badge-style design
+  // Render achievements section with badge-style design
   const renderAchievements = () => {
     const getBadgeDesign = (target: number, isUnlocked: boolean) => {
       // Define badge tiers with increasingly impressive designs
@@ -688,15 +656,32 @@ export default function StatsScreen() {
     };
 
     return (
-      <View style={styles.achievementsSection}>
+      <View
+        style={[
+          styles.achievementsSection,
+          { backgroundColor: colors.surface },
+        ]}
+      >
         <View style={styles.achievementsHeader}>
           <View style={styles.achievementsHeaderLeft}>
-            <View style={styles.trophyContainer}>
+            <View
+              style={[
+                styles.trophyContainer,
+                { backgroundColor: colors.background },
+              ]}
+            >
               <Ionicons name="trophy" size={20} color="#ffd700" />
             </View>
-            <Text style={styles.achievementsTitle}>Achievements</Text>
+            <Text style={[styles.achievementsTitle, { color: colors.text }]}>
+              Achievements
+            </Text>
           </View>
-          <View style={styles.achievementsStats}>
+          <View
+            style={[
+              styles.achievementsStats,
+              { backgroundColor: colors.background },
+            ]}
+          >
             <Text style={styles.achievementsCount}>
               {achievements.filter((a) => a.unlocked).length}/
               {achievements.length}
@@ -887,24 +872,47 @@ export default function StatsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Statistics</Text>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Statistics
+        </Text>
       </View>
 
       <ScrollView
-        style={styles.scrollView}
+        style={[styles.scrollView, { backgroundColor: colors.background }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* NEW: Widget-style streak boxes */}
+        {/* Widget-style streak boxes */}
         <View style={styles.widgetContainer}>
           {/* Current Streak Widget */}
-          <View style={[styles.widget, styles.currentStreakWidget]}>
+          <View
+            style={[
+              styles.widget,
+              styles.currentStreakWidget,
+              { backgroundColor: colors.surface },
+            ]}
+          >
             <View style={styles.widgetContent}>
               <Text style={styles.currentStreakNumber}>{currentStreak}</Text>
-              <Text style={styles.currentStreakLabel}>
+              <Text
+                style={[
+                  styles.currentStreakLabel,
+                  { color: colors.textSecondary },
+                ]}
+              >
                 day{currentStreak !== 1 ? "s" : ""} in a row
               </Text>
               <Text style={styles.currentStreakMessage}>
@@ -921,13 +929,31 @@ export default function StatsScreen() {
           </View>
 
           {/* Longest Streak Widget */}
-          <View style={[styles.widget, styles.longestStreakWidget]}>
+          <View
+            style={[
+              styles.widget,
+              styles.longestStreakWidget,
+              { backgroundColor: colors.surface },
+            ]}
+          >
             <View style={styles.widgetContent}>
               <Text style={styles.longestStreakNumber}>
                 {longestStreak.length}
               </Text>
-              <Text style={styles.longestStreakLabel}>longest streak</Text>
-              <Text style={styles.longestStreakDates}>
+              <Text
+                style={[
+                  styles.longestStreakLabel,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                longest streak
+              </Text>
+              <Text
+                style={[
+                  styles.longestStreakDates,
+                  { color: colors.textSecondary },
+                ]}
+              >
                 {getStreakDateRange()}
               </Text>
             </View>
@@ -938,7 +964,9 @@ export default function StatsScreen() {
         </View>
 
         {/* Monthly Heatmap */}
-        <View style={styles.heatmapSection}>
+        <View
+          style={[styles.heatmapSection, { backgroundColor: colors.surface }]}
+        >
           <View style={styles.heatmapHeader}>
             <TouchableOpacity
               style={styles.navButton}
@@ -947,7 +975,9 @@ export default function StatsScreen() {
               <Ionicons name="chevron-back" size={24} color="#007AFF" />
             </TouchableOpacity>
 
-            <Text style={styles.monthTitle}>{getMonthName(currentDate)}</Text>
+            <Text style={[styles.monthTitle, { color: colors.text }]}>
+              {getMonthName(currentDate)}
+            </Text>
 
             <TouchableOpacity
               style={styles.navButton}
@@ -959,9 +989,11 @@ export default function StatsScreen() {
 
           {renderHeatmapCalendar()}
 
-          {/* UPDATED: Success tracker legend */}
+          {/* Success tracker legend */}
           <View style={styles.legend}>
-            <Text style={styles.legendLabel}>Incomplete</Text>
+            <Text style={[styles.legendLabel, { color: colors.textSecondary }]}>
+              Incomplete
+            </Text>
             <View style={styles.legendColors}>
               <View
                 style={[
@@ -969,7 +1001,7 @@ export default function StatsScreen() {
                   {
                     backgroundColor: "transparent",
                     borderWidth: 1,
-                    borderColor: "#ebedf0",
+                    borderColor: colors.border,
                   },
                 ]}
               />
@@ -977,11 +1009,13 @@ export default function StatsScreen() {
                 style={[styles.legendColor, { backgroundColor: "#c6e48b" }]}
               />
             </View>
-            <Text style={styles.legendLabel}>All Complete</Text>
+            <Text style={[styles.legendLabel, { color: colors.textSecondary }]}>
+              All Complete
+            </Text>
           </View>
         </View>
 
-        {/* NEW: Achievements Section */}
+        {/* Achievements Section */}
         {renderAchievements()}
       </ScrollView>
     </SafeAreaView>
@@ -991,24 +1025,20 @@ export default function StatsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
   },
   header: {
-    backgroundColor: "#fff",
     paddingVertical: 20,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333",
   },
   scrollView: {
     flex: 1,
   },
-  // NEW: Widget container and styles
+  // Widget container and styles
   widgetContainer: {
     flexDirection: "row",
     paddingHorizontal: 20,
@@ -1017,7 +1047,6 @@ const styles = StyleSheet.create({
   },
   widget: {
     flex: 1,
-    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 16,
     flexDirection: "row",
@@ -1051,7 +1080,6 @@ const styles = StyleSheet.create({
   },
   currentStreakLabel: {
     fontSize: 14,
-    color: "#666",
     marginTop: 2,
   },
   currentStreakMessage: {
@@ -1068,17 +1096,14 @@ const styles = StyleSheet.create({
   },
   longestStreakLabel: {
     fontSize: 14,
-    color: "#666",
     marginTop: 2,
   },
   longestStreakDates: {
     fontSize: 12,
-    color: "#666",
     marginTop: 4,
   },
-  // Existing heatmap styles
+  // Heatmap styles
   heatmapSection: {
-    backgroundColor: "#fff",
     marginTop: 20,
     marginHorizontal: 20,
     borderRadius: 16,
@@ -1105,33 +1130,31 @@ const styles = StyleSheet.create({
   monthTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
   },
   heatmapGrid: {
     alignItems: "center",
-    width: "100%", // Ensure full width
+    width: "100%",
   },
   dayLabels: {
     flexDirection: "row",
     marginBottom: 10,
-    width: "100%", // Changed from width - 80 to 100%
+    width: "100%",
     paddingHorizontal: 0,
   },
   dayLabel: {
     flex: 1,
     textAlign: "center",
     fontSize: 12,
-    color: "#666",
     fontWeight: "500",
   },
   calendarGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    width: "100%", // Changed from width - 80 to 100%
+    width: "100%",
   },
   heatmapCell: {
-    width: "14.28%", // 100% / 7 days = 14.28% per day
-    aspectRatio: 1, // Keep square cells
+    width: "14.28%",
+    aspectRatio: 1,
     padding: 1,
   },
   heatmapDay: {
@@ -1142,7 +1165,6 @@ const styles = StyleSheet.create({
   },
   heatmapDayText: {
     fontSize: 12,
-    color: "#333",
     fontWeight: "500",
   },
   legend: {
@@ -1154,7 +1176,6 @@ const styles = StyleSheet.create({
   },
   legendLabel: {
     fontSize: 12,
-    color: "#666",
   },
   legendColors: {
     flexDirection: "row",
@@ -1165,9 +1186,8 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 2,
   },
-  // NEW: Achievements Section Styles - Completely redesigned
+  // Achievements Section Styles - Completely redesigned
   achievementsSection: {
-    backgroundColor: "#fff",
     marginTop: 20,
     marginHorizontal: 20,
     marginBottom: 20,
@@ -1197,7 +1217,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#fff8e1",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -1206,10 +1225,8 @@ const styles = StyleSheet.create({
   achievementsTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#333",
   },
   achievementsStats: {
-    backgroundColor: "#f0f9ff",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -1224,10 +1241,10 @@ const styles = StyleSheet.create({
   achievementsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8, // Smaller gap
+    gap: 8,
   },
   achievementCard: {
-    width: "31%", // 3 cards per row: 31% each with gaps = ~100%
+    width: "31%",
     borderRadius: 16,
     overflow: "hidden",
     position: "relative",
@@ -1257,9 +1274,25 @@ const styles = StyleSheet.create({
     minHeight: 120,
     justifyContent: "space-between",
   },
-  achievementBadge: {
+  // Badge-style achievement styles
+  achievementBadgeContainer: {
     position: "relative",
     marginBottom: 12,
+    alignItems: "center",
+  },
+  achievementBadgeNew: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    borderWidth: 3,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   achievementBadgeGlow: {
     shadowColor: "#00d4aa",
@@ -1270,34 +1303,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 8,
     elevation: 8,
-  },
-  achievementBadgeInner: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  // NEW: Badge-style achievement styles (replacing the old circular ones)
-  achievementBadgeContainer: {
-    position: "relative",
-    marginBottom: 12,
-    alignItems: "center",
-  },
-  achievementBadgeNew: {
-    width: 50,
-    height: 50,
-    borderRadius: 8, // More badge-like, less circular
-    borderWidth: 3,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
   },
   shieldBadge: {
     borderBottomLeftRadius: 20,
@@ -1310,7 +1315,7 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "45deg" }],
   },
   ultimateBadge: {
-    borderRadius: 50, // Back to circular for ultimate prestige
+    borderRadius: 50,
     width: 52,
     height: 52,
   },
@@ -1476,3 +1481,43 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 14,
   },
 });
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  SafeAreaView,
+  Alert,
+  Dimensions,
+  RefreshControl,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import { supabase } from "../../services/supabase";
+import { RoutineCompletion } from "../../types/database";
+import { useTheme } from "../../../ThemeContext";
+
+const { width } = Dimensions.get("window");
+
+interface CompletionData {
+  date: string;
+  completionCount: number;
+}
+
+interface StreakInfo {
+  length: number;
+  startDate: string;
+  endDate: string;
+  isOngoing: boolean;
+}
+
+// Achievement interface
+interface Achievement {
+  id: string;
+  name: string;
+  target: number;
+  unlocked: boolean;
+  unlockedDate?: string;
+}
