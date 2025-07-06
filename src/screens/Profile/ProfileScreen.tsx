@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../services/supabase";
 import { Profile, UserSettings } from "../../types/database";
+import { useTheme } from "../../../ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -38,13 +39,16 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // NEW: Achievement state (same as StatsScreen)
+  // Achievement state
   const [achievements, setAchievements] = useState<Achievement[]>([]);
 
-  // NEW: Help popup state
+  // Help popup state
   const [showHelpModal, setShowHelpModal] = useState(false);
 
-  // NEW: Achievement targets (same as StatsScreen)
+  // NEW: Theme context
+  const { colors } = useTheme();
+
+  // Achievement targets (same as StatsScreen)
   const ACHIEVEMENT_TARGETS = [
     3, 5, 7, 14, 30, 60, 100, 150, 200, 250, 300, 365,
   ];
@@ -87,7 +91,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       setProfile(profileData);
       setSettings(settingsData);
 
-      // NEW: Load achievements
+      // Load achievements
       await calculateAchievements(user.id);
     } catch (error) {
       console.error("Error loading profile:", error);
@@ -98,10 +102,9 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
   };
 
-  // NEW: Achievement calculation logic (same as StatsScreen)
+  // Achievement calculation logic (same as StatsScreen)
   const calculateAchievements = useCallback(async (userId: string) => {
     try {
-      // Get all historical streak data to check for past achievements
       const [completionsResult, userRoutinesResult, dayRoutinesResult] =
         await Promise.all([
           supabase
@@ -131,7 +134,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       const userRoutines = userRoutinesResult.data || [];
       const dayAssignments = dayRoutinesResult.data || [];
 
-      // Build day-routine mapping (same logic as streak calculation)
       const dayRoutineMap: Record<number, string[]> = {};
       dayAssignments.forEach((assignment) => {
         if (!dayRoutineMap[assignment.day_of_week]) {
@@ -140,7 +142,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
       });
 
-      // Create success days map
       const successDays = new Set<string>();
       const completionsByDate = new Map<string, string[]>();
 
@@ -152,7 +153,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         completionsByDate.get(date)!.push(completion.routine_id);
       });
 
-      // Check each date for success (same logic as streak calculation)
       completionsByDate.forEach((completedRoutineIds, date) => {
         const dayOfWeek = new Date(date).getDay();
         const dailyRoutineIds = dayRoutineMap[dayOfWeek] || [];
@@ -174,7 +174,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
       const successDatesArray = Array.from(successDays).sort();
 
-      // Find all streaks that have occurred
       const allStreaks: {
         length: number;
         startDate: string;
@@ -192,10 +191,8 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
             (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
 
           if (dayDiff === 1) {
-            // Consecutive day
             currentStreakLength++;
           } else {
-            // Streak broken, record the streak
             allStreaks.push({
               length: currentStreakLength,
               startDate: currentStreakStart,
@@ -206,7 +203,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           }
         }
 
-        // Don't forget the last streak
         allStreaks.push({
           length: currentStreakLength,
           startDate: currentStreakStart,
@@ -214,10 +210,8 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         });
       }
 
-      // Create achievements array
       const newAchievements: Achievement[] = ACHIEVEMENT_TARGETS.map(
         (target) => {
-          // Check if any streak has reached this target
           const unlockedStreak = allStreaks.find(
             (streak) => streak.length >= target
           );
@@ -256,7 +250,36 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     ]);
   };
 
-  // NEW: Get badge design for profile display (compact version)
+  // Help & Support popup
+  const showHelpSupport = () => {
+    setShowHelpModal(true);
+  };
+
+  // Handle email tap to open email app
+  const handleEmailPress = async () => {
+    const emailUrl = "mailto:askroutine@gmail.com";
+
+    try {
+      const canOpen = await Linking.canOpenURL(emailUrl);
+      if (canOpen) {
+        await Linking.openURL(emailUrl);
+      } else {
+        Alert.alert(
+          "Email Not Available",
+          "Please manually send an email to askroutine@gmail.com",
+          [{ text: "OK" }]
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        "Unable to open email app. Please manually send an email to askroutine@gmail.com",
+        [{ text: "OK" }]
+      );
+    }
+  };
+
+  // Get badge design for profile display
   const getBadgeDesign = (target: number, isUnlocked: boolean) => {
     if (target <= 30) {
       return {
@@ -301,23 +324,44 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
   };
 
-  // NEW: Render accomplished achievements section
+  // Render accomplished achievements section
   const renderAccomplishedAchievements = () => {
     const unlockedAchievements = achievements.filter((a) => a.unlocked);
 
     if (unlockedAchievements.length === 0) {
       return (
-        <View style={styles.achievementsSection}>
+        <View
+          style={[
+            styles.achievementsSection,
+            { backgroundColor: colors.surface },
+          ]}
+        >
           <View style={styles.achievementsHeader}>
             <Ionicons name="trophy" size={20} color="#ffd700" />
-            <Text style={styles.sectionTitle}>Accomplished Achievements</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Accomplished Achievements
+            </Text>
           </View>
           <View style={styles.emptyAchievements}>
-            <Ionicons name="medal-outline" size={48} color="#ccc" />
-            <Text style={styles.emptyAchievementsText}>
+            <Ionicons
+              name="medal-outline"
+              size={48}
+              color={colors.textTertiary}
+            />
+            <Text
+              style={[
+                styles.emptyAchievementsText,
+                { color: colors.textSecondary },
+              ]}
+            >
               No achievements yet
             </Text>
-            <Text style={styles.emptyAchievementsSubtext}>
+            <Text
+              style={[
+                styles.emptyAchievementsSubtext,
+                { color: colors.textTertiary },
+              ]}
+            >
               Complete your daily routines to start earning badges!
             </Text>
           </View>
@@ -326,11 +370,26 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
 
     return (
-      <View style={styles.achievementsSection}>
+      <View
+        style={[
+          styles.achievementsSection,
+          { backgroundColor: colors.surface },
+        ]}
+      >
         <View style={styles.achievementsHeader}>
           <Ionicons name="trophy" size={20} color="#ffd700" />
-          <Text style={styles.sectionTitle}>Accomplished Achievements</Text>
-          <Text style={styles.achievementCount}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Accomplished Achievements
+          </Text>
+          <Text
+            style={[
+              styles.achievementCount,
+              {
+                backgroundColor: colors.background,
+                color: "#007AFF",
+              },
+            ]}
+          >
             {unlockedAchievements.length}
           </Text>
         </View>
@@ -348,7 +407,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 key={achievement.id}
                 style={styles.accomplishedAchievementCard}
               >
-                {/* Badge */}
                 <View
                   style={[
                     styles.accomplishedBadge,
@@ -370,15 +428,29 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                   </View>
                 </View>
 
-                {/* Info */}
-                <Text style={styles.accomplishedAchievementTitle}>
+                <Text
+                  style={[
+                    styles.accomplishedAchievementTitle,
+                    { color: colors.text },
+                  ]}
+                >
                   {achievement.target} Day{achievement.target > 1 ? "s" : ""}
                 </Text>
-                <Text style={styles.accomplishedAchievementTier}>
+                <Text
+                  style={[
+                    styles.accomplishedAchievementTier,
+                    { color: colors.textSecondary },
+                  ]}
+                >
                   {badgeDesign.tier}
                 </Text>
                 {achievement.unlockedDate && (
-                  <Text style={styles.accomplishedAchievementDate}>
+                  <Text
+                    style={[
+                      styles.accomplishedAchievementDate,
+                      { color: colors.textTertiary },
+                    ]}
+                  >
                     {new Date(achievement.unlockedDate).toLocaleDateString(
                       "en-US",
                       {
@@ -395,35 +467,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         </ScrollView>
       </View>
     );
-  };
-
-  // NEW: Help & Support popup
-  const showHelpSupport = () => {
-    setShowHelpModal(true);
-  };
-
-  // NEW: Handle email tap to open email app
-  const handleEmailPress = async () => {
-    const emailUrl = "mailto:askroutine@gmail.com";
-
-    try {
-      const canOpen = await Linking.canOpenURL(emailUrl);
-      if (canOpen) {
-        await Linking.openURL(emailUrl);
-      } else {
-        Alert.alert(
-          "Email Not Available",
-          "Please manually send an email to askroutine@gmail.com",
-          [{ text: "OK" }]
-        );
-      }
-    } catch (error) {
-      Alert.alert(
-        "Error",
-        "Unable to open email app. Please manually send an email to askroutine@gmail.com",
-        [{ text: "OK" }]
-      );
-    }
   };
 
   const menuItems = [
@@ -443,39 +486,67 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+      >
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Profile
+          </Text>
         </View>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={[styles.loadingText, { color: colors.text }]}>
+            Loading...
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Profile
+        </Text>
       </View>
 
       <ScrollView
-        style={styles.scrollView}
+        style={[styles.scrollView, { backgroundColor: colors.background }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
         {/* User Info Section */}
-        <View style={styles.userSection}>
+        <View style={[styles.userSection, { backgroundColor: colors.surface }]}>
           <View style={styles.avatarContainer}>
             <Ionicons name="person-circle" size={80} color="#007AFF" />
           </View>
-          <Text style={styles.userName}>{profile?.full_name || "User"}</Text>
-          <Text style={styles.userEmail}>
+          <Text style={[styles.userName, { color: colors.text }]}>
+            {profile?.full_name || "User"}
+          </Text>
+          <Text style={[styles.userEmail, { color: colors.textSecondary }]}>
             {profile?.email || "user@example.com"}
           </Text>
-          <Text style={styles.joinDate}>
+          <Text style={[styles.joinDate, { color: colors.textTertiary }]}>
             Member since{" "}
             {profile?.created_at
               ? new Date(profile.created_at).toLocaleDateString("en-US", {
@@ -486,27 +557,45 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           </Text>
         </View>
 
-        {/* NEW: Accomplished Achievements Section (replaces Quick Stats) */}
+        {/* Accomplished Achievements Section */}
         {renderAccomplishedAchievements()}
 
         {/* Menu Items */}
-        <View style={styles.menuSection}>
+        <View style={[styles.menuSection, { backgroundColor: colors.surface }]}>
           {menuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
-              style={styles.menuItem}
+              style={[styles.menuItem, { borderBottomColor: colors.separator }]}
               onPress={item.onPress}
             >
               <View style={styles.menuItemLeft}>
-                <View style={styles.menuIconContainer}>
+                <View
+                  style={[
+                    styles.menuIconContainer,
+                    { backgroundColor: colors.background },
+                  ]}
+                >
                   <Ionicons name={item.icon as any} size={20} color="#007AFF" />
                 </View>
                 <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>{item.title}</Text>
-                  <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+                  <Text style={[styles.menuItemTitle, { color: colors.text }]}>
+                    {item.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.menuItemSubtitle,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {item.subtitle}
+                  </Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#ccc" />
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.textTertiary}
+              />
             </TouchableOpacity>
           ))}
         </View>
@@ -514,7 +603,13 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         {/* Sign Out Button */}
         <View style={styles.signOutSection}>
           <TouchableOpacity
-            style={styles.signOutButton}
+            style={[
+              styles.signOutButton,
+              {
+                backgroundColor: colors.surface,
+                borderColor: "#ff6b6b",
+              },
+            ]}
             onPress={handleSignOut}
           >
             <Ionicons name="log-out-outline" size={20} color="#ff6b6b" />
@@ -523,7 +618,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         </View>
       </ScrollView>
 
-      {/* NEW: Help & Support Modal */}
+      {/* Help & Support Modal */}
       <Modal
         visible={showHelpModal}
         transparent={true}
@@ -531,27 +626,40 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         onRequestClose={() => setShowHelpModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
+          <View
+            style={[styles.modalContainer, { backgroundColor: colors.surface }]}
+          >
+            <View
+              style={[
+                styles.modalHeader,
+                { borderBottomColor: colors.separator },
+              ]}
+            >
               <Ionicons name="help-circle" size={24} color="#007AFF" />
-              <Text style={styles.modalTitle}>Help & Support</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Help & Support
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowHelpModal(false)}
                 style={styles.modalCloseButton}
               >
-                <Ionicons name="close" size={24} color="#666" />
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.modalContent}>
               <View style={styles.contactInfo}>
-                <Text style={styles.contactLabel}>Email:</Text>
+                <Text style={[styles.contactLabel, { color: colors.text }]}>
+                  Email:
+                </Text>
                 <TouchableOpacity onPress={handleEmailPress}>
                   <Text style={styles.contactEmail}>askroutine@gmail.com</Text>
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.contactMessage}>
+              <Text
+                style={[styles.contactMessage, { color: colors.textSecondary }]}
+              >
                 Please reach out with any recommendations, comments, or
                 concerns.
               </Text>
@@ -573,19 +681,15 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
   },
   header: {
-    backgroundColor: "#fff",
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#333",
   },
   scrollView: {
     flex: 1,
@@ -597,10 +701,8 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: "#666",
   },
   userSection: {
-    backgroundColor: "#fff",
     alignItems: "center",
     paddingVertical: 30,
     marginTop: 15,
@@ -611,21 +713,17 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333",
     marginBottom: 5,
   },
   userEmail: {
     fontSize: 16,
-    color: "#666",
     marginBottom: 10,
   },
   joinDate: {
     fontSize: 14,
-    color: "#999",
   },
-  // NEW: Accomplished Achievements Styles
+  // Achievements Section Styles
   achievementsSection: {
-    backgroundColor: "#fff",
     paddingHorizontal: 20,
     paddingVertical: 20,
     marginTop: 15,
@@ -639,14 +737,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
     flex: 1,
   },
   achievementCount: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#007AFF",
-    backgroundColor: "#f0f9ff",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -695,20 +790,17 @@ const styles = StyleSheet.create({
   accomplishedAchievementTitle: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#333",
     textAlign: "center",
     marginBottom: 2,
   },
   accomplishedAchievementTier: {
     fontSize: 10,
     fontWeight: "700",
-    color: "#666",
     textAlign: "center",
     marginBottom: 4,
   },
   accomplishedAchievementDate: {
     fontSize: 9,
-    color: "#999",
     textAlign: "center",
   },
   emptyAchievements: {
@@ -718,18 +810,15 @@ const styles = StyleSheet.create({
   emptyAchievementsText: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#666",
     marginTop: 12,
     marginBottom: 4,
   },
   emptyAchievementsSubtext: {
     fontSize: 14,
-    color: "#999",
     textAlign: "center",
   },
-  // Existing menu styles
+  // Menu styles
   menuSection: {
-    backgroundColor: "#fff",
     marginTop: 15,
   },
   menuItem: {
@@ -739,7 +828,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   menuItemLeft: {
     flexDirection: "row",
@@ -750,7 +838,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#f0f8ff",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -761,12 +848,10 @@ const styles = StyleSheet.create({
   menuItemTitle: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
     marginBottom: 2,
   },
   menuItemSubtitle: {
     fontSize: 14,
-    color: "#666",
   },
   signOutSection: {
     paddingHorizontal: 20,
@@ -776,11 +861,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
     paddingVertical: 16,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ff6b6b",
   },
   signOutButtonText: {
     fontSize: 16,
@@ -788,7 +871,7 @@ const styles = StyleSheet.create({
     color: "#ff6b6b",
     marginLeft: 8,
   },
-  // NEW: Help & Support Modal Styles
+  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -797,7 +880,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   modalContainer: {
-    backgroundColor: "#fff",
     borderRadius: 16,
     width: "100%",
     maxWidth: 400,
@@ -813,12 +895,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
     flex: 1,
     marginLeft: 12,
   },
@@ -835,7 +915,6 @@ const styles = StyleSheet.create({
   contactLabel: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 8,
   },
   contactEmail: {
@@ -843,11 +922,10 @@ const styles = StyleSheet.create({
     color: "#007AFF",
     fontWeight: "500",
     marginBottom: 16,
-    textDecorationLine: "underline", // Makes it look more clickable
+    textDecorationLine: "underline",
   },
   contactMessage: {
     fontSize: 15,
-    color: "#666",
     lineHeight: 22,
     textAlign: "left",
   },
