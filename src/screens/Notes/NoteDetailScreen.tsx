@@ -18,6 +18,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import { supabase } from "../../services/supabase";
 import { Note } from "../../types/database";
+import { useTheme } from "../../../ThemeContext"; // ADD THIS IMPORT
 
 interface NoteDetailScreenProps {
   navigation: any;
@@ -51,6 +52,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
 }) => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const { colors } = useTheme(); // ADD THEME SUPPORT
 
   const handleSetPassword = () => {
     if (!password.trim()) {
@@ -72,28 +74,28 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
       animationType="slide"
       presentationStyle="pageSheet"
     >
-      <SafeAreaView style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
+      <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}> {/* USE THEME */}
+        <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}> {/* USE THEME */}
           <TouchableOpacity onPress={onClose}>
             <Text style={styles.modalCancelText}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={styles.modalTitle}>Set Password</Text>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Set Password</Text> {/* USE THEME */}
           <TouchableOpacity onPress={handleSetPassword}>
             <Text style={styles.modalSaveText}>Save</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.modalContent}>
-          <Text style={styles.passwordLabel}>
+          <Text style={[styles.passwordLabel, { color: colors.text }]}> {/* USE THEME */}
             Create a password to lock this note
           </Text>
 
           {/* FIXED: Single password input only */}
-          <View style={styles.passwordInputContainer}>
+          <View style={[styles.passwordInputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}> {/* USE THEME */}
             <TextInput
-              style={styles.passwordInput}
+              style={[styles.passwordInput, { color: colors.text }]} {/* USE THEME */}
               placeholder="Enter password"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.placeholder} {/* USE THEME */}
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
@@ -107,7 +109,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
               <Ionicons
                 name={showPassword ? "eye" : "eye-off"}
                 size={20}
-                color="#666"
+                color={colors.textSecondary} {/* USE THEME */}
               />
             </TouchableOpacity>
           </View>
@@ -124,31 +126,33 @@ const LockModal: React.FC<LockModalProps> = ({
   onLockWithFaceID,
   onLockWithPassword,
 }) => {
+  const { colors } = useTheme(); // ADD THEME SUPPORT
+
   return (
     <Modal visible={visible} animationType="fade" transparent>
       <View style={styles.overlayContainer}>
-        <View style={styles.lockModalContainer}>
-          <Text style={styles.lockModalTitle}>Lock Note</Text>
-          <Text style={styles.lockModalSubtitle}>
+        <View style={[styles.lockModalContainer, { backgroundColor: colors.surface }]}> {/* USE THEME */}
+          <Text style={[styles.lockModalTitle, { color: colors.text }]}>Lock Note</Text> {/* USE THEME */}
+          <Text style={[styles.lockModalSubtitle, { color: colors.textSecondary }]}> {/* USE THEME */}
             Choose how to lock this note
           </Text>
 
           <TouchableOpacity
-            style={styles.lockOption}
+            style={[styles.lockOption, { backgroundColor: colors.card }]} {/* USE THEME */}
             onPress={onLockWithFaceID}
           >
             <Ionicons name="finger-print" size={24} color="#007AFF" />
-            <Text style={styles.lockOptionText}>Face ID / Touch ID</Text>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
+            <Text style={[styles.lockOptionText, { color: colors.text }]}>Face ID / Touch ID</Text> {/* USE THEME */}
+            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} /> {/* USE THEME */}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.lockOption}
+            style={[styles.lockOption, { backgroundColor: colors.card }]} {/* USE THEME */}
             onPress={onLockWithPassword}
           >
             <Ionicons name="key" size={24} color="#007AFF" />
-            <Text style={styles.lockOptionText}>Password</Text>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
+            <Text style={[styles.lockOptionText, { color: colors.text }]}>Password</Text> {/* USE THEME */}
+            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} /> {/* USE THEME */}
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
@@ -176,217 +180,110 @@ export default function NoteDetailScreen({
   const [showLockModal, setShowLockModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
+  // ADD THEME SUPPORT
+  const { colors } = useTheme();
+
   const titleInputRef = useRef<TextInput>(null);
   const contentInputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Handle scrolling - disconnect cursor and dismiss keyboard
-  const handleScroll = () => {
-    Keyboard.dismiss();
-    titleInputRef.current?.blur();
-    contentInputRef.current?.blur();
-  };
-
-  const handleContentChange = (text: string) => {
-    setContent(text);
-  };
-
   useEffect(() => {
-    if (isNew && titleInputRef.current) {
-      titleInputRef.current.focus();
+    if (isNew) {
+      setTimeout(() => titleInputRef.current?.focus(), 300);
     }
   }, [isNew]);
 
   useEffect(() => {
-    setHasChanges(
-      title !== (note?.title || "") ||
-        content !== (note?.content || "") ||
-        isLocked !== (note?.is_locked || false)
-    );
-  }, [title, content, isLocked, note]);
-
-  // Auto-save functionality - only when note is unlocked
-  useEffect(() => {
-    if (!isUnlocked) return; // Don't auto-save when locked
-
-    const saveTimer = setTimeout(() => {
-      if (hasChanges && (title.trim() || content.trim())) {
-        handleSave(false); // Silent auto-save
+    const timer = setTimeout(() => {
+      if (hasChanges) {
+        saveNote();
       }
     }, 1000);
 
-    return () => clearTimeout(saveTimer);
-  }, [title, content, hasChanges, isUnlocked]);
+    return () => clearTimeout(timer);
+  }, [title, content, hasChanges]);
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("beforeRemove", (e: any) => {
-      if (!hasChanges) {
-        return;
-      }
-
-      e.preventDefault();
-
-      Alert.alert(
-        "Discard changes?",
-        "You have unsaved changes. Are you sure you want to discard them?",
-        [
-          { text: "Don't leave", style: "cancel", onPress: () => {} },
-          {
-            text: "Discard",
-            style: "destructive",
-            onPress: () => navigation.dispatch(e.data.action),
-          },
-        ]
-      );
-    });
-
-    return unsubscribe;
-  }, [navigation, hasChanges]);
-
-  // FIXED: Handle lock/unlock toggle from header button
-  const handleLockToggle = async () => {
-    if (isLocked && !isUnlocked) {
-      // Note is locked, try to unlock it
-      await unlockNote();
-    } else if (isUnlocked) {
-      // Note is unlocked, lock it
-      setShowLockModal(true);
-    }
+  const handleContentChange = (text: string) => {
+    setContent(text);
+    setHasChanges(true);
   };
 
-  // FIXED: Unified unlock function for both unlock button and header button
-  const unlockNote = async () => {
+  const handleScroll = () => {
+    Keyboard.dismiss();
+  };
+
+  const saveNote = async () => {
+    if (!title.trim() && !content.trim()) return;
+
     try {
-      // First try to get the stored password for this note
-      const storedPassword = await SecureStore.getItemAsync(
-        `note_password_${note?.id}`
-      );
+      setSaving(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (storedPassword) {
-        // This note was locked with a password
-        Alert.prompt(
-          "Enter Password",
-          "Enter the password to unlock this note",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Unlock",
-              onPress: async (inputPassword) => {
-                if (inputPassword === storedPassword) {
-                  setIsUnlocked(true);
-                } else {
-                  Alert.alert("Error", "Incorrect password");
-                }
-              },
-            },
-          ],
-          "secure-text"
-        );
-      } else {
-        // This note was locked with biometric authentication
-        console.log("Attempting Face ID unlock...");
+      if (isNew) {
+        const { data, error } = await supabase
+          .from("notes")
+          .insert({
+            user_id: user.id,
+            title: title.trim() || "Untitled",
+            content: content.trim(),
+            is_locked: isLocked,
+          })
+          .select()
+          .single();
 
-        // SIMPLIFIED: Try basic Face ID authentication
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: "Use Face ID to unlock this note",
-        });
+        if (error) throw error;
 
-        console.log("Face ID Unlock Result:", result);
+        // Update the route params to mark as not new anymore
+        navigation.setParams({ note: data, isNew: false });
+      } else if (note) {
+        const { error } = await supabase
+          .from("notes")
+          .update({
+            title: title.trim() || "Untitled",
+            content: content.trim(),
+            is_locked: isLocked,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", note.id);
 
-        if (result.success) {
-          setIsUnlocked(true);
-        } else {
-          Alert.alert(
-            "Face ID Authentication Failed",
-            "Face ID authentication was not successful. Please try again."
-          );
-        }
+        if (error) throw error;
+      }
+
+      setHasChanges(false);
+      if (onSave) {
+        onSave();
       }
     } catch (error) {
-      console.error("Error unlocking note:", error);
-      Alert.alert("Error", "Failed to unlock note");
+      console.error("Error saving note:", error);
+      Alert.alert("Error", "Failed to save note");
+    } finally {
+      setSaving(false);
     }
   };
 
   const lockWithFaceID = async () => {
     try {
-      // SIMPLIFIED: Try the most basic Face ID configuration first
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Use Face ID to lock this note",
-        // REMOVED: disableDeviceFallback - let's allow fallback for now to test
-      });
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
-      console.log("Face ID Result:", result);
-
-      if (result.success) {
-        // Remove any existing password for this note
-        if (note?.id) {
-          try {
-            await SecureStore.deleteItemAsync(`note_password_${note.id}`);
-          } catch (e) {
-            // Password didn't exist, that's fine
-          }
-        }
-
-        await updateNoteLockStatus(true);
-        setIsLocked(true);
-        setIsUnlocked(false);
-        setShowLockModal(false);
-        Alert.alert("Success", "Note locked with Face ID");
-      } else {
-        // If direct Face ID fails, try a different approach
+      if (!hasHardware || !isEnrolled) {
         Alert.alert(
-          "Face ID Setup",
-          "Would you like to try an alternative Face ID setup?",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Try Alternative",
-              onPress: () => tryAlternativeFaceID(),
-            },
-          ]
+          "Biometric Authentication Not Available",
+          "Please set up Face ID or Touch ID in your device settings, or use password protection instead."
         );
+        return;
       }
+
+      setIsLocked(true);
+      setIsUnlocked(false);
+      setShowLockModal(false);
+      await saveNote();
     } catch (error) {
-      console.error("Face ID Error:", error);
-      Alert.alert(
-        "Face ID Error",
-        "There was an error with Face ID authentication. Please try using the password option instead."
-      );
-    }
-  };
-
-  // NEW: Alternative Face ID approach using a different strategy
-  const tryAlternativeFaceID = async () => {
-    try {
-      // Try with minimal options - sometimes less is more
-      const result = await LocalAuthentication.authenticateAsync();
-
-      console.log("Alternative Face ID Result:", result);
-
-      if (result.success) {
-        if (note?.id) {
-          try {
-            await SecureStore.deleteItemAsync(`note_password_${note.id}`);
-          } catch (e) {
-            // Password didn't exist, that's fine
-          }
-        }
-
-        await updateNoteLockStatus(true);
-        setIsLocked(true);
-        setIsUnlocked(false);
-        setShowLockModal(false);
-        Alert.alert("Success", "Note locked with Face ID");
-      } else {
-        Alert.alert(
-          "Face ID Not Working",
-          "Face ID authentication is not working properly. Please use the password option instead."
-        );
-      }
-    } catch (error) {
-      console.error("Alternative Face ID Error:", error);
-      Alert.alert("Error", "Face ID setup failed. Please use password option.");
+      console.error("Error setting up Face ID lock:", error);
+      Alert.alert("Error", "Failed to set up Face ID protection");
     }
   };
 
@@ -397,96 +294,88 @@ export default function NoteDetailScreen({
 
   const handleSetPassword = async (password: string) => {
     try {
-      if (!note?.id) {
-        Alert.alert("Error", "Cannot lock unsaved note");
-        return;
-      }
+      const noteId = note?.id || `temp_${Date.now()}`;
+      await SecureStore.setItemAsync(`note_password_${noteId}`, password);
 
-      // Store the password securely
-      await SecureStore.setItemAsync(`note_password_${note.id}`, password);
-
-      await updateNoteLockStatus(true);
       setIsLocked(true);
       setIsUnlocked(false);
       setShowPasswordModal(false);
-      Alert.alert("Success", "Note locked with password");
+      await saveNote();
     } catch (error) {
       console.error("Error setting password:", error);
-      Alert.alert("Error", "Failed to set password");
+      Alert.alert("Error", "Failed to set password protection");
     }
   };
 
-  const updateNoteLockStatus = async (locked: boolean) => {
-    if (!note?.id) return;
-
+  const unlockNote = async () => {
     try {
-      const { error } = await supabase
-        .from("notes")
-        .update({ is_locked: locked })
-        .eq("id", note.id);
+      if (!note) return;
 
-      if (error) throw error;
-    } catch (error) {
-      console.error("Error updating lock status:", error);
-      throw error;
-    }
-  };
-
-  const handleSave = async (showAlert = true) => {
-    if (!title.trim() && !content.trim()) {
-      if (showAlert) {
-        Alert.alert("Empty Note", "Cannot save an empty note");
+      // Try password first (if exists)
+      try {
+        const storedPassword = await SecureStore.getItemAsync(
+          `note_password_${note.id}`
+        );
+        if (storedPassword) {
+          // Prompt for password
+          Alert.prompt(
+            "Enter Password",
+            "Enter the password to unlock this note:",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Unlock",
+                onPress: (inputPassword) => {
+                  if (inputPassword === storedPassword) {
+                    setIsUnlocked(true);
+                  } else {
+                    Alert.alert("Error", "Incorrect password");
+                  }
+                },
+              },
+            ],
+            "secure-text"
+          );
+          return;
+        }
+      } catch (e) {
+        // No password set, try biometric
       }
-      return;
-    }
 
-    setSaving(true);
+      // Try biometric authentication
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user found");
-
-      if (isNew) {
-        const { error } = await supabase.from("notes").insert({
-          user_id: user.id,
-          title: title.trim() || "Untitled",
-          content: content.trim(),
-          is_pinned: false,
-          is_locked: isLocked,
+      if (hasHardware && isEnrolled) {
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: "Unlock Note",
+          fallbackLabel: "Use Password",
         });
 
-        if (error) throw error;
+        if (result.success) {
+          setIsUnlocked(true);
+        }
       } else {
-        const { error } = await supabase
-          .from("notes")
-          .update({
-            title: title.trim() || "Untitled",
-            content: content.trim(),
-            is_locked: isLocked,
-          })
-          .eq("id", note!.id);
-
-        if (error) throw error;
-      }
-
-      setHasChanges(false);
-
-      if (showAlert) {
-        Alert.alert("Success", "Note saved successfully");
-      }
-
-      if (onSave) {
-        onSave();
+        Alert.alert(
+          "Authentication Not Available",
+          "No authentication method available for this note"
+        );
       }
     } catch (error) {
-      console.error("Error saving note:", error);
-      if (showAlert) {
-        Alert.alert("Error", "Failed to save note");
-      }
-    } finally {
-      setSaving(false);
+      console.error("Error unlocking note:", error);
+      Alert.alert("Error", "Failed to unlock note");
+    }
+  };
+
+  const handleLockToggle = () => {
+    if (isLocked) {
+      // Unlock the note
+      setIsLocked(false);
+      setIsUnlocked(true);
+      saveNote();
+    } else {
+      // Lock the note
+      setShowLockModal(true);
     }
   };
 
@@ -529,10 +418,10 @@ export default function NoteDetailScreen({
 
   // FIXED: Show unlock screen when note is locked and not unlocked
   const renderUnlockScreen = () => (
-    <View style={styles.unlockContainer}>
+    <View style={[styles.unlockContainer, { backgroundColor: colors.background }]}> {/* USE THEME */}
       <Ionicons name="lock-closed" size={64} color="#007AFF" />
-      <Text style={styles.unlockTitle}>Note is Locked</Text>
-      <Text style={styles.unlockSubtitle}>
+      <Text style={[styles.unlockTitle, { color: colors.text }]}>Note is Locked</Text> {/* USE THEME */}
+      <Text style={[styles.unlockSubtitle, { color: colors.textSecondary }]}> {/* USE THEME */}
         This note is protected. Unlock to view its contents.
       </Text>
 
@@ -544,14 +433,14 @@ export default function NoteDetailScreen({
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> {/* USE THEME */}
       <KeyboardAvoidingView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.background }]} {/* USE THEME */}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         {/* Header - always visible */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}> {/* USE THEME */}
           <View style={styles.headerLeft}>
             <TouchableOpacity
               style={styles.backButton}
@@ -569,7 +458,9 @@ export default function NoteDetailScreen({
             >
               <Ionicons
                 name={
-                  isLocked && !isUnlocked ? "lock-closed" : "lock-open-outline"
+                  isLocked && !isUnlocked
+                    ? "lock-closed"
+                    : "lock-open-outline"
                 }
                 size={20}
                 color="#007AFF"
@@ -595,7 +486,7 @@ export default function NoteDetailScreen({
           <>
             <ScrollView
               ref={scrollViewRef}
-              style={styles.content}
+              style={[styles.content, { backgroundColor: colors.background }]} {/* USE THEME */}
               keyboardShouldPersistTaps="handled"
               onScrollBeginDrag={handleScroll}
               onMomentumScrollBegin={handleScroll}
@@ -603,9 +494,9 @@ export default function NoteDetailScreen({
             >
               <TextInput
                 ref={titleInputRef}
-                style={styles.titleInput}
+                style={[styles.titleInput, { color: colors.text, borderBottomColor: colors.separator }]} {/* USE THEME */}
                 placeholder="Title"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.placeholder} {/* USE THEME */}
                 value={title}
                 onChangeText={setTitle}
                 returnKeyType="next"
@@ -614,9 +505,9 @@ export default function NoteDetailScreen({
 
               <TextInput
                 ref={contentInputRef}
-                style={styles.contentInput}
+                style={[styles.contentInput, { color: colors.text }]} {/* USE THEME */}
                 placeholder="Start writing..."
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.placeholder} {/* USE THEME */}
                 value={content}
                 onChangeText={handleContentChange}
                 multiline
@@ -656,7 +547,7 @@ export default function NoteDetailScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    // REMOVED HARDCODED backgroundColor: "#fff", - NOW USES THEME
   },
   header: {
     flexDirection: "row",
@@ -665,7 +556,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
+    // REMOVED HARDCODED borderBottomColor: "#e9ecef", - NOW USES THEME
+    // REMOVED HARDCODED backgroundColor - NOW USES THEME
   },
   headerLeft: {
     flex: 1,
@@ -690,18 +582,19 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+    // REMOVED HARDCODED backgroundColor - NOW USES THEME
   },
   titleInput: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333",
+    // REMOVED HARDCODED color: "#333", - NOW USES THEME
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    // REMOVED HARDCODED borderBottomColor: "#f0f0f0", - NOW USES THEME
   },
   contentInput: {
     fontSize: 16,
-    color: "#333",
+    // REMOVED HARDCODED color: "#333", - NOW USES THEME
     lineHeight: 24,
     paddingVertical: 16,
     minHeight: 400,
@@ -729,19 +622,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 40,
-    backgroundColor: "#fff",
+    // REMOVED HARDCODED backgroundColor: "#fff", - NOW USES THEME
   },
   unlockTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333",
+    // REMOVED HARDCODED color: "#333", - NOW USES THEME
     marginTop: 24,
     marginBottom: 12,
     textAlign: "center",
   },
   unlockSubtitle: {
     fontSize: 16,
-    color: "#666",
+    // REMOVED HARDCODED color: "#666", - NOW USES THEME
     textAlign: "center",
     lineHeight: 22,
     marginBottom: 32,
@@ -776,7 +669,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   lockModalContainer: {
-    backgroundColor: "#fff",
+    // REMOVED HARDCODED backgroundColor: "#fff", - NOW USES THEME
     borderRadius: 16,
     padding: 24,
     margin: 20,
@@ -788,10 +681,11 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 8,
+    // REMOVED HARDCODED color - NOW USES THEME
   },
   lockModalSubtitle: {
     fontSize: 16,
-    color: "#666",
+    // REMOVED HARDCODED color: "#666", - NOW USES THEME
     textAlign: "center",
     marginBottom: 24,
   },
@@ -801,7 +695,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: "#f8f9fa",
+    // REMOVED HARDCODED backgroundColor: "#f8f9fa", - NOW USES THEME
     marginBottom: 12,
   },
   lockOptionText: {
@@ -809,7 +703,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
     marginLeft: 12,
-    color: "#333",
+    // REMOVED HARDCODED color: "#333", - NOW USES THEME
   },
   cancelButton: {
     marginTop: 12,
@@ -824,7 +718,7 @@ const styles = StyleSheet.create({
   // Password Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: "#fff",
+    // REMOVED HARDCODED backgroundColor: "#fff", - NOW USES THEME
   },
   modalHeader: {
     flexDirection: "row",
@@ -833,11 +727,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
+    // REMOVED HARDCODED borderBottomColor: "#e9ecef", - NOW USES THEME
+    // REMOVED HARDCODED backgroundColor - NOW USES THEME
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "bold",
+    // REMOVED HARDCODED color - NOW USES THEME
   },
   modalCancelText: {
     fontSize: 16,
@@ -853,7 +749,7 @@ const styles = StyleSheet.create({
   },
   passwordLabel: {
     fontSize: 16,
-    color: "#333",
+    // REMOVED HARDCODED color: "#333", - NOW USES THEME
     marginBottom: 20,
     textAlign: "center",
   },
@@ -861,17 +757,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#ddd",
+    // REMOVED HARDCODED borderColor: "#ddd", - NOW USES THEME
     borderRadius: 12,
     marginBottom: 16,
-    backgroundColor: "#f8f9fa",
+    // REMOVED HARDCODED backgroundColor: "#f8f9fa", - NOW USES THEME
   },
   passwordInput: {
     flex: 1,
     fontSize: 16,
     paddingVertical: 16,
     paddingHorizontal: 16,
-    color: "#333",
+    // REMOVED HARDCODED color: "#333", - NOW USES THEME
   },
   eyeButton: {
     padding: 16,
