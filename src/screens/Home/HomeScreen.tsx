@@ -76,56 +76,96 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const getTimePeriodInfo = () => {
     const now = new Date();
     const hour = now.getHours();
-    const dateString = now.toISOString().split("T")[0];
+    const dateString = now.toISOString().split('T')[0];
 
-    let period: "morning" | "afternoon" | "evening" = "morning";
-
+    let timePeriod: string;
     if (hour >= 5 && hour < 12) {
-      period = "morning";
+      timePeriod = "morning";
     } else if (hour >= 12 && hour < 17) {
-      period = "afternoon";
+      timePeriod = "afternoon";
+    } else if (hour >= 17 && hour < 21) {
+      timePeriod = "evening";
     } else {
-      period = "evening";
+      timePeriod = "night";
     }
 
-    return { period, dateString, hour };
+    const seed = `${dateString}-${timePeriod}`;
+    return { timePeriod, seed, hour };
   };
 
-  // Generate a personalized greeting
-  const personalizedGreeting = useMemo(() => {
-    const { period } = getTimePeriodInfo();
-    const greetings = {
-      morning: [
-        "Good morning! Ready to start strong?",
-        "Rise and shine! Let's make today count.",
-        "Morning! Time to crush your goals.",
-        "Hello there! Ready for a productive day?",
-        "Good morning! Your future self will thank you.",
-      ],
-      afternoon: [
-        "Good afternoon! Keep the momentum going.",
-        "Afternoon check-in! How are you doing?",
-        "Hello! Making great progress today?",
-        "Good afternoon! Stay focused on your goals.",
-        "Hey there! Keep up the excellent work.",
-      ],
-      evening: [
-        "Good evening! Finishing strong today?",
-        "Evening! Time to wrap up those goals.",
-        "Hello! How did your day go?",
-        "Good evening! Every step counts.",
-        "Hey there! Proud of your progress today?",
-      ],
-    };
+  // Simple seeded random function to ensure consistency
+  const seededRandom = (seed: string) => {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      const char = seed.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash) / 2147483648;
+  };
 
-    const options = greetings[period];
-    // Use date as seed for consistent greeting throughout the day
-    const { dateString } = getTimePeriodInfo();
-    const seed = dateString
-      .split("-")
-      .reduce((acc, num) => acc + parseInt(num), 0);
-    return options[seed % options.length];
-  }, []);
+  // Memoized greeting that only changes when the time period changes
+  const personalizedGreeting = useMemo(() => {
+    const { timePeriod, seed, hour } = getTimePeriodInfo();
+    const firstName = userProfile?.full_name?.split(" ")[0] || "there";
+
+    const morningGreetings = [
+      `Good morning, ${firstName}!`,
+      `Rise and shine, ${firstName}`,
+      `Morning, ${firstName}.`,
+      `Start strong, ${firstName}`,
+      `New day, new you, ${firstName}.`,
+      `Let's conquer today, ${firstName}!`,
+      `Early bird gets the worm, ${firstName}`,
+      `Ready to seize the day, ${firstName}?`,
+      `Fresh start awaits, ${firstName}.`,
+    ];
+
+    const afternoonGreetings = [
+      `Good afternoon, ${firstName}`,
+      `Halfway there, ${firstName}!`,
+      `Keep it up, ${firstName}.`,
+      `Afternoon momentum, ${firstName}`,
+      `You're crushing it, ${firstName}`,
+      `Stay focused, ${firstName}.`,
+      `Pushing through, ${firstName}?`,
+      `Making progress, ${firstName}`,
+      `Steady as she goes, ${firstName}.`,
+    ];
+
+    const eveningGreetings = [
+      `Good evening, ${firstName}`,
+      `Evening wind down, ${firstName}`,
+      `How did today go, ${firstName}?`,
+      `Wrapping up strong, ${firstName}?`,
+      `Reflect and recharge, ${firstName}`,
+      `Proud of today, ${firstName}?`,
+      `Rest well tonight, ${firstName}`,
+      `Tomorrow awaits, ${firstName}`,
+      `End on a high note, ${firstName}`,
+    ];
+
+    const nightGreetings = [
+      `Working late, ${firstName}?`,
+      `Night owl mode, ${firstName}`,
+      `Burning the midnight oil, ${firstName}?`,
+      `Late night productivity, ${firstName}`,
+      `Making the most of tonight, ${firstName}?`,
+      `Night shift, ${firstName}?`,
+      `Still going strong, ${firstName}`,
+      `Quiet hours, ${firstName}`,
+      `Peace and focus, ${firstName}`,
+    ];
+
+    let greetingArray = morningGreetings;
+    if (timePeriod === "afternoon") greetingArray = afternoonGreetings;
+    else if (timePeriod === "evening") greetingArray = eveningGreetings;
+    else if (timePeriod === "night") greetingArray = nightGreetings;
+
+    const randomValue = seededRandom(seed);
+    const greetingIndex = Math.floor(randomValue * greetingArray.length);
+    return greetingArray[greetingIndex];
+  }, [userProfile?.full_name]);
 
   // Load all user routines and day assignments
   const loadData = useCallback(async () => {
@@ -157,36 +197,30 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       const todayStr = today.toISOString().split("T")[0];
 
       // Load routines, completions, and day assignments
-      const [
-        routinesResult,
-        dailyCompletionsResult,
-        weeklyCompletionsResult,
-        dayRoutinesResult,
-      ] = await Promise.all([
-        supabase
-          .from("user_routines")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("is_active", true)
-          .order("sort_order"),
-        supabase
-          .from("routine_completions")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("completion_date", todayStr),
-        supabase
-          .from("routine_completions")
-          .select("*")
-          .eq("user_id", user.id)
-          .gte("week_start_date", weekStart.toISOString().split("T")[0])
-          .lt(
-            "week_start_date",
-            new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000)
-              .toISOString()
-              .split("T")[0]
-          ),
-        supabase.from("user_day_routines").select("*").eq("user_id", user.id),
-      ]);
+      const [routinesResult, dailyCompletionsResult, weeklyCompletionsResult, dayRoutinesResult] =
+        await Promise.all([
+          supabase
+            .from("user_routines")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("is_active", true)
+            .order("sort_order"),
+          supabase
+            .from("routine_completions")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("completion_date", todayStr),
+          supabase
+            .from("routine_completions")
+            .select("*")
+            .eq("user_id", user.id)
+            .gte("week_start_date", weekStart.toISOString().split("T")[0])
+            .lt("week_start_date", new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]),
+          supabase
+            .from("user_day_routines")
+            .select("*")
+            .eq("user_id", user.id),
+        ]);
 
       const routines = routinesResult.data || [];
       const dailyCompletions = dailyCompletionsResult.data || [];
@@ -206,7 +240,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       // Process daily routines for the selected day
       const daily: RoutineWithCompletion[] = [];
       const selectedDayRoutineIds = dayMapping[selectedDay] || [];
-
+      
       routines?.forEach((routine) => {
         if (!routine.is_weekly && selectedDayRoutineIds.includes(routine.id)) {
           const completion = dailyCompletions?.find(
@@ -278,7 +312,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     loadData().finally(() => setRefreshing(false));
   }, [loadData]);
 
-  // NEW: Function to check if all daily routines are completed
+  // NEW: Function to check if all daily routines are completed (KEEP THIS FOR FUNCTIONALITY)
   const checkDailyCompletionStatus = async (userId: string) => {
     try {
       const today = new Date();
@@ -317,44 +351,30 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       const todayRoutineAssignments = dayRoutinesResult.data || [];
 
       // Get daily routines for today
-      const todayDailyRoutineIds = todayRoutineAssignments.map(
-        (a) => a.routine_id
-      );
+      const todayDailyRoutineIds = todayRoutineAssignments.map(a => a.routine_id);
       const todayDailyRoutines = userRoutines.filter(
-        (routine) =>
-          !routine.is_weekly && todayDailyRoutineIds.includes(routine.id)
+        routine => !routine.is_weekly && todayDailyRoutineIds.includes(routine.id)
       );
 
       // Get completed routine IDs for today
-      const completedRoutineIds = todayCompletions.map((c) => c.routine_id);
+      const completedRoutineIds = todayCompletions.map(c => c.routine_id);
 
       // Check if ALL daily routines are completed
-      const allCompleted =
-        todayDailyRoutines.length > 0 &&
-        todayDailyRoutines.every((routine) =>
-          completedRoutineIds.includes(routine.id)
-        );
+      const allCompleted = todayDailyRoutines.length > 0 && 
+        todayDailyRoutines.every(routine => completedRoutineIds.includes(routine.id));
 
       console.log("📋 COMPLETION CHECK RESULTS:");
-      console.log(
-        "  - Required routines today:",
-        todayDailyRoutines.map((r) => r.name)
-      );
+      console.log("  - Required routines today:", todayDailyRoutines.map(r => r.name));
       console.log("  - Completed routine IDs:", completedRoutineIds);
       console.log("  - All daily routines completed:", allCompleted);
-
+      
       if (allCompleted) {
         console.log("🎉 ALL DAILY ROUTINES COMPLETED!");
         console.log("  - Stats calendar should show GREEN for today");
         console.log("  - Date:", todayStr);
       } else {
-        const missing = todayDailyRoutines.filter(
-          (r) => !completedRoutineIds.includes(r.id)
-        );
-        console.log(
-          "⏳ Still need to complete:",
-          missing.map((r) => r.name)
-        );
+        const missing = todayDailyRoutines.filter(r => !completedRoutineIds.includes(r.id));
+        console.log("⏳ Still need to complete:", missing.map(r => r.name));
       }
 
       return allCompleted;
@@ -364,78 +384,76 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ENHANCED toggleRoutineCompletion function with real-time completion checking
-  const toggleRoutineCompletion = async (
-    routine: RoutineWithCompletion,
-    isWeekly: boolean
-  ) => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+const toggleRoutineCompletion = async (
+  routine: RoutineWithCompletion,
+  isWeekly: boolean
+) => {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
 
-      if (routine.isCompleted && routine.completionId) {
-        // UNCHECKING a routine
-        const { error } = await supabase
-          .from("routine_completions")
-          .delete()
-          .eq("id", routine.completionId);
+    if (routine.isCompleted && routine.completionId) {
+      // UNCHECKING a routine
+      const { error } = await supabase
+        .from("routine_completions")
+        .delete()
+        .eq("id", routine.completionId);
 
-        if (error) throw error;
+      if (error) throw error;
 
-        console.log("❌ ROUTINE UNCHECKED:");
-        console.log("  - Routine:", routine.name);
-        console.log("  - Completion removed for today");
-      } else {
-        // CHECKING a routine
-        // CRITICAL FIX: Always use today's date for completion, regardless of selectedDay
-        const today = new Date();
-        const completionDate = today.toISOString().split("T")[0];
+      console.log("❌ ROUTINE UNCHECKED:");
+      console.log("  - Routine:", routine.name);
+      console.log("  - Completion removed for today");
+    } else {
+      // CHECKING a routine
+      // CRITICAL FIX: Always use today's date for completion, regardless of selectedDay
+      const today = new Date();
+      const completionDate = today.toISOString().split("T")[0];
 
-        // Original logic preserved for weekly routine week calculation
-        let weekStartDate = null;
-        if (isWeekly) {
-          const now = new Date();
-          const currentDay = now.getDay();
-          const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
-          const weekStart = new Date(now);
-          weekStart.setDate(now.getDate() - daysFromMonday);
-          weekStart.setHours(0, 0, 0, 0);
-          weekStartDate = weekStart.toISOString().split("T")[0];
-        }
-
-        const { error } = await supabase.from("routine_completions").insert({
-          user_id: user.id,
-          routine_id: routine.id,
-          completion_date: completionDate, // Always today's date
-          week_start_date: weekStartDate,
-        });
-
-        if (error) throw error;
-
-        console.log("✅ ROUTINE CHECKED:");
-        console.log("  - Routine:", routine.name);
-        console.log("  - Completion date:", completionDate);
-        console.log("  - Today's date:", completionDate);
-        console.log("  - Selected day in UI:", selectedDay);
-        console.log(
-          "  - Is for TODAY:",
-          completionDate === today.toISOString().split("T")[0]
-        );
+      // Original logic preserved for weekly routine week calculation
+      let weekStartDate = null;
+      if (isWeekly) {
+        const now = new Date();
+        const currentDay = now.getDay();
+        const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - daysFromMonday);
+        weekStart.setHours(0, 0, 0, 0);
+        weekStartDate = weekStart.toISOString().split("T")[0];
       }
 
-      // NEW: After any completion change, check if all daily routines are complete
-      await checkDailyCompletionStatus(user.id);
+      const { error } = await supabase.from("routine_completions").insert({
+        user_id: user.id,
+        routine_id: routine.id,
+        completion_date: completionDate, // Always today's date
+        week_start_date: weekStartDate,
+      });
 
-      // Reload data to reflect changes
-      await loadData();
-    } catch (error) {
-      console.error("Error toggling routine:", error);
-      Alert.alert("Error", "Failed to update routine");
+      if (error) throw error;
+
+      console.log("✅ ROUTINE CHECKED:");
+      console.log("  - Routine:", routine.name);
+      console.log("  - Completion date:", completionDate);
+      console.log("  - Today's date:", completionDate);
+      console.log("  - Selected day in UI:", selectedDay);
+      console.log(
+        "  - Is for TODAY:",
+        completionDate === today.toISOString().split("T")[0]
+      );
     }
-  };
 
+    // NEW: After any completion change, check if all daily routines are complete
+    await checkDailyCompletionStatus(user.id);
+
+    // Reload data to reflect changes
+    await loadData();
+  } catch (error) {
+    console.error("Error toggling routine:", error);
+    Alert.alert("Error", "Failed to update routine");
+  }
+};
   // Load available routines for day assignment modal
   const loadAvailableRoutines = async () => {
     try {
@@ -519,31 +537,26 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       },
       onPanResponderMove: (evt, gestureState) => {
         dragY.setValue(gestureState.dy);
-
+        
         const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
         const itemHeight = 80;
-        const newIndex = Math.max(
-          0,
-          Math.min(
-            routines.length - 1,
-            Math.round(index + gestureState.dy / itemHeight)
-          )
-        );
-
+        const newIndex = Math.max(0, Math.min(routines.length - 1, 
+          Math.round(index + gestureState.dy / itemHeight)));
+        
         if (newIndex !== lastSwapIndex && newIndex !== index) {
           setLastSwapIndex(newIndex);
-
+          
           const newRoutines = [...routines];
           const draggedItem = newRoutines[index];
           newRoutines.splice(index, 1);
           newRoutines.splice(newIndex, 0, draggedItem);
-
+          
           if (section === "daily") {
             setDailyRoutines(newRoutines);
           } else {
             setWeeklyRoutines(newRoutines);
           }
-
+          
           setDraggedIndex(newIndex);
         }
       },
@@ -551,11 +564,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setIsDragging(false);
         setScrollEnabled(true);
         dragY.setValue(0);
-
+        
         if (originalIndex !== draggedIndex) {
           await saveRoutineOrder(section);
         }
-
+        
         setDraggedIndex(null);
         setDraggedSection(null);
         setOriginalIndex(null);
@@ -779,47 +792,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="today" size={24} color="#007AFF" />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Daily Routines -{" "}
-              {daysOfWeek.find((d) => d.value === selectedDay)?.name}
-            </Text>
-            <TouchableOpacity
-              onPress={() => {
-                loadAvailableRoutines();
-                setShowDayRoutineModal(true);
-              }}
-              style={styles.addButton}
-            >
-              <Ionicons name="add" size={20} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
-
-          {dailyRoutines.length > 0 ? (
-            dailyRoutines.map((routine, index) =>
-              renderRoutineItem(routine, index, "daily")
-            )
-          ) : (
-            <View style={styles.emptyState}>
-              <Text
-                style={[styles.emptyStateText, { color: colors.textSecondary }]}
-              >
-                No routines for this day yet
-              </Text>
-              <Text
-                style={[
-                  styles.emptyStateSubtext,
-                  { color: colors.textTertiary },
-                ]}
-              >
-                Tap the + button to add routines to this day!
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <View style={styles.sectionHeader}>
             <Ionicons name="trophy" size={24} color="#ffd700" />
             <View style={styles.weeklyGoalsHeaderContainer}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -865,34 +837,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </ScrollView>
 
-      {/* Add Routine Button */}
-      <View style={styles.fabContainer}>
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => navigation.navigate("AddRoutine")}
-        >
-          <Ionicons name="add" size={28} color="#fff" />
-        </TouchableOpacity>
-      </View>
-
       {/* Day Routine Assignment Modal */}
       <Modal
         visible={showDayRoutineModal}
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <View
-          style={[
-            styles.modalContainer,
-            { backgroundColor: colors.background },
-          ]}
-        >
-          <View
-            style={[styles.modalHeader, { borderBottomColor: colors.border }]}
-          >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Routines for{" "}
-              {daysOfWeek.find((d) => d.value === selectedDay)?.name}
+              Routines for {daysOfWeek.find((d) => d.value === selectedDay)?.name}
             </Text>
             <TouchableOpacity onPress={() => setShowDayRoutineModal(false)}>
               <Text style={[styles.modalCancelButton, { color: "#007AFF" }]}>
@@ -902,17 +856,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
           <ScrollView style={styles.modalContent}>
             {availableRoutines.map((routine) => {
-              const isAssigned = (
-                daySpecificRoutines[selectedDay] || []
-              ).includes(routine.id);
+              const isAssigned = (daySpecificRoutines[selectedDay] || []).includes(
+                routine.id
+              );
               return (
                 <TouchableOpacity
                   key={routine.id}
                   style={[
                     styles.availableRoutineItem,
-                    {
-                      backgroundColor: isAssigned ? "#e6f3ff" : colors.card,
-                      borderBottomColor: colors.border,
+                    { 
+                      backgroundColor: colors.card,
+                      borderBottomColor: colors.border 
                     },
                   ]}
                   onPress={() =>
@@ -923,12 +877,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 >
                   <View style={styles.routineIcon}>
                     <Ionicons
-                      name={(routine.icon as any) || "checkmark-circle"}
-                      size={20}
+                      name={routine.icon as any || "checkmark-circle"}
+                      size={24}
                       color="#007AFF"
                     />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={styles.routineInfo}>
                     <Text style={[styles.routineName, { color: colors.text }]}>
                       {routine.name}
                     </Text>
@@ -943,18 +897,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                       </Text>
                     )}
                   </View>
-                  <Ionicons
-                    name={
-                      isAssigned ? "checkmark-circle" : "add-circle-outline"
-                    }
-                    size={24}
-                    color={isAssigned ? "#34c759" : "#007AFF"}
-                  />
+                  <Ionicons name="add-circle" size={24} color="#007AFF" />
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
-        </View>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -968,8 +916,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: 10,
-    paddingBottom: 20,
+    paddingVertical: 20,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
   },
@@ -982,12 +929,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   section: {
-    marginHorizontal: 20,
-    marginVertical: 10,
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#f0f0f0",
+    marginVertical: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -998,16 +942,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     marginLeft: 8,
+  },
+  weeklyGoalsHeaderContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
+    marginLeft: 8,
+  },
+  dailyRoutinesHeaderContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginLeft: 8,
   },
   addButton: {
     padding: 4,
-  },
-  weeklyGoalsHeaderContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
   },
   weekTimer: {
     flexDirection: "row",
@@ -1154,24 +1103,6 @@ const styles = StyleSheet.create({
     marginVertical: 1,
     borderRadius: 1,
   },
-  fabContainer: {
-    position: "absolute",
-    bottom: 30,
-    right: 20,
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#007AFF",
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-  },
   modalContainer: {
     flex: 1,
   },
@@ -1215,4 +1146,46 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HomeScreen;
+export default HomeScreen; { backgroundColor: colors.surface }]}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="today" size={24} color="#007AFF" />
+            <View style={styles.dailyRoutinesHeaderContainer}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Daily Routines - {daysOfWeek.find((d) => d.value === selectedDay)?.name}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  loadAvailableRoutines();
+                  setShowDayRoutineModal(true);
+                }}
+                style={styles.addButton}
+              >
+                <Ionicons name="add" size={20} color="#007AFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {dailyRoutines.length > 0 ? (
+            dailyRoutines.map((routine, index) =>
+              renderRoutineItem(routine, index, "daily")
+            )
+          ) : (
+            <View style={styles.emptyState}>
+              <Text
+                style={[styles.emptyStateText, { color: colors.textSecondary }]}
+              >
+                No routines for this day yet
+              </Text>
+              <Text
+                style={[
+                  styles.emptyStateSubtext,
+                  { color: colors.textTertiary },
+                ]}
+              >
+                Tap the + button to add routines to this day!
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={[styles.section,
