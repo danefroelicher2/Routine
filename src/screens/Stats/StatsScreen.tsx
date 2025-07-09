@@ -1362,7 +1362,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   achievementCard: {
-    width: (width - 100) / 3,
+    width: (width - 120) / 3,
     aspectRatio: 1,
     borderRadius: 16,
     padding: 12,
