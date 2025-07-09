@@ -25,8 +25,9 @@ export default function StatsScreen() {
   // Load data when screen comes into focus (real-time updates)
   useFocusEffect(
     useCallback(() => {
+      console.log("📊 Stats screen focused - loading fresh data");
       loadStatsData();
-    }, [currentDate])
+    }, []) // ✅ FIXED: No dependencies = runs every time you navigate to stats
   );
 
   useEffect(() => {
