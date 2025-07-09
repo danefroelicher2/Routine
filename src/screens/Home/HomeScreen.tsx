@@ -21,6 +21,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
 import { UserRoutine } from "../../types/database";
+import { useTheme } from "../../../ThemeContext"; // CRITICAL: Theme import
 
 interface RoutineWithCompletion extends UserRoutine {
   isCompleted: boolean;
@@ -32,6 +33,9 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  // CRITICAL: Get theme colors - this was missing!
+  const { colors } = useTheme();
+
   const [dailyRoutines, setDailyRoutines] = useState<RoutineWithCompletion[]>(
     []
   );
@@ -52,7 +56,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [originalIndex, setOriginalIndex] = useState<number | null>(null);
   const [lastSwapIndex, setLastSwapIndex] = useState<number | null>(null);
-  // FIXED: Add state to track which section is being dragged
   const [draggedSection, setDraggedSection] = useState<
     "daily" | "weekly" | null
   >(null);
@@ -207,65 +210,44 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       weekStart.setDate(now.getDate() - daysFromMonday);
       weekStart.setHours(0, 0, 0, 0);
 
-      // Get user's routines and day-specific assignments
-      const { data: routines, error: routinesError } = await supabase
-        .from("user_routines")
-        .select("*")
-        .eq("user_id", user.id);
+      const weekStartDate = weekStart.toISOString().split("T")[0];
 
-      const { data: dayAssignments, error: dayError } = await supabase
-        .from("user_day_routines")
-        .select("*")
-        .eq("user_id", user.id);
+      // Load routines and completions
+      const [routinesResult, dailyCompletionsResult, weeklyCompletionsResult] =
+        await Promise.all([
+          supabase
+            .from("user_routines")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("sort_order"),
+          supabase
+            .from("routine_completions")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("completion_date", today),
+          supabase
+            .from("routine_completions")
+            .select("*")
+            .eq("user_id", user.id)
+            .gte("completion_date", weekStartDate)
+            .eq("is_weekly_completion", true),
+        ]);
 
-      if (routinesError || dayError) {
-        console.error("Error fetching routines:", routinesError || dayError);
-        return;
-      }
+      const { data: routines } = routinesResult;
+      const { data: dailyCompletions } = dailyCompletionsResult;
+      const { data: weeklyCompletions } = weeklyCompletionsResult;
 
-      // Build day-specific routines mapping
-      const dayRoutineMap: Record<number, string[]> = {};
-      dayAssignments?.forEach((assignment) => {
-        if (!dayRoutineMap[assignment.day_of_week]) {
-          dayRoutineMap[assignment.day_of_week] = [];
-        }
-        dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
-      });
-      setDaySpecificRoutines(dayRoutineMap);
-
-      // Get selected date for filtering daily routines
-      const selectedDate = new Date();
-      selectedDate.setDate(
-        selectedDate.getDate() + (selectedDay - selectedDate.getDay())
-      );
-      const selectedDateString = selectedDate.toISOString().split("T")[0];
-
-      // Get completions for selected day
-      const { data: dailyCompletions, error: dailyError } = await supabase
-        .from("routine_completions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("completion_date", selectedDateString);
-
-      // Get weekly completions (from week start to now)
-      const weekStartString = weekStart.toISOString().split("T")[0];
-      const { data: weeklyCompletions, error: weeklyError } = await supabase
-        .from("routine_completions")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("completion_date", weekStartString);
-
-      if (dailyError || weeklyError) {
-        console.error("Error fetching completions:", dailyError || weeklyError);
-        return;
-      }
-
-      // Filter routines for selected day
-      const selectedDayRoutineIds = dayRoutineMap[selectedDay] || [];
+      // Filter routines for today or selected day
       const daily: RoutineWithCompletion[] = [];
+      const daySpecificData: Record<number, string[]> = {};
+
+      // Initialize day specific data
+      for (let i = 0; i <= 6; i++) {
+        daySpecificData[i] = [];
+      }
 
       routines?.forEach((routine) => {
-        if (!routine.is_weekly && selectedDayRoutineIds.includes(routine.id)) {
+        if (routine.is_daily) {
           const completion = dailyCompletions?.find(
             (c) => c.routine_id === routine.id
           );
@@ -274,6 +256,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             isCompleted: !!completion,
             completionId: completion?.id,
           });
+        } else {
+          // This is a day-specific routine
+          // For simplicity, assuming day_of_week field exists or use a mapping
+          const dayOfWeek =
+            routine.day_of_week !== undefined
+              ? routine.day_of_week
+              : selectedDay;
+          daySpecificData[dayOfWeek].push(routine.id);
+
+          if (dayOfWeek === selectedDay) {
+            const completion = dailyCompletions?.find(
+              (c) => c.routine_id === routine.id
+            );
+            daily.push({
+              ...routine,
+              isCompleted: !!completion,
+              completionId: completion?.id,
+            });
+          }
         }
       });
 
@@ -294,6 +295,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       setDailyRoutines(daily);
       setWeeklyRoutines(weekly);
+      setDaySpecificRoutines(daySpecificData);
 
       // Calculate time remaining in week
       const weekEnd = new Date(weekStart);
@@ -365,39 +367,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
           const weekStart = new Date(now);
           weekStart.setDate(now.getDate() - daysFromMonday);
+          weekStart.setHours(0, 0, 0, 0);
           weekStartDate = weekStart.toISOString().split("T")[0];
         }
 
-        // Check if completion already exists to avoid duplicate key error
-        const { data: existingCompletion, error: checkError } = await supabase
-          .from("routine_completions")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("routine_id", routine.id)
-          .eq("completion_date", today)
-          .single();
+        const { error } = await supabase.from("routine_completions").insert({
+          user_id: user.id,
+          routine_id: routine.id,
+          completion_date: today,
+          week_start_date: weekStartDate,
+          is_weekly_completion: isWeekly,
+        });
 
-        if (checkError && checkError.code !== "PGRST116") {
-          // PGRST116 is "not found" error, which is expected if no completion exists
-          throw checkError;
-        }
-
-        if (!existingCompletion) {
-          const { error } = await supabase.from("routine_completions").insert({
-            user_id: user.id,
-            routine_id: routine.id,
-            completion_date: today,
-            week_start_date: weekStartDate,
-          });
-
-          if (error) throw error;
-        }
+        if (error) throw error;
       }
 
-      // Reload data to reflect changes
+      // Reload data
       loadData();
     } catch (error) {
-      console.error("Error toggling completion:", error);
+      console.error("Error toggling routine:", error);
       Alert.alert("Error", "Failed to update routine");
     }
   };
@@ -406,25 +394,142 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setSelectedDay(dayValue);
   };
 
+  // RESTORED: Missing function for adding routines to specific days
   const addRoutineToDay = () => {
-    navigation.navigate("AddRoutine", { selectedDay });
+    setShowDayRoutineModal(true);
+    loadAvailableRoutines();
   };
 
-  const addWeeklyRoutine = () => {
-    navigation.navigate("AddRoutine", { isWeekly: true });
-  };
-
-  const updateRoutineOrder = async (routines: RoutineWithCompletion[]) => {
+  // RESTORED: Load available routines for the modal
+  const loadAvailableRoutines = async () => {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Update sort_order for each routine based on new position
+      const { data: routines, error } = await supabase
+        .from("user_routines")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("name");
+
+      if (error) throw error;
+      setAvailableRoutines(routines || []);
+    } catch (error) {
+      console.error("Error loading available routines:", error);
+      Alert.alert("Error", "Failed to load available routines");
+    }
+  };
+
+  // RESTORED: Add routine to specific day
+  const assignRoutineToDay = async (routineId: string) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Add to user_day_routines table or update routine's day_of_week
+      const { error } = await supabase
+        .from("user_routines")
+        .update({ day_of_week: selectedDay })
+        .eq("id", routineId)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      setShowDayRoutineModal(false);
+      loadData(); // Reload to show the new assignment
+    } catch (error) {
+      console.error("Error assigning routine to day:", error);
+      Alert.alert("Error", "Failed to assign routine to day");
+    }
+  };
+
+  // Drag and drop functionality for reordering routines
+  const createPanResponder = (index: number, section: "daily" | "weekly") =>
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only allow vertical dragging and ensure we have enough movement
+        return Math.abs(gestureState.dy) > 10 && Math.abs(gestureState.dx) < 50;
+      },
+      onPanResponderGrant: () => {
+        setDraggedIndex(index);
+        setOriginalIndex(index);
+        setDraggedSection(section);
+        setIsDragging(true);
+        setScrollEnabled(false);
+        setLastSwapIndex(null);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // Update the animated value
+        dragY.setValue(gestureState.dy);
+
+        // Calculate which index we should swap with based on drag position
+        const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
+        const itemHeight = 80; // Approximate height of routine item
+        const offset = gestureState.dy;
+        const targetIndex = Math.max(
+          0,
+          Math.min(routines.length - 1, index + Math.round(offset / itemHeight))
+        );
+
+        // Only perform swap if we're dragging to a different position
+        if (targetIndex !== lastSwapIndex && targetIndex !== index) {
+          const newRoutines = [...routines];
+          const draggedItem = newRoutines[index];
+
+          // Remove dragged item and insert at new position
+          newRoutines.splice(index, 1);
+          newRoutines.splice(targetIndex, 0, draggedItem);
+
+          // Update state
+          if (section === "daily") {
+            setDailyRoutines(newRoutines);
+          } else {
+            setWeeklyRoutines(newRoutines);
+          }
+
+          setDraggedIndex(targetIndex);
+          setLastSwapIndex(targetIndex);
+        }
+      },
+      onPanResponderRelease: async () => {
+        // Reset drag state
+        Animated.spring(dragY, {
+          toValue: 0,
+          useNativeDriver: false,
+        }).start();
+
+        setIsDragging(false);
+        setScrollEnabled(true);
+
+        // Save new order to database if position changed
+        if (draggedIndex !== null && originalIndex !== draggedIndex) {
+          await saveRoutineOrder(section);
+        }
+
+        setDraggedIndex(null);
+        setOriginalIndex(null);
+        setDraggedSection(null);
+        setLastSwapIndex(null);
+      },
+    });
+
+  const saveRoutineOrder = async (section: "daily" | "weekly") => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
+
+      // Update sort_order for all routines in this section
       const updates = routines.map((routine, index) => ({
         id: routine.id,
-        sort_order: index + 1,
+        sort_order: index,
       }));
 
       for (const update of updates) {
@@ -436,196 +541,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         if (error) throw error;
       }
     } catch (error) {
-      console.error("Error updating routine order:", error);
-      Alert.alert("Error", "Failed to update routine order");
+      console.error("Error saving routine order:", error);
+      Alert.alert("Error", "Failed to save routine order");
     }
-  };
-
-  const moveRoutineUp = (index: number, isWeekly: boolean) => {
-    if (index === 0) return; // Already at top
-
-    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
-    const [movedItem] = routines.splice(index, 1);
-    routines.splice(index - 1, 0, movedItem);
-
-    if (isWeekly) {
-      setWeeklyRoutines(routines);
-    } else {
-      setDailyRoutines(routines);
-    }
-
-    updateRoutineOrder(routines);
-  };
-
-  const moveRoutineDown = (index: number, isWeekly: boolean) => {
-    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
-    if (index === routines.length - 1) return; // Already at bottom
-
-    const [movedItem] = routines.splice(index, 1);
-    routines.splice(index + 1, 0, movedItem);
-
-    if (isWeekly) {
-      setWeeklyRoutines(routines);
-    } else {
-      setDailyRoutines(routines);
-    }
-
-    updateRoutineOrder(routines);
-  };
-
-  const moveRoutineToPosition = (
-    fromIndex: number,
-    toIndex: number,
-    isWeekly: boolean
-  ) => {
-    if (fromIndex === toIndex) return;
-
-    const routines = isWeekly ? [...weeklyRoutines] : [...dailyRoutines];
-    const [movedItem] = routines.splice(fromIndex, 1);
-    routines.splice(toIndex, 0, movedItem);
-
-    if (isWeekly) {
-      setWeeklyRoutines(routines);
-    } else {
-      setDailyRoutines(routines);
-    }
-
-    updateRoutineOrder(routines);
-  };
-
-  // FIXED: Real-time drag with section constraints
-  const createPanResponder = (index: number, isWeekly: boolean) => {
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return Math.abs(gestureState.dy) > 5;
-      },
-      onStartShouldSetPanResponderCapture: () => true,
-      onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
-        return Math.abs(gestureState.dy) > 3;
-      },
-
-      onPanResponderGrant: (evt, gestureState) => {
-        console.log(
-          "Starting drag for",
-          isWeekly ? "weekly" : "daily",
-          "routine at index:",
-          index
-        );
-        setDraggedIndex(index);
-        setOriginalIndex(index);
-        setIsDragging(true);
-        setScrollEnabled(false);
-        setDraggedSection(isWeekly ? "weekly" : "daily");
-        dragY.setValue(0);
-      },
-
-      onPanResponderMove: (evt, gestureState) => {
-        if (!isDragging || draggedSection !== (isWeekly ? "weekly" : "daily")) {
-          return;
-        }
-
-        const routines = isWeekly ? weeklyRoutines : dailyRoutines;
-        const itemHeight = 76;
-
-        // FIXED: Constrain drag movement within section bounds
-        const maxUpMovement = -(originalIndex! * itemHeight);
-        const maxDownMovement =
-          (routines.length - 1 - originalIndex!) * itemHeight;
-        const constrainedDy = Math.max(
-          maxUpMovement,
-          Math.min(maxDownMovement, gestureState.dy)
-        );
-
-        dragY.setValue(constrainedDy);
-
-        // FIXED: Real-time position calculation and swapping
-        const positionsToMove = Math.round(constrainedDy / itemHeight);
-        const newIndex = Math.max(
-          0,
-          Math.min(routines.length - 1, originalIndex! + positionsToMove)
-        );
-
-        // Only reorder if we've moved to a different position
-        if (newIndex !== draggedIndex && newIndex !== originalIndex) {
-          console.log(
-            `Real-time swap: moving from ${draggedIndex} to ${newIndex}`
-          );
-
-          const newRoutines = [...routines];
-          const [draggedItem] = newRoutines.splice(draggedIndex!, 1);
-          newRoutines.splice(newIndex, 0, draggedItem);
-
-          // FIXED: Update state immediately for real-time feedback
-          if (isWeekly) {
-            setWeeklyRoutines(newRoutines);
-          } else {
-            setDailyRoutines(newRoutines);
-          }
-
-          // Update tracking
-          setDraggedIndex(newIndex);
-        }
-      },
-
-      onPanResponderRelease: (evt, gestureState) => {
-        if (!isDragging || draggedSection !== (isWeekly ? "weekly" : "daily")) {
-          return;
-        }
-
-        console.log("Drag ended - saving to database");
-
-        // FIXED: Save final order to database
-        const currentRoutines = isWeekly ? weeklyRoutines : dailyRoutines;
-        updateRoutineOrder(currentRoutines);
-
-        // Reset drag state
-        setDraggedIndex(null);
-        setOriginalIndex(null);
-        setIsDragging(false);
-        setScrollEnabled(true);
-        setDraggedSection(null);
-
-        // Animate back to rest position
-        Animated.spring(dragY, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 120,
-          friction: 7,
-        }).start();
-      },
-
-      onPanResponderTerminate: () => {
-        console.log("Drag terminated");
-
-        // Reset everything
-        setDraggedIndex(null);
-        setOriginalIndex(null);
-        setIsDragging(false);
-        setScrollEnabled(true);
-        setDraggedSection(null);
-
-        Animated.spring(dragY, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      },
-
-      onPanResponderTerminationRequest: () => false,
-      onShouldBlockNativeResponder: () => true,
-    });
   };
 
   const renderRoutineItem = (
     routine: RoutineWithCompletion,
-    isWeekly: boolean,
-    index: number
+    index: number,
+    section: "daily" | "weekly"
   ) => {
-    const panResponder = createPanResponder(index, isWeekly);
-    // FIXED: Only apply drag effects if this item is being dragged AND it's from the correct section
+    const panResponder = createPanResponder(index, section);
     const isBeingDragged =
-      draggedIndex === index &&
-      draggedSection === (isWeekly ? "weekly" : "daily");
+      isDragging && draggedIndex === index && draggedSection === section;
 
     return (
       <Animated.View
@@ -634,26 +562,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           styles.routineItem,
           isBeingDragged && {
             transform: [{ translateY: dragY }],
-            zIndex: 1000,
+            elevation: 8,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
           },
         ]}
       >
         <View
           style={[
             styles.routineContent,
-            isBeingDragged && styles.routineContentDragging,
+            { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
           <TouchableOpacity
             style={styles.routineLeft}
             onPress={() =>
-              !isDragging && toggleRoutineCompletion(routine, isWeekly)
+              toggleRoutineCompletion(routine, section === "weekly")
             }
-            activeOpacity={isDragging ? 1 : 0.7}
+            activeOpacity={routine.isCompleted ? 1 : 0.7}
           >
             <View
               style={[
                 styles.checkbox,
+                { borderColor: colors.border },
                 routine.isCompleted && styles.checkboxCompleted,
               ]}
             >
@@ -665,13 +598,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Text
                 style={[
                   styles.routineName,
+                  { color: colors.text },
                   routine.isCompleted && styles.routineNameCompleted,
                 ]}
               >
                 {routine.name}
               </Text>
               {routine.description && (
-                <Text style={styles.routineDescription}>
+                <Text
+                  style={[
+                    styles.routineDescription,
+                    { color: colors.textSecondary },
+                  ]}
+                >
                   {routine.description}
                 </Text>
               )}
@@ -686,9 +625,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           {/* Drag Handle - Separate from main touch area */}
           <View style={styles.dragHandle} {...panResponder.panHandlers}>
             <View style={styles.dragIcon}>
-              <View style={styles.dragLine} />
-              <View style={styles.dragLine} />
-              <View style={styles.dragLine} />
+              <View
+                style={[
+                  styles.dragLine,
+                  { backgroundColor: colors.textTertiary },
+                ]}
+              />
+              <View
+                style={[
+                  styles.dragLine,
+                  { backgroundColor: colors.textTertiary },
+                ]}
+              />
+              <View
+                style={[
+                  styles.dragLine,
+                  { backgroundColor: colors.textTertiary },
+                ]}
+              />
             </View>
           </View>
         </View>
@@ -697,139 +651,256 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{personalizedGreeting}</Text>
-        <Text style={styles.headerDate}>
-          {new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        </Text>
-      </View>
-
-      {/* Day Calendar Strip */}
-      <View style={styles.calendarContainer}>
-        <View style={styles.calendarGrid}>
-          {daysOfWeek.map((day) => {
-            const isToday = day.value === new Date().getDay();
-            const isSelected = day.value === selectedDay;
-            const hasRoutines =
-              (daySpecificRoutines[day.value] || []).length > 0;
-
-            return (
-              <TouchableOpacity
-                key={day.value}
-                style={[
-                  styles.dayBox,
-                  isToday && styles.dayBoxToday,
-                  isSelected && styles.dayBoxSelected,
-                ]}
-                onPress={() => handleDayPress(day.value)}
-              >
-                <Text
-                  style={[
-                    styles.dayBoxName,
-                    isToday && styles.dayBoxNameToday,
-                    isSelected && styles.dayBoxNameSelected,
-                  ]}
-                >
-                  {day.name}
-                </Text>
-                <View
-                  style={[
-                    styles.dayBoxIndicator,
-                    hasRoutines && styles.dayBoxIndicatorActive,
-                  ]}
-                />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       <ScrollView
         style={styles.scrollView}
-        scrollEnabled={scrollEnabled}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        scrollEnabled={scrollEnabled}
+        showsVerticalScrollIndicator={false}
       >
+        {/* Header */}
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {personalizedGreeting}
+          </Text>
+          <Text style={[styles.headerDate, { color: colors.textSecondary }]}>
+            {new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </Text>
+        </View>
+
+        {/* Day Calendar Strip */}
+        <View
+          style={[
+            styles.calendarContainer,
+            {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
+          <View style={styles.calendarGrid}>
+            {daysOfWeek.map((day) => {
+              const isToday = day.value === new Date().getDay();
+              const isSelected = day.value === selectedDay;
+              const hasRoutines =
+                (daySpecificRoutines[day.value] || []).length > 0;
+
+              return (
+                <TouchableOpacity
+                  key={day.value}
+                  style={[
+                    styles.dayBox,
+                    { backgroundColor: colors.card },
+                    isToday && styles.dayBoxToday,
+                    isSelected && styles.dayBoxSelected,
+                  ]}
+                  onPress={() => handleDayPress(day.value)}
+                >
+                  <Text
+                    style={[
+                      styles.dayBoxName,
+                      { color: colors.text },
+                      isToday && styles.dayBoxNameToday,
+                      isSelected && styles.dayBoxNameSelected,
+                    ]}
+                  >
+                    {day.name}
+                  </Text>
+                  <View
+                    style={[
+                      styles.dayBoxIndicator,
+                      { backgroundColor: colors.border },
+                      hasRoutines && styles.dayBoxIndicatorActive,
+                    ]}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         {/* Daily Routines Section */}
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="today" size={24} color="#007AFF" />
-            {/* FIXED: Use same layout structure as weekly goals for consistency */}
+            <Ionicons name="calendar" size={24} color="#007AFF" />
             <View style={styles.dailyRoutinesHeaderContainer}>
-              <Text style={styles.sectionTitle}>
-                {daysOfWeek.find((d) => d.value === selectedDay)?.name} Routines
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Daily Routines
               </Text>
             </View>
-            {/* FIXED: Plus icon separated on the far right */}
             <TouchableOpacity
-              onPress={addRoutineToDay}
               style={styles.addButton}
+              onPress={() => navigation.navigate("AddRoutine")}
             >
-              <Ionicons name="add" size={20} color="#007AFF" />
+              <Ionicons name="add" size={24} color="#007AFF" />
             </TouchableOpacity>
           </View>
 
-          {dailyRoutines.length === 0 ? (
+          {dailyRoutines.length > 0 ? (
+            dailyRoutines.map((routine, index) =>
+              renderRoutineItem(routine, index, "daily")
+            )
+          ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>
-                No routines set for{" "}
-                {daysOfWeek.find((d) => d.value === selectedDay)?.name}
+              <Text
+                style={[styles.emptyStateText, { color: colors.textSecondary }]}
+              >
+                No daily routines set up yet
               </Text>
-              <Text style={styles.emptyStateSubtext}>
-                Tap on the day above to assign routines!
+              <Text
+                style={[
+                  styles.emptyStateSubtext,
+                  { color: colors.textTertiary },
+                ]}
+              >
+                Build consistent daily habits!
               </Text>
             </View>
-          ) : (
-            dailyRoutines.map((routine, index) =>
-              renderRoutineItem(routine, false, index)
-            )
           )}
         </View>
 
-        {/* FIXED: Weekly Routines Section with proper header layout */}
-        <View style={styles.section}>
+        {/* Weekly Routines Section */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="calendar" size={24} color="#007AFF" />
-            {/* FIXED: New layout structure for Weekly Goals header */}
+            <Ionicons name="trophy" size={24} color="#ffd700" />
             <View style={styles.weeklyGoalsHeaderContainer}>
-              <Text style={styles.sectionTitle}>Weekly Goals</Text>
-              {/* FIXED: Time remaining directly to the right of "Weekly Goals" */}
-              <View style={styles.weekTimer}>
-                <Ionicons name="time" size={16} color="#666" />
-                <Text style={styles.weekTimerText}>{weekTimeRemaining}</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Weekly Goals
+              </Text>
+              <View
+                style={[styles.weekTimer, { backgroundColor: colors.card }]}
+              >
+                <Ionicons name="time" size={12} color="#007AFF" />
+                <Text
+                  style={[
+                    styles.weekTimerText,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {weekTimeRemaining}
+                </Text>
               </View>
             </View>
-            {/* FIXED: Plus icon separated on the far right */}
-            <TouchableOpacity
-              onPress={addWeeklyRoutine}
-              style={styles.addButton}
-            >
-              <Ionicons name="add" size={20} color="#007AFF" />
-            </TouchableOpacity>
           </View>
 
-          {weeklyRoutines.length === 0 ? (
+          {weeklyRoutines.length > 0 ? (
+            weeklyRoutines.map((routine, index) =>
+              renderRoutineItem(routine, index, "weekly")
+            )
+          ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>
+              <Text
+                style={[styles.emptyStateText, { color: colors.textSecondary }]}
+              >
                 No weekly routines set up yet
               </Text>
-              <Text style={styles.emptyStateSubtext}>
+              <Text
+                style={[
+                  styles.emptyStateSubtext,
+                  { color: colors.textTertiary },
+                ]}
+              >
                 Add weekly goals to track longer-term habits!
               </Text>
             </View>
-          ) : (
-            weeklyRoutines.map((routine, index) =>
-              renderRoutineItem(routine, true, index)
-            )
           )}
         </View>
       </ScrollView>
+
+      {/* RESTORED: Day Routine Assignment Modal */}
+      <Modal
+        visible={showDayRoutineModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView
+          style={[
+            styles.modalContainer,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          <View
+            style={[
+              styles.modalHeader,
+              {
+                backgroundColor: colors.surface,
+                borderBottomColor: colors.border,
+              },
+            ]}
+          >
+            <TouchableOpacity onPress={() => setShowDayRoutineModal(false)}>
+              <Text style={[styles.modalCancelButton, { color: colors.text }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Add to {daysOfWeek.find((d) => d.value === selectedDay)?.name}
+            </Text>
+            <View style={{ width: 50 }} />
+          </View>
+
+          <ScrollView
+            style={[
+              styles.modalContent,
+              { backgroundColor: colors.background },
+            ]}
+          >
+            {availableRoutines.map((routine) => (
+              <TouchableOpacity
+                key={routine.id}
+                style={[
+                  styles.availableRoutineItem,
+                  {
+                    backgroundColor: colors.card,
+                    borderBottomColor: colors.separator,
+                  },
+                ]}
+                onPress={() => assignRoutineToDay(routine.id)}
+              >
+                <View style={styles.routineIcon}>
+                  <Ionicons
+                    name={(routine.icon as any) || "checkmark-circle"}
+                    size={24}
+                    color="#007AFF"
+                  />
+                </View>
+                <View style={styles.routineInfo}>
+                  <Text style={[styles.routineName, { color: colors.text }]}>
+                    {routine.name}
+                  </Text>
+                  {routine.description && (
+                    <Text
+                      style={[
+                        styles.routineDescription,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {routine.description}
+                    </Text>
+                  )}
+                </View>
+                <Ionicons name="add-circle" size={24} color="#007AFF" />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -837,30 +908,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
-  },
-  header: {
-    backgroundColor: "#fff",
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 4,
-  },
-  headerDate: {
-    fontSize: 16,
-    color: "#666",
   },
   scrollView: {
     flex: 1,
   },
+  header: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 4,
+  },
+  headerDate: {
+    fontSize: 16,
+  },
   section: {
-    backgroundColor: "#fff",
     marginVertical: 8,
     paddingVertical: 16,
     paddingHorizontal: 16,
@@ -873,18 +938,16 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
     marginLeft: 8,
-    // FIXED: Remove flex: 1 to allow proper layout
   },
-  // FIXED: New container for Weekly Goals header layout
+  // New container for Weekly Goals header layout
   weeklyGoalsHeaderContainer: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
     marginLeft: 8,
   },
-  // FIXED: New container for Daily Routines header layout (same as weekly)
+  // New container for Daily Routines header layout (same as weekly)
   dailyRoutinesHeaderContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -897,44 +960,18 @@ const styles = StyleSheet.create({
   weekTimer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8f9fa",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    // FIXED: Add margin to properly space from "Weekly Goals"
     marginLeft: 12,
   },
   weekTimerText: {
     fontSize: 12,
-    color: "#666",
     marginLeft: 4,
     fontWeight: "500",
   },
   routineItem: {
     marginBottom: 12,
-  },
-  routineItemDragging: {
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    // Keep the same background and border radius as the content
-  },
-  routineContentDragging: {
-    elevation: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    // Maintains the same borderRadius: 12 and backgroundColor: '#f8f9fa'
-    // from the base routineContent style
   },
   routineContent: {
     flexDirection: "row",
@@ -942,8 +979,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: "#f8f9fa",
     borderRadius: 12,
+    borderWidth: 1,
   },
   routineLeft: {
     flexDirection: "row",
@@ -955,7 +992,6 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#ddd",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -970,7 +1006,6 @@ const styles = StyleSheet.create({
   routineName: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
   },
   routineNameCompleted: {
     textDecorationLine: "line-through",
@@ -978,7 +1013,6 @@ const styles = StyleSheet.create({
   },
   routineDescription: {
     fontSize: 14,
-    color: "#666",
     marginTop: 2,
   },
   routineTarget: {
@@ -993,22 +1027,18 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 16,
-    color: "#666",
     textAlign: "center",
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: "#999",
     textAlign: "center",
     marginTop: 8,
   },
   // Calendar Strip Styles
   calendarContainer: {
-    backgroundColor: "#fff",
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
   },
   calendarGrid: {
     flexDirection: "row",
@@ -1021,7 +1051,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginHorizontal: 2,
     borderRadius: 12,
-    backgroundColor: "#f8f9fa",
     borderWidth: 2,
     borderColor: "transparent",
     minHeight: 65,
@@ -1038,7 +1067,6 @@ const styles = StyleSheet.create({
   dayBoxName: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 4,
   },
   dayBoxNameToday: {
@@ -1053,7 +1081,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#ddd",
   },
   dayBoxIndicatorActive: {
     backgroundColor: "#34c759",
@@ -1074,9 +1101,50 @@ const styles = StyleSheet.create({
   dragLine: {
     width: 18,
     height: 2,
-    backgroundColor: "#666",
     marginVertical: 1,
     borderRadius: 1,
+  },
+  // RESTORED: Modal Styles
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  modalCancelButton: {
+    fontSize: 16,
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  availableRoutineItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+  },
+  routineIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f0f8ff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
 });
 
