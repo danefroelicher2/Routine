@@ -125,7 +125,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
   };
 
   const getPreviewText = (content: string) => {
-    if (!content) return "";
+    if (!content || content.trim() === "") return "";
     const stripped = content.replace(/\n/g, " ").trim();
     return stripped.length > 60 ? stripped.substring(0, 60) + "..." : stripped;
   };
@@ -174,9 +174,8 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
 
       <Text style={[styles.noteCardDate, { color: colors.textSecondary }]}>
         {formatDate(note.updated_at)}
-        {getPreviewText(note.content || "")
-          ? ` ${getPreviewText(note.content || "")}`
-          : ""}
+        {getPreviewText(note.content || "") &&
+          ` ${getPreviewText(note.content || "")}`}
       </Text>
     </TouchableOpacity>
   );
