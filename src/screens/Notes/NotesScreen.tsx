@@ -141,8 +141,6 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
           style={[styles.noteCardTitle, { color: colors.text }]}
           numberOfLines={1}
         >
-          {" "}
-          {/* USE THEME */}
           {note.title || "Untitled"}
         </Text>
         <View style={styles.noteCardActions}>
@@ -153,8 +151,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
                 name="lock-closed"
                 size={14}
                 color={colors.textSecondary}
-              />{" "}
-              {/* USE THEME */}
+              />
             </View>
           )}
           <TouchableOpacity
