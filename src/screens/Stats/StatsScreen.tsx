@@ -26,8 +26,13 @@ export default function StatsScreen() {
   useFocusEffect(
     useCallback(() => {
       console.log("📊 Stats screen focused - loading fresh data");
-      loadStatsData();
-    }, []) // ✅ FIXED: No dependencies = runs every time you navigate to stats
+      // Add a small delay to ensure database writes are complete
+      const timer = setTimeout(() => {
+        loadStatsData();
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }, [])
   );
 
   useEffect(() => {
