@@ -63,7 +63,7 @@ export default function StatsScreen() {
     3, 5, 7, 14, 30, 60, 100, 150, 200, 250, 300, 365,
   ];
 
-  // ENHANCED: Load data when screen comes into focus (real-time updates) - KEEP THIS FOR FUNCTIONALITY
+  // ENHANCED: Load data when screen comes into focus (real-time updates)
   useFocusEffect(
     useCallback(() => {
       console.log("📊 Stats screen focused - loading fresh data");
@@ -80,7 +80,7 @@ export default function StatsScreen() {
     loadStatsData();
   }, [currentDate]);
 
-  // ENHANCED loadStatsData function with better completion detection - KEEP THIS FOR FUNCTIONALITY
+  // ENHANCED loadStatsData function with better completion detection
   const loadStatsData = async () => {
     try {
       setLoading(true);
@@ -130,7 +130,7 @@ export default function StatsScreen() {
           // Get all active user routines
           supabase
             .from("user_routines")
-            .select("id, is_weekly, name")  // Added name for debugging
+            .select("id, is_weekly, name") // Added name for debugging
             .eq("user_id", user.id),
           // Get day-specific routine assignments
           supabase
@@ -369,8 +369,9 @@ export default function StatsScreen() {
       // Calculate current streak (working backwards from today)
       let currentStreakValue = 0;
       const todayDate = new Date();
-      
-      for (let i = 0; i < 365; i++) { // Look back up to a year
+
+      for (let i = 0; i < 365; i++) {
+        // Look back up to a year
         const checkDate = new Date(todayDate);
         checkDate.setDate(todayDate.getDate() - i);
         const checkDateStr = checkDate.toISOString().split("T")[0];
@@ -395,7 +396,8 @@ export default function StatsScreen() {
         for (let i = 1; i < successDatesArray.length; i++) {
           const prevDate = new Date(successDatesArray[i - 1]);
           const currDate = new Date(successDatesArray[i]);
-          const dayDiff = (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
+          const dayDiff =
+            (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
 
           if (dayDiff === 1) {
             // Consecutive day
@@ -419,7 +421,8 @@ export default function StatsScreen() {
           longestStreakValue = currentLength;
           longestStart = currentStart;
           longestEnd = successDatesArray[successDatesArray.length - 1];
-          longestIsOngoing = successDatesArray[successDatesArray.length - 1] === today;
+          longestIsOngoing =
+            successDatesArray[successDatesArray.length - 1] === today;
         }
       }
 
@@ -441,7 +444,7 @@ export default function StatsScreen() {
     }
   };
 
-  // Achievement calculation logic (same as StatsScreen)
+  // Achievement calculation logic
   const calculateAchievements = useCallback(async (userId: string) => {
     try {
       const [completionsResult, userRoutinesResult, dayRoutinesResult] =
@@ -515,7 +518,7 @@ export default function StatsScreen() {
 
       // Find all streaks that have occurred
       const streaks: Array<{ length: number; endDate: string }> = [];
-      
+
       if (successDatesArray.length > 0) {
         let currentStreakLength = 1;
         let currentStreakStart = successDatesArray[0];
@@ -523,7 +526,8 @@ export default function StatsScreen() {
         for (let i = 1; i < successDatesArray.length; i++) {
           const prevDate = new Date(successDatesArray[i - 1]);
           const currDate = new Date(successDatesArray[i]);
-          const dayDiff = (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
+          const dayDiff =
+            (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
 
           if (dayDiff === 1) {
             currentStreakLength++;
@@ -711,27 +715,37 @@ export default function StatsScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Widget-style streak boxes */}
+        {/* Enhanced Widget-style streak boxes */}
         <View style={styles.widgetContainer}>
-          {/* Current Streak Widget */}
+          {/* Current Streak Widget - Enhanced for Dark Mode */}
           <View
             style={[
               styles.widget,
               styles.currentStreakWidget,
-              { backgroundColor: colors.surface },
+              {
+                backgroundColor: colors.surface,
+                shadowColor: colors.text,
+              },
             ]}
           >
             <View style={styles.widgetContent}>
-              <Text style={styles.currentStreakNumber}>{currentStreak}</Text>
+              <Text style={[styles.currentStreakNumber, { color: "#ff6b35" }]}>
+                {currentStreak}
+              </Text>
               <Text
                 style={[
                   styles.currentStreakLabel,
-                  { color: colors.textSecondary },
+                  { color: colors.text }, // Use primary text color instead of secondary
                 ]}
               >
                 day{currentStreak !== 1 ? "s" : ""} in a row
               </Text>
-              <Text style={styles.currentStreakMessage}>
+              <Text
+                style={[
+                  styles.currentStreakMessage,
+                  { color: colors.textSecondary },
+                ]}
+              >
                 {getCurrentStreakMessage()}
               </Text>
             </View>
@@ -739,27 +753,30 @@ export default function StatsScreen() {
               <Ionicons
                 name={currentStreak > 0 ? "flame" : "flame-outline"}
                 size={32}
-                color={currentStreak > 0 ? "#ff6b35" : "#ccc"}
+                color={currentStreak > 0 ? "#ff6b35" : colors.textTertiary}
               />
             </View>
           </View>
 
-          {/* Longest Streak Widget */}
+          {/* Longest Streak Widget - Enhanced for Dark Mode */}
           <View
             style={[
               styles.widget,
               styles.longestStreakWidget,
-              { backgroundColor: colors.surface },
+              {
+                backgroundColor: colors.surface,
+                shadowColor: colors.text,
+              },
             ]}
           >
             <View style={styles.widgetContent}>
-              <Text style={styles.longestStreakNumber}>
+              <Text style={[styles.longestStreakNumber, { color: "#ffd700" }]}>
                 {longestStreak.length}
               </Text>
               <Text
                 style={[
                   styles.longestStreakLabel,
-                  { color: colors.textSecondary },
+                  { color: colors.text }, // Use primary text color instead of secondary
                 ]}
               >
                 longest streak
@@ -839,8 +856,13 @@ export default function StatsScreen() {
           </View>
         </View>
 
-        {/* Achievements */}
-        <View style={[styles.achievementsSection, { backgroundColor: colors.surface }]}>
+        {/* Fixed Achievements - 3 per row with proper spacing */}
+        <View
+          style={[
+            styles.achievementsSection,
+            { backgroundColor: colors.surface },
+          ]}
+        >
           <View style={styles.achievementsHeader}>
             <Text style={[styles.achievementsTitle, { color: colors.text }]}>
               🏆 Achievements
@@ -849,7 +871,10 @@ export default function StatsScreen() {
           <View style={styles.achievementsGrid}>
             {achievements.map((achievement) => {
               const isUnlocked = achievement.unlocked;
-              const progress = Math.min((currentStreak / achievement.target) * 100, 100);
+              const progress = Math.min(
+                (currentStreak / achievement.target) * 100,
+                100
+              );
 
               return (
                 <View
@@ -953,7 +978,7 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  // Widget container and styles
+  // Enhanced Widget container and styles
   widgetContainer: {
     flexDirection: "row",
     paddingHorizontal: 20,
@@ -967,7 +992,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -993,27 +1017,26 @@ const styles = StyleSheet.create({
   currentStreakNumber: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#ff6b35",
     lineHeight: 32,
   },
   currentStreakLabel: {
-    fontSize: 12,
+    fontSize: 14, // Increased from 12
     marginTop: 2,
+    fontWeight: "600", // Added font weight
   },
   currentStreakMessage: {
     fontSize: 11,
-    color: "#999",
     marginTop: 4,
   },
   longestStreakNumber: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#ffd700",
     lineHeight: 36,
   },
   longestStreakLabel: {
-    fontSize: 14,
+    fontSize: 14, // Increased from 14
     marginTop: 2,
+    fontWeight: "600", // Added font weight
   },
   longestStreakDates: {
     fontSize: 12,
@@ -1104,7 +1127,7 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 2,
   },
-  // Achievements Section Styles - Completely redesigned
+  // Fixed Achievements Section Styles - 3 per row
   achievementsSection: {
     marginTop: 20,
     marginHorizontal: 20,
@@ -1133,16 +1156,18 @@ const styles = StyleSheet.create({
   achievementsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    justifyContent: "space-between", // Changed from flex-start
+    gap: 8, // Reduced gap
   },
   achievementCard: {
-    width: (width - 80) / 4,
+    width: (width - 80) / 3, // Fixed: 3 per row instead of 4
     aspectRatio: 1,
     borderRadius: 14,
     borderWidth: 1.5,
     padding: 6,
     position: "relative",
     overflow: "hidden",
+    marginBottom: 8, // Added margin bottom for rows
   },
   achievementCardContent: {
     flex: 1,

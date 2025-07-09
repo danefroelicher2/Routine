@@ -820,21 +820,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
             <Ionicons name="today" size={24} color="#007AFF" />
-            <View style={styles.dailyRoutinesHeaderContainer}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Daily Routines -{" "}
-                {daysOfWeek.find((d) => d.value === selectedDay)?.name}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  loadAvailableRoutines();
-                  setShowDayRoutineModal(true);
-                }}
-                style={styles.addButton}
-              >
-                <Ionicons name="add" size={20} color="#007AFF" />
-              </TouchableOpacity>
-            </View>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Daily Routines
+            </Text>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate("AddRoutine", {
+                  selectedDay,
+                  isWeekly: false,
+                })
+              }
+              style={styles.addButton}
+            >
+              <Ionicons name="add" size={20} color="#007AFF" />
+            </TouchableOpacity>
           </View>
 
           {dailyRoutines.length > 0 ? (
@@ -863,24 +862,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
             <Ionicons name="trophy" size={24} color="#ffd700" />
-            <View style={styles.weeklyGoalsHeaderContainer}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Weekly Goals
-              </Text>
-              <View
-                style={[styles.weekTimer, { backgroundColor: colors.card }]}
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Weekly Goals
+            </Text>
+            <View style={[styles.weekTimer, { backgroundColor: colors.card }]}>
+              <Ionicons name="time" size={12} color="#007AFF" />
+              <Text
+                style={[styles.weekTimerText, { color: colors.textSecondary }]}
               >
-                <Ionicons name="time" size={12} color="#007AFF" />
-                <Text
-                  style={[
-                    styles.weekTimerText,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {weekTimeRemaining}
-                </Text>
-              </View>
+                {weekTimeRemaining}
+              </Text>
             </View>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate("AddRoutine", { isWeekly: true })
+              }
+              style={styles.addButton}
+            >
+              <Ionicons name="add" size={20} color="#007AFF" />
+            </TouchableOpacity>
           </View>
 
           {weeklyRoutines.length > 0 ? (
@@ -1024,18 +1024,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     marginLeft: 8,
-  },
-  weeklyGoalsHeaderContainer: {
-    flexDirection: "row",
-    alignItems: "center",
     flex: 1,
-    marginLeft: 8,
-  },
-  dailyRoutinesHeaderContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    marginLeft: 8,
   },
   addButton: {
     padding: 4,
@@ -1046,7 +1035,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    marginLeft: 12,
+    marginRight: 8,
   },
   weekTimerText: {
     fontSize: 12,
