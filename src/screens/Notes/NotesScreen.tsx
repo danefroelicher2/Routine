@@ -89,6 +89,23 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     navigation.navigate("NoteDetail", { note });
   };
 
+  const togglePin = async (noteId: string, currentPinStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("notes")
+        .update({ is_pinned: !currentPinStatus })
+        .eq("id", noteId);
+
+      if (error) throw error;
+
+      // Reload notes to reflect changes
+      await loadNotes();
+    } catch (error) {
+      console.error("Error toggling pin:", error);
+      Alert.alert("Error", "Failed to update note");
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -120,20 +137,30 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
       onPress={() => openNote(note)}
     >
       <View style={styles.noteCardHeader}>
-        <Text style={[styles.noteCardTitle, { color: colors.text }]} numberOfLines={1}> {/* USE THEME */}
+        <Text
+          style={[styles.noteCardTitle, { color: colors.text }]}
+          numberOfLines={1}
+        >
+          {" "}
+          {/* USE THEME */}
           {note.title || "Untitled"}
         </Text>
         <View style={styles.noteCardActions}>
           {/* Show lock indicator if note is locked */}
           {note.is_locked && (
             <View style={styles.lockIndicator}>
-              <Ionicons name="lock-closed" size={14} color={colors.textSecondary} /> {/* USE THEME */}
+              <Ionicons
+                name="lock-closed"
+                size={14}
+                color={colors.textSecondary}
+              />{" "}
+              {/* USE THEME */}
             </View>
           )}
           <TouchableOpacity
             onPress={(e) => {
               e.stopPropagation();
-              // Handle pin/unpin logic here if needed
+              togglePin(note.id, note.is_pinned);
             }}
           >
             <Ionicons
@@ -145,7 +172,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
         </View>
       </View>
 
-      <Text style={[styles.noteCardDate, { color: colors.textSecondary }]}> {/* USE THEME */}
+      <Text style={[styles.noteCardDate, { color: colors.textSecondary }]}>
         {formatDate(note.updated_at)} {getPreviewText(note.content || "")}
       </Text>
     </TouchableOpacity>
@@ -153,9 +180,15 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
 
   const renderEmpty = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="document-text-outline" size={64} color={colors.textTertiary} /> {/* USE THEME */}
-      <Text style={[styles.emptyStateTitle, { color: colors.textSecondary }]}>No Notes Yet</Text> {/* USE THEME */}
-      <Text style={[styles.emptyStateText, { color: colors.textTertiary }]}> {/* USE THEME */}
+      <Ionicons
+        name="document-text-outline"
+        size={64}
+        color={colors.textTertiary}
+      />
+      <Text style={[styles.emptyStateTitle, { color: colors.textSecondary }]}>
+        No Notes Yet
+      </Text>
+      <Text style={[styles.emptyStateText, { color: colors.textTertiary }]}>
         Tap the + button to create your first note
       </Text>
     </View>
@@ -166,11 +199,23 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
   const regularNotes = notes.filter((note) => !note.is_pinned);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> {/* USE THEME */}
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       {/* Daily Quote Section */}
-      <View style={[styles.quoteContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}> {/* USE THEME */}
-        <View style={[styles.quoteBox, { backgroundColor: colors.surface }]}> {/* USE THEME */}
-          <Text style={[styles.quoteText, { color: colors.text }]}>{dailyQuote}</Text> {/* USE THEME */}
+      <View
+        style={[
+          styles.quoteContainer,
+          {
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <View style={[styles.quoteBox, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.quoteText, { color: colors.text }]}>
+            {dailyQuote}
+          </Text>
         </View>
       </View>
 
@@ -185,13 +230,25 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
         {/* Pinned Section */}
         {pinnedNotes.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Pinned</Text> {/* USE THEME */}
-            <View style={[styles.sectionContent, { backgroundColor: colors.surface }]}> {/* USE THEME */}
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Pinned
+            </Text>
+            <View
+              style={[
+                styles.sectionContent,
+                { backgroundColor: colors.surface },
+              ]}
+            >
               {pinnedNotes.map((note, index) => (
                 <View key={note.id}>
                   {renderNoteCard(note)}
                   {index < pinnedNotes.length - 1 && (
-                    <View style={[styles.noteSeparator, { backgroundColor: colors.separator }]} /> {/* USE THEME */}
+                    <View
+                      style={[
+                        styles.noteSeparator,
+                        { backgroundColor: colors.separator },
+                      ]}
+                    />
                   )}
                 </View>
               ))}
@@ -202,13 +259,25 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
         {/* Recent Section */}
         {regularNotes.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent</Text> {/* USE THEME */}
-            <View style={[styles.sectionContent, { backgroundColor: colors.surface }]}> {/* USE THEME */}
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Recent
+            </Text>
+            <View
+              style={[
+                styles.sectionContent,
+                { backgroundColor: colors.surface },
+              ]}
+            >
               {regularNotes.map((note, index) => (
                 <View key={note.id}>
                   {renderNoteCard(note)}
                   {index < regularNotes.length - 1 && (
-                    <View style={[styles.noteSeparator, { backgroundColor: colors.separator }]} /> {/* USE THEME */}
+                    <View
+                      style={[
+                        styles.noteSeparator,
+                        { backgroundColor: colors.separator },
+                      ]}
+                    />
                   )}
                 </View>
               ))}

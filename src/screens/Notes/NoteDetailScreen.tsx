@@ -74,28 +74,45 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
       animationType="slide"
       presentationStyle="pageSheet"
     >
-      <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}> {/* USE THEME */}
-        <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}> {/* USE THEME */}
+      <SafeAreaView
+        style={[styles.modalContainer, { backgroundColor: colors.background }]}
+      >
+        <View
+          style={[
+            styles.modalHeader,
+            {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
           <TouchableOpacity onPress={onClose}>
             <Text style={styles.modalCancelText}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Set Password</Text> {/* USE THEME */}
+          <Text style={[styles.modalTitle, { color: colors.text }]}>
+            Set Password
+          </Text>
           <TouchableOpacity onPress={handleSetPassword}>
             <Text style={styles.modalSaveText}>Save</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.modalContent}>
-          <Text style={[styles.passwordLabel, { color: colors.text }]}> {/* USE THEME */}
+          <Text style={[styles.passwordLabel, { color: colors.text }]}>
             Create a password to lock this note
           </Text>
 
           {/* FIXED: Single password input only */}
-          <View style={[styles.passwordInputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}> {/* USE THEME */}
+          <View
+            style={[
+              styles.passwordInputContainer,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <TextInput
-              style={[styles.passwordInput, { color: colors.text }]} {/* USE THEME */}
+              style={[styles.passwordInput, { color: colors.text }]}
               placeholder="Enter password"
-              placeholderTextColor={colors.placeholder} {/* USE THEME */}
+              placeholderTextColor={colors.placeholder}
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
@@ -109,7 +126,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
               <Ionicons
                 name={showPassword ? "eye" : "eye-off"}
                 size={20}
-                color={colors.textSecondary} {/* USE THEME */}
+                color={colors.textSecondary}
               />
             </TouchableOpacity>
           </View>
@@ -131,28 +148,49 @@ const LockModal: React.FC<LockModalProps> = ({
   return (
     <Modal visible={visible} animationType="fade" transparent>
       <View style={styles.overlayContainer}>
-        <View style={[styles.lockModalContainer, { backgroundColor: colors.surface }]}> {/* USE THEME */}
-          <Text style={[styles.lockModalTitle, { color: colors.text }]}>Lock Note</Text> {/* USE THEME */}
-          <Text style={[styles.lockModalSubtitle, { color: colors.textSecondary }]}> {/* USE THEME */}
+        <View
+          style={[
+            styles.lockModalContainer,
+            { backgroundColor: colors.surface },
+          ]}
+        >
+          <Text style={[styles.lockModalTitle, { color: colors.text }]}>
+            Lock Note
+          </Text>
+          <Text
+            style={[styles.lockModalSubtitle, { color: colors.textSecondary }]}
+          >
             Choose how to lock this note
           </Text>
 
           <TouchableOpacity
-            style={[styles.lockOption, { backgroundColor: colors.card }]} {/* USE THEME */}
+            style={[styles.lockOption, { backgroundColor: colors.card }]}
             onPress={onLockWithFaceID}
           >
             <Ionicons name="finger-print" size={24} color="#007AFF" />
-            <Text style={[styles.lockOptionText, { color: colors.text }]}>Face ID / Touch ID</Text> {/* USE THEME */}
-            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} /> {/* USE THEME */}
+            <Text style={[styles.lockOptionText, { color: colors.text }]}>
+              Face ID / Touch ID
+            </Text>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.textTertiary}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.lockOption, { backgroundColor: colors.card }]} {/* USE THEME */}
+            style={[styles.lockOption, { backgroundColor: colors.card }]}
             onPress={onLockWithPassword}
           >
             <Ionicons name="key" size={24} color="#007AFF" />
-            <Text style={[styles.lockOptionText, { color: colors.text }]}>Password</Text> {/* USE THEME */}
-            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} /> {/* USE THEME */}
+            <Text style={[styles.lockOptionText, { color: colors.text }]}>
+              Password
+            </Text>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.textTertiary}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
@@ -277,10 +315,17 @@ export default function NoteDetailScreen({
         return;
       }
 
+      // Update database
+      const { error } = await supabase
+        .from("notes")
+        .update({ is_locked: true })
+        .eq("id", note?.id);
+
+      if (error) throw error;
+
       setIsLocked(true);
       setIsUnlocked(false);
       setShowLockModal(false);
-      await saveNote();
     } catch (error) {
       console.error("Error setting up Face ID lock:", error);
       Alert.alert("Error", "Failed to set up Face ID protection");
@@ -297,10 +342,17 @@ export default function NoteDetailScreen({
       const noteId = note?.id || `temp_${Date.now()}`;
       await SecureStore.setItemAsync(`note_password_${noteId}`, password);
 
+      // Update database
+      const { error } = await supabase
+        .from("notes")
+        .update({ is_locked: true })
+        .eq("id", note?.id);
+
+      if (error) throw error;
+
       setIsLocked(true);
       setIsUnlocked(false);
       setShowPasswordModal(false);
-      await saveNote();
     } catch (error) {
       console.error("Error setting password:", error);
       Alert.alert("Error", "Failed to set password protection");
@@ -367,12 +419,23 @@ export default function NoteDetailScreen({
     }
   };
 
-  const handleLockToggle = () => {
+  const handleLockToggle = async () => {
     if (isLocked) {
       // Unlock the note
-      setIsLocked(false);
-      setIsUnlocked(true);
-      saveNote();
+      try {
+        const { error } = await supabase
+          .from("notes")
+          .update({ is_locked: false })
+          .eq("id", note?.id);
+
+        if (error) throw error;
+
+        setIsLocked(false);
+        setIsUnlocked(true);
+      } catch (error) {
+        console.error("Error unlocking note:", error);
+        Alert.alert("Error", "Failed to unlock note");
+      }
     } else {
       // Lock the note
       setShowLockModal(true);
@@ -418,10 +481,14 @@ export default function NoteDetailScreen({
 
   // FIXED: Show unlock screen when note is locked and not unlocked
   const renderUnlockScreen = () => (
-    <View style={[styles.unlockContainer, { backgroundColor: colors.background }]}> {/* USE THEME */}
+    <View
+      style={[styles.unlockContainer, { backgroundColor: colors.background }]}
+    >
       <Ionicons name="lock-closed" size={64} color="#007AFF" />
-      <Text style={[styles.unlockTitle, { color: colors.text }]}>Note is Locked</Text> {/* USE THEME */}
-      <Text style={[styles.unlockSubtitle, { color: colors.textSecondary }]}> {/* USE THEME */}
+      <Text style={[styles.unlockTitle, { color: colors.text }]}>
+        Note is Locked
+      </Text>
+      <Text style={[styles.unlockSubtitle, { color: colors.textSecondary }]}>
         This note is protected. Unlock to view its contents.
       </Text>
 
@@ -433,14 +500,24 @@ export default function NoteDetailScreen({
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> {/* USE THEME */}
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: colors.background }]} {/* USE THEME */}
+        style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         {/* Header - always visible */}
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}> {/* USE THEME */}
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
           <View style={styles.headerLeft}>
             <TouchableOpacity
               style={styles.backButton}
@@ -458,9 +535,7 @@ export default function NoteDetailScreen({
             >
               <Ionicons
                 name={
-                  isLocked && !isUnlocked
-                    ? "lock-closed"
-                    : "lock-open-outline"
+                  isLocked && !isUnlocked ? "lock-closed" : "lock-open-outline"
                 }
                 size={20}
                 color="#007AFF"
@@ -486,7 +561,7 @@ export default function NoteDetailScreen({
           <>
             <ScrollView
               ref={scrollViewRef}
-              style={[styles.content, { backgroundColor: colors.background }]} {/* USE THEME */}
+              style={[styles.content, { backgroundColor: colors.background }]}
               keyboardShouldPersistTaps="handled"
               onScrollBeginDrag={handleScroll}
               onMomentumScrollBegin={handleScroll}
@@ -494,9 +569,12 @@ export default function NoteDetailScreen({
             >
               <TextInput
                 ref={titleInputRef}
-                style={[styles.titleInput, { color: colors.text, borderBottomColor: colors.separator }]} {/* USE THEME */}
+                style={[
+                  styles.titleInput,
+                  { color: colors.text, borderBottomColor: colors.separator },
+                ]}
                 placeholder="Title"
-                placeholderTextColor={colors.placeholder} {/* USE THEME */}
+                placeholderTextColor={colors.placeholder}
                 value={title}
                 onChangeText={setTitle}
                 returnKeyType="next"
@@ -505,9 +583,9 @@ export default function NoteDetailScreen({
 
               <TextInput
                 ref={contentInputRef}
-                style={[styles.contentInput, { color: colors.text }]} {/* USE THEME */}
+                style={[styles.contentInput, { color: colors.text }]}
                 placeholder="Start writing..."
-                placeholderTextColor={colors.placeholder} {/* USE THEME */}
+                placeholderTextColor={colors.placeholder}
                 value={content}
                 onChangeText={handleContentChange}
                 multiline
