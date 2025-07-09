@@ -375,6 +375,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           routine_id: routine.id,
           completion_date: completionDate, // Always today's date
           week_start_date: weekStartDate,
+          is_weekly_completion: isWeekly,
         });
 
         if (error) throw error;

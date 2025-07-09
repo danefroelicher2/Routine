@@ -34,6 +34,9 @@ export default function StatsScreen() {
     loadStatsData();
   }, [currentDate]);
 
+  // FIXED loadStatsData function in StatsScreen.tsx
+  // Replace the existing loadStatsData function with this corrected version
+
   const loadStatsData = async () => {
     try {
       const {
@@ -48,14 +51,14 @@ export default function StatsScreen() {
       const lastDay = new Date(year, month + 1, 0);
 
       // CRITICAL FIX: Always include today's date in our query range
-      const today = new Date().toISOString().split("T")[0];
-      const todayDate = new Date(today);
+      const today = new Date();
+      const todayStr = today.toISOString().split("T")[0];
 
       // Expand the date range to include today if it's not in the current month view
-      const queryStartDate = todayDate < firstDay ? todayDate : firstDay;
-      const queryEndDate = todayDate > lastDay ? todayDate : lastDay;
+      const queryStartDate = today < firstDay ? today : firstDay;
+      const queryEndDate = today > lastDay ? today : lastDay;
 
-      console.log("📅 Loading stats data:");
+      console.log("📅 STATS: Loading data for calendar");
       console.log(
         "  - Month view:",
         firstDay.toISOString().split("T")[0],
@@ -68,7 +71,7 @@ export default function StatsScreen() {
         "to",
         queryEndDate.toISOString().split("T")[0]
       );
-      console.log("  - Today:", today);
+      console.log("  - Today:", todayStr);
 
       // Get both completions and user routines - EXPANDED RANGE
       const [completionsResult, userRoutinesResult, dayRoutinesResult] =
@@ -100,9 +103,9 @@ export default function StatsScreen() {
       const userRoutines = userRoutinesResult.data || [];
       const dayAssignments = dayRoutinesResult.data || [];
 
-      console.log("📊 Loaded data:");
+      console.log("📊 STATS: Loaded data:");
       console.log("  - Completions:", completions.length);
-      console.log("  - Routines:", userRoutines.length);
+      console.log("  - User routines:", userRoutines.length);
       console.log("  - Day assignments:", dayAssignments.length);
 
       // Build day-specific routines mapping
@@ -114,7 +117,7 @@ export default function StatsScreen() {
         dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
       });
 
-      // CRITICAL FIX: Create completion success map for ALL dates in our expanded range
+      // Create completion map for ALL dates in our expanded range
       const completionsByDate = new Map<string, string[]>();
       completions.forEach((completion) => {
         const date = completion.completion_date;
@@ -124,7 +127,7 @@ export default function StatsScreen() {
         completionsByDate.get(date)!.push(completion.routine_id);
       });
 
-      // Process success data using the correct table structure - ONLY FOR DISPLAY MONTH
+      // Process success data for the DISPLAY MONTH only
       const successData: CompletionData[] = [];
 
       for (
@@ -153,8 +156,8 @@ export default function StatsScreen() {
           );
 
         // ENHANCED LOGGING for today's data
-        if (dateStr === today) {
-          console.log("🟢 TODAY'S ANALYSIS:");
+        if (dateStr === todayStr) {
+          console.log("🟢 STATS: TODAY'S CALENDAR ANALYSIS:");
           console.log("  - Date:", dateStr);
           console.log("  - Day of week:", dayOfWeek);
           console.log(
@@ -176,7 +179,15 @@ export default function StatsScreen() {
       }
 
       setCompletionData(successData);
-      console.log("📈 Final completion data set:", successData.length, "days");
+      console.log(
+        "📈 STATS: Final completion data set:",
+        successData.length,
+        "days"
+      );
+      console.log(
+        "📈 STATS: Today's data included:",
+        successData.some((d) => d.date === todayStr)
+      );
 
       // Calculate streaks based on success days (using expanded data)
       await calculateStreaks(user.id);
