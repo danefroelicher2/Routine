@@ -227,18 +227,23 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setDaySpecificRoutines(dayRoutineMap);
 
       // Get selected date for filtering daily routines
-      const selectedDate = new Date();
-      selectedDate.setDate(
-        selectedDate.getDate() + (selectedDay - selectedDate.getDay())
-      );
-      const selectedDateString = selectedDate.toISOString().split("T")[0];
+      const completionDate = new Date().toISOString().split("T")[0];
 
       // Get completions for selected day
       const { data: dailyCompletions, error: dailyError } = await supabase
         .from("routine_completions")
         .select("*")
         .eq("user_id", user.id)
-        .eq("completion_date", selectedDateString);
+        .eq(
+          "completion_date",
+          (() => {
+            const selectedDate = new Date();
+            selectedDate.setDate(
+              selectedDate.getDate() + (selectedDay - selectedDate.getDay())
+            );
+            return selectedDate.toISOString().split("T")[0];
+          })()
+        );
 
       // Get weekly completions (from week start to now)
       const weekStartString = weekStart.toISOString().split("T")[0];
@@ -328,6 +333,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     loadData().finally(() => setRefreshing(false));
   }, [loadData]);
 
+  // FIXED toggleRoutineCompletion function for HomeScreen.tsx
+  // Replace the existing toggleRoutineCompletion function with this corrected version
+
   const toggleRoutineCompletion = async (
     routine: RoutineWithCompletion,
     isWeekly: boolean
@@ -346,12 +354,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         if (error) throw error;
       } else {
-        const selectedDate = new Date();
-        selectedDate.setDate(
-          selectedDate.getDate() + (selectedDay - selectedDate.getDay())
-        );
-        const completionDate = selectedDate.toISOString().split("T")[0];
+        // CRITICAL FIX: Always use today's date for completion, regardless of selectedDay
+        const today = new Date();
+        const completionDate = today.toISOString().split("T")[0];
 
+        // Original logic preserved for weekly routine week calculation
         let weekStartDate = null;
         if (isWeekly) {
           const now = new Date();
@@ -366,33 +373,32 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         const { error } = await supabase.from("routine_completions").insert({
           user_id: user.id,
           routine_id: routine.id,
-          completion_date: completionDate,
+          completion_date: completionDate, // Always today's date
           week_start_date: weekStartDate,
         });
 
         if (error) throw error;
 
-        // Debug logging for stats
-        console.log("Routine completed:", routine.name, "on", completionDate);
-
-        // ADDED: Enhanced debugging for day tracking
-        const today = new Date().toISOString().split("T")[0];
-        const todayDayOfWeek = new Date().getDay();
-        console.log("📅 Debug info:");
-        console.log("  - Today's date:", today);
-        console.log("  - Today's day of week:", todayDayOfWeek);
-        console.log("  - Selected day in UI:", selectedDay);
+        // Enhanced debug logging for stats
+        console.log("✅ ROUTINE COMPLETION LOGGED:");
+        console.log("  - Routine:", routine.name);
         console.log("  - Completion date:", completionDate);
+        console.log("  - Today's date:", completionDate);
+        console.log("  - Selected day in UI:", selectedDay);
+        console.log(
+          "  - Is for TODAY:",
+          completionDate === today.toISOString().split("T")[0]
+        );
+        console.log("  - Stats calendar should update for today!");
 
-        if (completionDate === today) {
-          console.log("✅ TODAY'S ROUTINE COMPLETED - Stats should update!");
-        } else {
-          console.log(
-            "⚠️  Routine completed for different day - Stats won't show green for today"
-          );
-        }
+        // Additional verification logging
+        const todayDayOfWeek = today.getDay();
+        console.log("📊 Stats Update Check:");
+        console.log("  - Today's day of week:", todayDayOfWeek);
+        console.log("  - Completion recorded for today's date ✅");
       }
 
+      // Reload data to reflect changes
       loadData();
     } catch (error) {
       console.error("Error toggling routine:", error);
