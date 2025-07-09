@@ -63,10 +63,10 @@ export default function StatsScreen() {
     3, 5, 7, 14, 30, 60, 100, 150, 200, 250, 300, 365,
   ];
 
-  // ENHANCED: Load data when screen comes into focus (real-time updates)
+  // ENHANCED: Load data when screen comes into focus (real-time updates) - KEEP THIS FOR FUNCTIONALITY
   useFocusEffect(
     useCallback(() => {
-      console.log("📊 STATS: Screen focused - reloading all data");
+      console.log("📊 Stats screen focused - loading fresh data");
       // Add a small delay to ensure database writes are complete
       const timer = setTimeout(() => {
         loadStatsData();
@@ -80,7 +80,7 @@ export default function StatsScreen() {
     loadStatsData();
   }, [currentDate]);
 
-  // ENHANCED loadStatsData function with better completion detection
+  // ENHANCED loadStatsData function with better completion detection - KEEP THIS FOR FUNCTIONALITY
   const loadStatsData = async () => {
     try {
       setLoading(true);
@@ -130,7 +130,7 @@ export default function StatsScreen() {
           // Get all active user routines
           supabase
             .from("user_routines")
-            .select("id, is_weekly, name") // Added name for debugging
+            .select("id, is_weekly, name")  // Added name for debugging
             .eq("user_id", user.id),
           // Get day-specific routine assignments
           supabase
@@ -369,9 +369,8 @@ export default function StatsScreen() {
       // Calculate current streak (working backwards from today)
       let currentStreakValue = 0;
       const todayDate = new Date();
-
-      for (let i = 0; i < 365; i++) {
-        // Look back up to a year
+      
+      for (let i = 0; i < 365; i++) { // Look back up to a year
         const checkDate = new Date(todayDate);
         checkDate.setDate(todayDate.getDate() - i);
         const checkDateStr = checkDate.toISOString().split("T")[0];
@@ -396,8 +395,7 @@ export default function StatsScreen() {
         for (let i = 1; i < successDatesArray.length; i++) {
           const prevDate = new Date(successDatesArray[i - 1]);
           const currDate = new Date(successDatesArray[i]);
-          const dayDiff =
-            (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
+          const dayDiff = (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
 
           if (dayDiff === 1) {
             // Consecutive day
@@ -421,8 +419,7 @@ export default function StatsScreen() {
           longestStreakValue = currentLength;
           longestStart = currentStart;
           longestEnd = successDatesArray[successDatesArray.length - 1];
-          longestIsOngoing =
-            successDatesArray[successDatesArray.length - 1] === today;
+          longestIsOngoing = successDatesArray[successDatesArray.length - 1] === today;
         }
       }
 
@@ -518,7 +515,7 @@ export default function StatsScreen() {
 
       // Find all streaks that have occurred
       const streaks: Array<{ length: number; endDate: string }> = [];
-
+      
       if (successDatesArray.length > 0) {
         let currentStreakLength = 1;
         let currentStreakStart = successDatesArray[0];
@@ -526,8 +523,7 @@ export default function StatsScreen() {
         for (let i = 1; i < successDatesArray.length; i++) {
           const prevDate = new Date(successDatesArray[i - 1]);
           const currDate = new Date(successDatesArray[i]);
-          const dayDiff =
-            (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
+          const dayDiff = (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
 
           if (dayDiff === 1) {
             currentStreakLength++;
@@ -614,6 +610,20 @@ export default function StatsScreen() {
     return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   };
 
+  const getCurrentStreakMessage = () => {
+    if (currentStreak === 0) {
+      return "Start your streak today!";
+    } else if (currentStreak === 1) {
+      return "Great start! Keep it up.";
+    } else if (currentStreak <= 7) {
+      return "Building momentum!";
+    } else if (currentStreak <= 30) {
+      return "Impressive consistency!";
+    } else {
+      return "You're unstoppable!";
+    }
+  };
+
   const renderHeatmapCalendar = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -674,225 +684,252 @@ export default function StatsScreen() {
       );
     }
 
-    // Fill remaining cells to complete the grid
-    const totalCells = Math.ceil((firstDayOfWeek + daysInMonth) / 7) * 7;
-    for (let i = firstDayOfWeek + daysInMonth; i < totalCells; i++) {
-      days.push(
-        <View key={`empty-end-${i}`} style={styles.heatmapCell}>
-          <View
-            style={[styles.heatmapDay, { backgroundColor: "transparent" }]}
-          />
-        </View>
-      );
-    }
-
-    return (
-      <View style={styles.heatmapContainer}>
-        <View style={styles.heatmapHeader}>
-          <TouchableOpacity
-            onPress={() => navigateMonth("prev")}
-            style={styles.monthNavButton}
-          >
-            <Ionicons name="chevron-back" size={20} color="#007AFF" />
-          </TouchableOpacity>
-          <Text style={[styles.monthTitle, { color: colors.text }]}>
-            {getMonthName(currentDate)}
-          </Text>
-          <TouchableOpacity
-            onPress={() => navigateMonth("next")}
-            style={styles.monthNavButton}
-          >
-            <Ionicons name="chevron-forward" size={20} color="#007AFF" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Week day headers */}
-        <View style={styles.weekDaysHeader}>
-          {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
-            <View key={index} style={styles.weekDayHeader}>
-              <Text
-                style={[styles.weekDayText, { color: colors.textSecondary }]}
-              >
-                {day}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.heatmapGrid}>{days}</View>
-
-        {/* Legend */}
-        <View style={styles.heatmapLegend}>
-          <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-            Less
-          </Text>
-          <View style={styles.legendSquares}>
-            <View
-              style={[styles.legendSquare, { backgroundColor: "#ebedf0" }]}
-            />
-            <View
-              style={[styles.legendSquare, { backgroundColor: "#c6e48b" }]}
-            />
-          </View>
-          <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-            More
-          </Text>
-        </View>
-      </View>
-    );
+    return days;
   };
-
-  if (loading) {
-    return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-      >
-        <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: colors.text }]}>
-            Loading statistics...
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
     >
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Statistics
+        </Text>
+      </View>
+
       <ScrollView
-        style={styles.scrollView}
+        style={[styles.scrollView, { backgroundColor: colors.background }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={[styles.header, { backgroundColor: colors.surface }]}>
-          <View style={styles.headerContent}>
-            <Ionicons name="stats-chart" size={28} color="#007AFF" />
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              Your Progress
-            </Text>
-          </View>
-        </View>
-
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
-            <View style={styles.statIcon}>
-              <Ionicons name="flame" size={24} color="#FF6B35" />
+        {/* Widget-style streak boxes */}
+        <View style={styles.widgetContainer}>
+          {/* Current Streak Widget */}
+          <View
+            style={[
+              styles.widget,
+              styles.currentStreakWidget,
+              { backgroundColor: colors.surface },
+            ]}
+          >
+            <View style={styles.widgetContent}>
+              <Text style={styles.currentStreakNumber}>{currentStreak}</Text>
+              <Text
+                style={[
+                  styles.currentStreakLabel,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                day{currentStreak !== 1 ? "s" : ""} in a row
+              </Text>
+              <Text style={styles.currentStreakMessage}>
+                {getCurrentStreakMessage()}
+              </Text>
             </View>
-            <Text style={[styles.statValue, { color: colors.text }]}>
-              {currentStreak}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-              Current Streak
-            </Text>
+            <View style={styles.widgetIcon}>
+              <Ionicons
+                name={currentStreak > 0 ? "flame" : "flame-outline"}
+                size={32}
+                color={currentStreak > 0 ? "#ff6b35" : "#ccc"}
+              />
+            </View>
           </View>
 
-          <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
-            <View style={styles.statIcon}>
-              <Ionicons name="trophy" size={24} color="#FFD700" />
-            </View>
-            <Text style={[styles.statValue, { color: colors.text }]}>
-              {longestStreak.length}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-              Best Streak
-            </Text>
-            {longestStreak.length > 0 && (
-              <Text style={[styles.streakDate, { color: colors.textTertiary }]}>
+          {/* Longest Streak Widget */}
+          <View
+            style={[
+              styles.widget,
+              styles.longestStreakWidget,
+              { backgroundColor: colors.surface },
+            ]}
+          >
+            <View style={styles.widgetContent}>
+              <Text style={styles.longestStreakNumber}>
+                {longestStreak.length}
+              </Text>
+              <Text
+                style={[
+                  styles.longestStreakLabel,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                longest streak
+              </Text>
+              <Text
+                style={[
+                  styles.longestStreakDates,
+                  { color: colors.textSecondary },
+                ]}
+              >
                 {getStreakDateRange()}
               </Text>
-            )}
-          </View>
-
-          <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
-            <View style={styles.statIcon}>
-              <Ionicons name="checkmark-circle" size={24} color="#32D74B" />
             </View>
-            <Text style={[styles.statValue, { color: colors.text }]}>
-              {completionData.filter((d) => d.completionCount > 0).length}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-              Perfect Days
-            </Text>
+            <View style={styles.widgetIcon}>
+              <Ionicons name="trophy" size={32} color="#ffd700" />
+            </View>
           </View>
         </View>
 
-        {/* Calendar Heatmap */}
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="calendar" size={24} color="#007AFF" />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Monthly Progress
+        {/* Monthly Heatmap */}
+        <View
+          style={[styles.heatmapSection, { backgroundColor: colors.surface }]}
+        >
+          <View style={styles.heatmapHeader}>
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={() => navigateMonth("prev")}
+            >
+              <Ionicons name="chevron-back" size={24} color="#007AFF" />
+            </TouchableOpacity>
+
+            <Text style={[styles.monthTitle, { color: colors.text }]}>
+              {getMonthName(currentDate)}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={() => navigateMonth("next")}
+            >
+              <Ionicons name="chevron-forward" size={24} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.heatmapGrid}>
+            {/* Day labels */}
+            <View style={styles.dayLabels}>
+              {["S", "M", "T", "W", "T", "F", "S"].map((dayLabel, index) => (
+                <Text
+                  key={index}
+                  style={[styles.dayLabel, { color: colors.textSecondary }]}
+                >
+                  {dayLabel}
+                </Text>
+              ))}
+            </View>
+
+            {/* Calendar grid */}
+            <View style={styles.calendarGrid}>{renderHeatmapCalendar()}</View>
+          </View>
+
+          {/* Success tracker legend */}
+          <View style={styles.legend}>
+            <Text style={[styles.legendLabel, { color: colors.textSecondary }]}>
+              Less
+            </Text>
+            <View style={styles.legendColors}>
+              <View
+                style={[styles.legendColor, { backgroundColor: "#ebedf0" }]}
+              />
+              <View
+                style={[styles.legendColor, { backgroundColor: "#c6e48b" }]}
+              />
+            </View>
+            <Text style={[styles.legendLabel, { color: colors.textSecondary }]}>
+              More
             </Text>
           </View>
-          {renderHeatmapCalendar()}
         </View>
 
         {/* Achievements */}
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="trophy" size={24} color="#FFD700" />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Achievements
+        <View style={[styles.achievementsSection, { backgroundColor: colors.surface }]}>
+          <View style={styles.achievementsHeader}>
+            <Text style={[styles.achievementsTitle, { color: colors.text }]}>
+              🏆 Achievements
             </Text>
           </View>
           <View style={styles.achievementsGrid}>
-            {achievements.map((achievement) => (
-              <View
-                key={achievement.id}
-                style={[
-                  styles.achievementCard,
-                  {
-                    backgroundColor: achievement.unlocked
-                      ? "#f0f9ff"
-                      : colors.card,
-                    borderColor: achievement.unlocked
-                      ? "#0ea5e9"
-                      : colors.border,
-                  },
-                ]}
-              >
-                <View style={styles.achievementContent}>
-                  <Ionicons
-                    name={achievement.unlocked ? "trophy" : "trophy-outline"}
-                    size={20}
-                    color={achievement.unlocked ? "#0ea5e9" : "#9ca3af"}
-                  />
-                  <Text
-                    style={[
-                      styles.achievementText,
-                      achievement.unlocked
-                        ? styles.achievementTextUnlocked
-                        : styles.achievementTextLocked,
-                    ]}
-                  >
-                    {achievement.target}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.achievementSubtext,
-                      achievement.unlocked
-                        ? styles.achievementSubtextUnlocked
-                        : styles.achievementSubtextLocked,
-                    ]}
-                  >
-                    Day{achievement.target === 1 ? "" : "s"}
-                  </Text>
-                </View>
-                {achievement.unlocked && achievement.unlockedDate && (
-                  <View style={styles.achievementUnlockedContainer}>
-                    <Ionicons name="checkmark" size={10} color="#059669" />
-                    <Text style={styles.achievementUnlockedDate}>
-                      {formatStreakDate(achievement.unlockedDate)}
-                    </Text>
+            {achievements.map((achievement) => {
+              const isUnlocked = achievement.unlocked;
+              const progress = Math.min((currentStreak / achievement.target) * 100, 100);
+
+              return (
+                <View
+                  key={achievement.id}
+                  style={[
+                    styles.achievementCard,
+                    {
+                      backgroundColor: isUnlocked ? "#f0f9ff" : colors.card,
+                      borderColor: isUnlocked ? "#0ea5e9" : colors.border,
+                    },
+                  ]}
+                >
+                  <View style={styles.achievementCardContent}>
+                    <View style={styles.achievementIcon}>
+                      <Ionicons
+                        name={isUnlocked ? "trophy" : "trophy-outline"}
+                        size={16}
+                        color={isUnlocked ? "#0ea5e9" : "#9ca3af"}
+                      />
+                    </View>
+                    <View style={styles.achievementInfo}>
+                      <Text
+                        style={[
+                          styles.achievementText,
+                          isUnlocked
+                            ? styles.achievementTextUnlocked
+                            : styles.achievementTextLocked,
+                        ]}
+                      >
+                        {achievement.target} Day
+                        {achievement.target > 1 ? "s" : ""}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.achievementSubtext,
+                          isUnlocked
+                            ? styles.achievementSubtextUnlocked
+                            : styles.achievementSubtextLocked,
+                        ]}
+                      >
+                        Streak
+                      </Text>
+
+                      {isUnlocked && achievement.unlockedDate && (
+                        <View style={styles.achievementUnlockedContainer}>
+                          <Ionicons name="calendar" size={8} color="#00d4aa" />
+                          <Text style={styles.achievementUnlockedDate}>
+                            {new Date(
+                              achievement.unlockedDate
+                            ).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                )}
-              </View>
-            ))}
+
+                  {/* Progress indicator for locked achievements */}
+                  {!isUnlocked && (
+                    <View style={styles.achievementProgress}>
+                      <View style={styles.achievementProgressBg}>
+                        <View
+                          style={[
+                            styles.achievementProgressFill,
+                            {
+                              width: `${Math.min(
+                                (currentStreak / achievement.target) * 100,
+                                100
+                              )}%`,
+                            },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
           </View>
         </View>
       </ScrollView>
@@ -904,167 +941,218 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+  header: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
   },
-  loadingText: {
-    fontSize: 16,
-    marginTop: 16,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
   },
   scrollView: {
     flex: 1,
   },
-  header: {
-    paddingTop: 10,
-    paddingBottom: 20,
+  // Widget container and styles
+  widgetContainer: {
+    flexDirection: "row",
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    paddingTop: 20,
+    gap: 12,
   },
-  headerContent: {
+  widget: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 16,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
+  currentStreakWidget: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#ff6b35",
+  },
+  longestStreakWidget: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#ffd700",
+  },
+  widgetContent: {
+    flex: 1,
+  },
+  widgetIcon: {
     marginLeft: 12,
   },
-  statsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 20,
-    paddingHorizontal: 12,
-    marginHorizontal: 4,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#f0f0f0",
-  },
-  statIcon: {
-    marginBottom: 8,
-  },
-  statValue: {
-    fontSize: 24,
+  currentStreakNumber: {
+    fontSize: 28,
     fontWeight: "bold",
-    marginBottom: 4,
+    color: "#ff6b35",
+    lineHeight: 32,
   },
-  statLabel: {
+  currentStreakLabel: {
     fontSize: 12,
-    textAlign: "center",
+    marginTop: 2,
   },
-  streakDate: {
-    fontSize: 10,
-    textAlign: "center",
+  currentStreakMessage: {
+    fontSize: 11,
+    color: "#999",
     marginTop: 4,
   },
-  section: {
+  longestStreakNumber: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#ffd700",
+    lineHeight: 36,
+  },
+  longestStreakLabel: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  longestStreakDates: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  // Heatmap styles
+  heatmapSection: {
+    marginTop: 20,
     marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 20,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#f0f0f0",
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  heatmapContainer: {
-    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   heatmapHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    justifyContent: "space-between",
+    marginBottom: 20,
   },
-  monthNavButton: {
+  navButton: {
     padding: 8,
   },
   monthTitle: {
     fontSize: 18,
     fontWeight: "600",
   },
-  weekDaysHeader: {
-    flexDirection: "row",
-    marginBottom: 8,
-  },
-  weekDayHeader: {
-    flex: 1,
+  heatmapGrid: {
     alignItems: "center",
+    width: "100%",
   },
-  weekDayText: {
+  dayLabels: {
+    flexDirection: "row",
+    marginBottom: 10,
+    width: "100%",
+    paddingHorizontal: 0,
+  },
+  dayLabel: {
+    flex: 1,
+    textAlign: "center",
     fontSize: 12,
     fontWeight: "500",
   },
-  heatmapGrid: {
+  calendarGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    width: "100%",
   },
   heatmapCell: {
-    width: `${100 / 7}%`,
+    width: "14.28%",
     aspectRatio: 1,
     padding: 1,
   },
   heatmapDay: {
     flex: 1,
     borderRadius: 4,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#ebedf0",
   },
   heatmapDayText: {
     fontSize: 12,
     fontWeight: "500",
   },
-  heatmapLegend: {
+  legend: {
     flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
-    marginTop: 16,
+    justifyContent: "center",
+    marginTop: 20,
+    gap: 8,
   },
-  legendText: {
+  legendLabel: {
     fontSize: 12,
-    marginHorizontal: 8,
   },
-  legendSquares: {
+  legendColors: {
     flexDirection: "row",
     gap: 2,
   },
-  legendSquare: {
+  legendColor: {
     width: 12,
     height: 12,
     borderRadius: 2,
   },
+  // Achievements Section Styles - Completely redesigned
+  achievementsSection: {
+    marginTop: 20,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  achievementsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  achievementsTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
   achievementsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 10,
   },
   achievementCard: {
     width: (width - 80) / 4,
     aspectRatio: 1,
     borderRadius: 14,
     borderWidth: 1.5,
-    padding: 8,
+    padding: 6,
     position: "relative",
     overflow: "hidden",
   },
-  achievementContent: {
+  achievementCardContent: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  achievementIcon: {
+    marginBottom: 4,
+  },
+  achievementInfo: {
     alignItems: "center",
     flex: 1,
     justifyContent: "center",
@@ -1107,5 +1195,24 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: "#059669",
     fontWeight: "600",
+  },
+  achievementProgress: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+  },
+  achievementProgressBg: {
+    flex: 1,
+    backgroundColor: "#e5e7eb",
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+  },
+  achievementProgressFill: {
+    height: "100%",
+    backgroundColor: "#10b981",
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
   },
 });
