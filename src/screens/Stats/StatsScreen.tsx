@@ -856,7 +856,7 @@ export default function StatsScreen() {
           </View>
         </View>
 
-        {/* Fixed Achievements - 3 per row with proper spacing */}
+        {/* Original Achievements Design with Badge System */}
         <View
           style={[
             styles.achievementsSection,
@@ -864,16 +864,99 @@ export default function StatsScreen() {
           ]}
         >
           <View style={styles.achievementsHeader}>
-            <Text style={[styles.achievementsTitle, { color: colors.text }]}>
-              🏆 Achievements
-            </Text>
+            <View style={styles.achievementsHeaderLeft}>
+              <View
+                style={[
+                  styles.trophyContainer,
+                  { backgroundColor: colors.background },
+                ]}
+              >
+                <Ionicons name="trophy" size={20} color="#ffd700" />
+              </View>
+              <Text style={[styles.achievementsTitle, { color: colors.text }]}>
+                Achievements
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.achievementsStats,
+                { backgroundColor: colors.background },
+              ]}
+            >
+              <Text style={styles.achievementsCount}>
+                {achievements.filter((a) => a.unlocked).length}/
+                {achievements.length}
+              </Text>
+            </View>
           </View>
+
           <View style={styles.achievementsGrid}>
-            {achievements.map((achievement) => {
+            {achievements.map((achievement, index) => {
               const isUnlocked = achievement.unlocked;
-              const progress = Math.min(
-                (currentStreak / achievement.target) * 100,
-                100
+              const getBadgeDesign = (target: number, isUnlocked: boolean) => {
+                // Define badge tiers with increasingly impressive designs
+                if (target <= 30) {
+                  // Starter badges - simple circles with stars (3, 5, 7, 14, 30 days)
+                  return {
+                    type: "basic",
+                    backgroundColor: isUnlocked ? "#10b981" : "#d1d5db",
+                    borderColor: isUnlocked ? "#059669" : "#9ca3af",
+                    icon: "star",
+                    iconColor: isUnlocked ? "#fff" : "#6b7280",
+                    ribbonColor: isUnlocked ? "#059669" : "#9ca3af",
+                    hasRibbon: true,
+                    hasWings: false,
+                    hasCrown: false,
+                    hasGems: false,
+                  };
+                } else if (target <= 150) {
+                  // Builder badges with ribbons (60, 100, 150 days)
+                  return {
+                    type: "shield",
+                    backgroundColor: isUnlocked ? "#3b82f6" : "#d1d5db",
+                    borderColor: isUnlocked ? "#2563eb" : "#9ca3af",
+                    icon: "shield-checkmark",
+                    iconColor: isUnlocked ? "#fff" : "#6b7280",
+                    ribbonColor: isUnlocked ? "#2563eb" : "#9ca3af",
+                    hasRibbon: true,
+                    hasWings: false,
+                    hasCrown: false,
+                    hasGems: false,
+                  };
+                } else if (target <= 300) {
+                  // Champion badges with wings (200, 250, 300 days)
+                  return {
+                    type: "premium",
+                    backgroundColor: isUnlocked ? "#8b5cf6" : "#d1d5db",
+                    borderColor: isUnlocked ? "#7c3aed" : "#9ca3af",
+                    icon: "diamond",
+                    iconColor: isUnlocked ? "#fff" : "#6b7280",
+                    ribbonColor: isUnlocked ? "#7c3aed" : "#9ca3af",
+                    hasRibbon: true,
+                    hasWings: true,
+                    hasCrown: false,
+                    hasGems: true,
+                  };
+                } else {
+                  // Legend badges with crown, wings, and gems (365 days)
+                  return {
+                    type: "ultimate",
+                    backgroundColor: isUnlocked ? "#f59e0b" : "#d1d5db",
+                    borderColor: isUnlocked ? "#d97706" : "#9ca3af",
+                    icon: "trophy",
+                    iconColor: isUnlocked ? "#fff" : "#6b7280",
+                    ribbonColor: isUnlocked ? "#d97706" : "#9ca3af",
+                    hasRibbon: true,
+                    hasWings: true,
+                    hasCrown: true,
+                    hasGems: true,
+                  };
+                }
+              };
+
+              const badgeDesign = getBadgeDesign(
+                achievement.target,
+                isUnlocked
               );
 
               return (
@@ -881,20 +964,117 @@ export default function StatsScreen() {
                   key={achievement.id}
                   style={[
                     styles.achievementCard,
-                    {
-                      backgroundColor: isUnlocked ? "#f0f9ff" : colors.card,
-                      borderColor: isUnlocked ? "#0ea5e9" : colors.border,
-                    },
+                    isUnlocked
+                      ? styles.achievementCardUnlocked
+                      : styles.achievementCardLocked,
                   ]}
                 >
-                  <View style={styles.achievementCardContent}>
-                    <View style={styles.achievementIcon}>
-                      <Ionicons
-                        name={isUnlocked ? "trophy" : "trophy-outline"}
-                        size={16}
-                        color={isUnlocked ? "#0ea5e9" : "#9ca3af"}
-                      />
+                  <View style={styles.achievementCardInner}>
+                    {/* Badge container with decorative elements */}
+                    <View style={styles.achievementBadgeContainer}>
+                      {/* Wings (for premium and ultimate badges) */}
+                      {badgeDesign.hasWings && isUnlocked && (
+                        <>
+                          <View
+                            style={[styles.badgeWing, styles.badgeWingLeft]}
+                          />
+                          <View
+                            style={[styles.badgeWing, styles.badgeWingRight]}
+                          />
+                        </>
+                      )}
+
+                      {/* Crown (for ultimate badges) */}
+                      {badgeDesign.hasCrown && isUnlocked && (
+                        <View style={styles.badgeCrown}>
+                          <Ionicons name="diamond" size={8} color="#ffd700" />
+                          <Ionicons name="diamond" size={10} color="#ffd700" />
+                          <Ionicons name="diamond" size={8} color="#ffd700" />
+                        </View>
+                      )}
+
+                      {/* Main badge */}
+                      <View
+                        style={[
+                          styles.achievementBadgeNew,
+                          {
+                            backgroundColor: badgeDesign.backgroundColor,
+                            borderColor: badgeDesign.borderColor,
+                          },
+                          badgeDesign.type === "shield" && styles.shieldBadge,
+                          badgeDesign.type === "premium" && styles.premiumBadge,
+                          badgeDesign.type === "ultimate" &&
+                            styles.ultimateBadge,
+                          isUnlocked && styles.achievementBadgeGlow,
+                        ]}
+                      >
+                        {/* Gems (for premium and ultimate badges) */}
+                        {badgeDesign.hasGems && isUnlocked && (
+                          <>
+                            <View
+                              style={[styles.badgeGem, styles.badgeGemTopLeft]}
+                            />
+                            <View
+                              style={[styles.badgeGem, styles.badgeGemTopRight]}
+                            />
+                            <View
+                              style={[
+                                styles.badgeGem,
+                                styles.badgeGemBottomLeft,
+                              ]}
+                            />
+                            <View
+                              style={[
+                                styles.badgeGem,
+                                styles.badgeGemBottomRight,
+                              ]}
+                            />
+                          </>
+                        )}
+
+                        {/* Main icon */}
+                        <Ionicons
+                          name={badgeDesign.icon as any}
+                          size={20}
+                          color={badgeDesign.iconColor}
+                          style={styles.badgeMainIcon}
+                        />
+
+                        {/* Number overlay */}
+                        <View style={styles.badgeNumberContainer}>
+                          <Text
+                            style={[
+                              styles.badgeNumber,
+                              { color: badgeDesign.iconColor },
+                            ]}
+                          >
+                            {achievement.target}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Ribbon banner */}
+                      {badgeDesign.hasRibbon && (
+                        <View
+                          style={[
+                            styles.badgeRibbon,
+                            { backgroundColor: badgeDesign.ribbonColor },
+                          ]}
+                        >
+                          <Text style={styles.badgeRibbonText}>
+                            {achievement.target <= 30
+                              ? "STARTER"
+                              : achievement.target <= 150
+                              ? "BUILDER"
+                              : achievement.target <= 300
+                              ? "CHAMPION"
+                              : "LEGEND"}
+                          </Text>
+                        </View>
+                      )}
                     </View>
+
+                    {/* Achievement info */}
                     <View style={styles.achievementInfo}>
                       <Text
                         style={[
@@ -1127,7 +1307,7 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 2,
   },
-  // Fixed Achievements Section Styles - 3 per row
+  // Original Achievements Section Styles with Badge System
   achievementsSection: {
     marginTop: 20,
     marginHorizontal: 20,
@@ -1149,33 +1329,202 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 20,
   },
+  achievementsHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  trophyContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
   achievementsTitle: {
     fontSize: 20,
     fontWeight: "700",
   },
+  achievementsStats: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  achievementsCount: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#007AFF",
+  },
   achievementsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between", // Changed from flex-start
-    gap: 8, // Reduced gap
+    justifyContent: "space-around", // CHANGED FROM space-between TO space-around
+    gap: 12,
   },
   achievementCard: {
-    width: (width - 80) / 3, // Fixed: 3 per row instead of 4
+    width: (width - 100) / 3,
     aspectRatio: 1,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    padding: 6,
+    borderRadius: 16,
+    padding: 12,
     position: "relative",
     overflow: "hidden",
-    marginBottom: 8, // Added margin bottom for rows
+    marginBottom: 8,
   },
-  achievementCardContent: {
+  achievementCardUnlocked: {
+    backgroundColor: "#f8fafc",
+    borderWidth: 2,
+    borderColor: "#e2e8f0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  achievementCardLocked: {
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  achievementCardInner: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
   },
-  achievementIcon: {
-    marginBottom: 4,
+  achievementBadgeContainer: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  achievementBadgeNew: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 3,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  achievementBadgeGlow: {
+    shadowColor: "#3b82f6",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  shieldBadge: {
+    borderRadius: 8,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  premiumBadge: {
+    borderRadius: 12,
+    transform: [{ rotate: "45deg" }],
+  },
+  ultimateBadge: {
+    borderRadius: 50,
+    width: 52,
+    height: 52,
+  },
+  // Wings for premium badges
+  badgeWing: {
+    position: "absolute",
+    width: 20,
+    height: 12,
+    backgroundColor: "#fbbf24",
+    top: 8,
+    zIndex: -1,
+  },
+  badgeWingLeft: {
+    left: -15,
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+    transform: [{ skewY: "-15deg" }],
+  },
+  badgeWingRight: {
+    right: -15,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
+    transform: [{ skewY: "15deg" }],
+  },
+  // Crown for ultimate badges
+  badgeCrown: {
+    position: "absolute",
+    top: -8,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    zIndex: 2,
+    gap: 1,
+  },
+  // Gems for decoration
+  badgeGem: {
+    position: "absolute",
+    width: 4,
+    height: 4,
+    backgroundColor: "#60a5fa",
+    borderRadius: 2,
+    zIndex: 1,
+  },
+  badgeGemTopLeft: {
+    top: 4,
+    left: 4,
+  },
+  badgeGemTopRight: {
+    top: 4,
+    right: 4,
+  },
+  badgeGemBottomLeft: {
+    bottom: 4,
+    left: 4,
+  },
+  badgeGemBottomRight: {
+    bottom: 4,
+    right: 4,
+  },
+  // Main icon in center
+  badgeMainIcon: {
+    position: "absolute",
+    zIndex: 2,
+  },
+  // Number overlay
+  badgeNumberContainer: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    minWidth: 16,
+    minHeight: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  badgeNumber: {
+    fontSize: 10,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  // Ribbon banner
+  badgeRibbon: {
+    position: "absolute",
+    bottom: -6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    zIndex: 3,
+  },
+  badgeRibbonText: {
+    fontSize: 8,
+    fontWeight: "700",
+    color: "#fff",
+    textAlign: "center",
   },
   achievementInfo: {
     alignItems: "center",
