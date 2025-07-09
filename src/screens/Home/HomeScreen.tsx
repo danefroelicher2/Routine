@@ -374,6 +374,23 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         // Debug logging for stats
         console.log("Routine completed:", routine.name, "on", completionDate);
+
+        // ADDED: Enhanced debugging for day tracking
+        const today = new Date().toISOString().split("T")[0];
+        const todayDayOfWeek = new Date().getDay();
+        console.log("📅 Debug info:");
+        console.log("  - Today's date:", today);
+        console.log("  - Today's day of week:", todayDayOfWeek);
+        console.log("  - Selected day in UI:", selectedDay);
+        console.log("  - Completion date:", completionDate);
+
+        if (completionDate === today) {
+          console.log("✅ TODAY'S ROUTINE COMPLETED - Stats should update!");
+        } else {
+          console.log(
+            "⚠️  Routine completed for different day - Stats won't show green for today"
+          );
+        }
       }
 
       loadData();
