@@ -200,8 +200,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setUserProfile(profile);
       }
 
-      const today = new Date().toISOString().split("T")[0];
-
       // Calculate week start (Monday)
       const now = new Date();
       const currentDay = now.getDay();
@@ -210,44 +208,66 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       weekStart.setDate(now.getDate() - daysFromMonday);
       weekStart.setHours(0, 0, 0, 0);
 
-      const weekStartDate = weekStart.toISOString().split("T")[0];
+      // Get user's routines and day-specific assignments
+      const { data: routines, error: routinesError } = await supabase
+        .from("user_routines")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("sort_order");
 
-      // Load routines and completions
-      const [routinesResult, dailyCompletionsResult, weeklyCompletionsResult] =
-        await Promise.all([
-          supabase
-            .from("user_routines")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("sort_order"),
-          supabase
-            .from("routine_completions")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("completion_date", today),
-          supabase
-            .from("routine_completions")
-            .select("*")
-            .eq("user_id", user.id)
-            .gte("completion_date", weekStartDate)
-            .eq("is_weekly_completion", true),
-        ]);
+      const { data: dayAssignments, error: dayError } = await supabase
+        .from("user_day_routines")
+        .select("*")
+        .eq("user_id", user.id);
 
-      const { data: routines } = routinesResult;
-      const { data: dailyCompletions } = dailyCompletionsResult;
-      const { data: weeklyCompletions } = weeklyCompletionsResult;
-
-      // Filter routines for today or selected day
-      const daily: RoutineWithCompletion[] = [];
-      const daySpecificData: Record<number, string[]> = {};
-
-      // Initialize day specific data
-      for (let i = 0; i <= 6; i++) {
-        daySpecificData[i] = [];
+      if (routinesError || dayError) {
+        console.error("Error fetching routines:", routinesError || dayError);
+        return;
       }
 
+      // Build day-specific routines mapping
+      const dayRoutineMap: Record<number, string[]> = {};
+      dayAssignments?.forEach((assignment) => {
+        if (!dayRoutineMap[assignment.day_of_week]) {
+          dayRoutineMap[assignment.day_of_week] = [];
+        }
+        dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
+      });
+      setDaySpecificRoutines(dayRoutineMap);
+
+      // Get selected date for filtering daily routines
+      const selectedDate = new Date();
+      selectedDate.setDate(
+        selectedDate.getDate() + (selectedDay - selectedDate.getDay())
+      );
+      const selectedDateString = selectedDate.toISOString().split("T")[0];
+
+      // Get completions for selected day
+      const { data: dailyCompletions, error: dailyError } = await supabase
+        .from("routine_completions")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("completion_date", selectedDateString);
+
+      // Get weekly completions (from week start to now) - FIXED: Remove is_weekly_completion filter
+      const weekStartString = weekStart.toISOString().split("T")[0];
+      const { data: weeklyCompletions, error: weeklyError } = await supabase
+        .from("routine_completions")
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("completion_date", weekStartString);
+
+      if (dailyError || weeklyError) {
+        console.error("Error fetching completions:", dailyError || weeklyError);
+        return;
+      }
+
+      // Filter routines for selected day
+      const selectedDayRoutineIds = dayRoutineMap[selectedDay] || [];
+      const daily: RoutineWithCompletion[] = [];
+
       routines?.forEach((routine) => {
-        if (routine.is_daily) {
+        if (!routine.is_weekly && selectedDayRoutineIds.includes(routine.id)) {
           const completion = dailyCompletions?.find(
             (c) => c.routine_id === routine.id
           );
@@ -256,25 +276,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             isCompleted: !!completion,
             completionId: completion?.id,
           });
-        } else {
-          // This is a day-specific routine
-          // For simplicity, assuming day_of_week field exists or use a mapping
-          const dayOfWeek =
-            routine.day_of_week !== undefined
-              ? routine.day_of_week
-              : selectedDay;
-          daySpecificData[dayOfWeek].push(routine.id);
-
-          if (dayOfWeek === selectedDay) {
-            const completion = dailyCompletions?.find(
-              (c) => c.routine_id === routine.id
-            );
-            daily.push({
-              ...routine,
-              isCompleted: !!completion,
-              completionId: completion?.id,
-            });
-          }
         }
       });
 
@@ -295,7 +296,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       setDailyRoutines(daily);
       setWeeklyRoutines(weekly);
-      setDaySpecificRoutines(daySpecificData);
 
       // Calculate time remaining in week
       const weekEnd = new Date(weekStart);
@@ -358,7 +358,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         if (error) throw error;
       } else {
         // Add completion
-        const today = new Date().toISOString().split("T")[0];
+        // Use the selected day's date, not just today
+        const selectedDate = new Date();
+        selectedDate.setDate(
+          selectedDate.getDate() + (selectedDay - selectedDate.getDay())
+        );
+        const completionDate = selectedDate.toISOString().split("T")[0];
 
         let weekStartDate = null;
         if (isWeekly) {
@@ -374,9 +379,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         const { error } = await supabase.from("routine_completions").insert({
           user_id: user.id,
           routine_id: routine.id,
-          completion_date: today,
+          completion_date: completionDate,
           week_start_date: weekStartDate,
-          is_weekly_completion: isWeekly,
+          // REMOVED: is_weekly_completion field since it doesn't exist in the table
         });
 
         if (error) throw error;
@@ -422,7 +427,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // RESTORED: Add routine to specific day
+  // RESTORED: Add routine to specific day using user_day_routines table
   const assignRoutineToDay = async (routineId: string) => {
     try {
       const {
@@ -430,12 +435,26 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Add to user_day_routines table or update routine's day_of_week
-      const { error } = await supabase
-        .from("user_routines")
-        .update({ day_of_week: selectedDay })
-        .eq("id", routineId)
-        .eq("user_id", user.id);
+      // Check if already assigned to this day
+      const { data: existingAssignment } = await supabase
+        .from("user_day_routines")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("routine_id", routineId)
+        .eq("day_of_week", selectedDay)
+        .single();
+
+      if (existingAssignment) {
+        Alert.alert("Info", "This routine is already assigned to this day");
+        return;
+      }
+
+      // Add to user_day_routines table
+      const { error } = await supabase.from("user_day_routines").insert({
+        user_id: user.id,
+        routine_id: routineId,
+        day_of_week: selectedDay,
+      });
 
       if (error) throw error;
 
