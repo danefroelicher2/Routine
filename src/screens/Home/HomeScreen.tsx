@@ -21,7 +21,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
 import { UserRoutine } from "../../types/database";
-import { useTheme } from "../../../ThemeContext"; // CRITICAL: Theme import
+import { useTheme } from "../../../ThemeContext";
 
 interface RoutineWithCompletion extends UserRoutine {
   isCompleted: boolean;
@@ -33,7 +33,6 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
-  // CRITICAL: Get theme colors - this was missing!
   const { colors } = useTheme();
 
   const [dailyRoutines, setDailyRoutines] = useState<RoutineWithCompletion[]>(
@@ -77,7 +76,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const getTimePeriodInfo = () => {
     const now = new Date();
     const hour = now.getHours();
-    const dateString = now.toDateString(); // This will be the same for the entire day
+    const dateString = now.toDateString();
 
     let timePeriod: string;
     if (hour >= 5 && hour < 12) {
@@ -90,8 +89,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       timePeriod = "night";
     }
 
-    // Create a consistent seed based on date + time period
-    // This ensures the same greeting within the same time period of the same day
     const seed = `${dateString}-${timePeriod}`;
     return { timePeriod, seed, hour };
   };
@@ -102,9 +99,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     for (let i = 0; i < seed.length; i++) {
       const char = seed.charCodeAt(i);
       hash = (hash << 5) - hash + char;
-      hash = hash & hash; // Convert to 32-bit integer
+      hash = hash & hash;
     }
-    // Normalize to 0-1 range
     return Math.abs(hash) / 2147483648;
   };
 
@@ -113,7 +109,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     const { timePeriod, seed, hour } = getTimePeriodInfo();
     const firstName = userProfile?.full_name?.split(" ")[0] || "there";
 
-    // Morning greetings (5 AM - 11:59 AM)
     const morningGreetings = [
       `Good morning, ${firstName}!`,
       `Rise and shine, ${firstName}`,
@@ -126,7 +121,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       `Fresh start awaits, ${firstName}.`,
     ];
 
-    // Afternoon greetings (12 PM - 4:59 PM)
     const afternoonGreetings = [
       `Good afternoon, ${firstName}`,
       `Halfway there, ${firstName}!`,
@@ -139,7 +133,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       `Steady as she goes, ${firstName}.`,
     ];
 
-    // Evening greetings (5 PM - 8:59 PM)
     const eveningGreetings = [
       `Good evening, ${firstName}`,
       `Evening vibes, ${firstName}.`,
@@ -152,7 +145,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       `Day's end approaches, ${firstName}.`,
     ];
 
-    // Night greetings (9 PM - 4:59 AM)
     const nightGreetings = [
       `Good night, ${firstName}`,
       `Night owl mode, ${firstName}?`,
@@ -176,11 +168,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       greetings = nightGreetings;
     }
 
-    // Use seeded random to get consistent greeting for this time period
     const randomValue = seededRandom(seed);
     const index = Math.floor(randomValue * greetings.length);
     return greetings[index];
-  }, [userProfile?.full_name, getTimePeriodInfo().seed]); // Only re-compute when user name or time period changes
+  }, [userProfile?.full_name, getTimePeriodInfo().seed]);
 
   const loadData = useCallback(async () => {
     try {
@@ -249,7 +240,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         .eq("user_id", user.id)
         .eq("completion_date", selectedDateString);
 
-      // Get weekly completions (from week start to now) - FIXED: Remove is_weekly_completion filter
+      // Get weekly completions (from week start to now)
       const weekStartString = weekStart.toISOString().split("T")[0];
       const { data: weeklyCompletions, error: weeklyError } = await supabase
         .from("routine_completions")
@@ -279,7 +270,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         }
       });
 
-      // Process weekly routines (unchanged)
+      // Process weekly routines
       const weekly: RoutineWithCompletion[] = [];
       routines?.forEach((routine) => {
         if (routine.is_weekly) {
@@ -323,7 +314,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     loadData();
   }, [selectedDay]);
 
-  // Add focus listener to reload data when coming back from AddRoutine
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
       console.log("HomeScreen focused - reloading data");
@@ -349,7 +339,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (!user) return;
 
       if (routine.isCompleted && routine.completionId) {
-        // Remove completion
         const { error } = await supabase
           .from("routine_completions")
           .delete()
@@ -357,8 +346,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         if (error) throw error;
       } else {
-        // Add completion
-        // Use the selected day's date, not just today
         const selectedDate = new Date();
         selectedDate.setDate(
           selectedDate.getDate() + (selectedDay - selectedDate.getDay())
@@ -381,13 +368,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           routine_id: routine.id,
           completion_date: completionDate,
           week_start_date: weekStartDate,
-          // REMOVED: is_weekly_completion field since it doesn't exist in the table
         });
 
         if (error) throw error;
+
+        // Debug logging for stats
+        console.log("Routine completed:", routine.name, "on", completionDate);
       }
 
-      // Reload data
       loadData();
     } catch (error) {
       console.error("Error toggling routine:", error);
@@ -399,13 +387,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setSelectedDay(dayValue);
   };
 
-  // RESTORED: Missing function for adding routines to specific days
   const addRoutineToDay = () => {
     setShowDayRoutineModal(true);
     loadAvailableRoutines();
   };
 
-  // RESTORED: Load available routines for the modal
   const loadAvailableRoutines = async () => {
     try {
       const {
@@ -427,7 +413,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // RESTORED: Add routine to specific day using user_day_routines table
   const assignRoutineToDay = async (routineId: string) => {
     try {
       const {
@@ -435,7 +420,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Check if already assigned to this day
       const { data: existingAssignment } = await supabase
         .from("user_day_routines")
         .select("id")
@@ -449,7 +433,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         return;
       }
 
-      // Add to user_day_routines table
       const { error } = await supabase.from("user_day_routines").insert({
         user_id: user.id,
         routine_id: routineId,
@@ -459,18 +442,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (error) throw error;
 
       setShowDayRoutineModal(false);
-      loadData(); // Reload to show the new assignment
+      loadData();
     } catch (error) {
       console.error("Error assigning routine to day:", error);
       Alert.alert("Error", "Failed to assign routine to day");
     }
   };
 
-  // Drag and drop functionality for reordering routines
   const createPanResponder = (index: number, section: "daily" | "weekly") =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only allow vertical dragging and ensure we have enough movement
         return Math.abs(gestureState.dy) > 10 && Math.abs(gestureState.dx) < 50;
       },
       onPanResponderGrant: () => {
@@ -482,28 +463,23 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setLastSwapIndex(null);
       },
       onPanResponderMove: (_, gestureState) => {
-        // Update the animated value
         dragY.setValue(gestureState.dy);
 
-        // Calculate which index we should swap with based on drag position
         const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
-        const itemHeight = 80; // Approximate height of routine item
+        const itemHeight = 80;
         const offset = gestureState.dy;
         const targetIndex = Math.max(
           0,
           Math.min(routines.length - 1, index + Math.round(offset / itemHeight))
         );
 
-        // Only perform swap if we're dragging to a different position
         if (targetIndex !== lastSwapIndex && targetIndex !== index) {
           const newRoutines = [...routines];
           const draggedItem = newRoutines[index];
 
-          // Remove dragged item and insert at new position
           newRoutines.splice(index, 1);
           newRoutines.splice(targetIndex, 0, draggedItem);
 
-          // Update state
           if (section === "daily") {
             setDailyRoutines(newRoutines);
           } else {
@@ -515,7 +491,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         }
       },
       onPanResponderRelease: async () => {
-        // Reset drag state
         Animated.spring(dragY, {
           toValue: 0,
           useNativeDriver: false,
@@ -524,7 +499,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setIsDragging(false);
         setScrollEnabled(true);
 
-        // Save new order to database if position changed
         if (draggedIndex !== null && originalIndex !== draggedIndex) {
           await saveRoutineOrder(section);
         }
@@ -545,7 +519,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
 
-      // Update sort_order for all routines in this section
       const updates = routines.map((routine, index) => ({
         id: routine.id,
         sort_order: index,
@@ -605,7 +578,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <View
               style={[
                 styles.checkbox,
-                { borderColor: colors.border },
+                {
+                  borderColor: routine.isCompleted
+                    ? "#007AFF"
+                    : colors.textSecondary, // FIXED: More visible in dark mode
+                },
                 routine.isCompleted && styles.checkboxCompleted,
               ]}
             >
@@ -641,7 +618,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </View>
           </TouchableOpacity>
 
-          {/* Drag Handle - Separate from main touch area */}
           <View style={styles.dragHandle} {...panResponder.panHandlers}>
             <View style={styles.dragIcon}>
               <View
@@ -681,7 +657,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         scrollEnabled={scrollEnabled}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View
           style={[
             styles.header,
@@ -703,7 +678,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </Text>
         </View>
 
-        {/* Day Calendar Strip */}
         <View
           style={[
             styles.calendarContainer,
@@ -754,18 +728,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Daily Routines Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="calendar" size={24} color="#007AFF" />
+            <Ionicons name="today" size={24} color="#007AFF" />
             <View style={styles.dailyRoutinesHeaderContainer}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Daily Routines
+                {daysOfWeek.find((d) => d.value === selectedDay)?.name} Routines
               </Text>
             </View>
             <TouchableOpacity
               style={styles.addButton}
-              onPress={() => navigation.navigate("AddRoutine")}
+              onPress={addRoutineToDay}
             >
               <Ionicons name="add" size={24} color="#007AFF" />
             </TouchableOpacity>
@@ -780,7 +753,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Text
                 style={[styles.emptyStateText, { color: colors.textSecondary }]}
               >
-                No daily routines set up yet
+                No routines set for{" "}
+                {daysOfWeek.find((d) => d.value === selectedDay)?.name}
               </Text>
               <Text
                 style={[
@@ -788,13 +762,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   { color: colors.textTertiary },
                 ]}
               >
-                Build consistent daily habits!
+                Tap the + to assign routines to this day!
               </Text>
             </View>
           )}
         </View>
 
-        {/* Weekly Routines Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
             <Ionicons name="trophy" size={24} color="#ffd700" />
@@ -842,7 +815,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </ScrollView>
 
-      {/* RESTORED: Day Routine Assignment Modal */}
       <Modal
         visible={showDayRoutineModal}
         animationType="slide"
@@ -959,14 +931,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginLeft: 8,
   },
-  // New container for Weekly Goals header layout
   weeklyGoalsHeaderContainer: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
     marginLeft: 8,
   },
-  // New container for Daily Routines header layout (same as weekly)
   dailyRoutinesHeaderContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -1053,7 +1023,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 8,
   },
-  // Calendar Strip Styles
   calendarContainer: {
     paddingVertical: 15,
     paddingHorizontal: 15,
@@ -1104,7 +1073,6 @@ const styles = StyleSheet.create({
   dayBoxIndicatorActive: {
     backgroundColor: "#34c759",
   },
-  // Drag and Drop Styles
   dragHandle: {
     alignItems: "center",
     justifyContent: "center",
@@ -1123,7 +1091,6 @@ const styles = StyleSheet.create({
     marginVertical: 1,
     borderRadius: 1,
   },
-  // RESTORED: Modal Styles
   modalContainer: {
     flex: 1,
   },
