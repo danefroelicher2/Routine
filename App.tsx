@@ -21,6 +21,7 @@ import SignupScreen from "./src/screens/Auth/SignupScreen";
 import HomeScreen from "./src/screens/Home/HomeScreen";
 import AddRoutineScreen from "./src/screens/Home/AddRoutineScreen";
 import StatsScreen from "./src/screens/Stats/StatsScreen";
+import SocialScreen from "./src/screens/Social/SocialScreen"; // NEW: Social Screen Import
 import NotesScreen from "./src/screens/Notes/NotesScreen";
 import NoteDetailScreen from "./src/screens/Notes/NoteDetailScreen";
 import ProfileScreen from "./src/screens/Profile/ProfileScreen";
@@ -111,7 +112,7 @@ function AuthStack() {
   );
 }
 
-// Main App Tabs with Theme
+// Main App Tabs with Theme and NEW Social Tab
 function MainTabs() {
   const { colors } = useTheme();
 
@@ -125,6 +126,9 @@ function MainTabs() {
             iconName = focused ? "home" : "home-outline";
           } else if (route.name === "Stats") {
             iconName = focused ? "stats-chart" : "stats-chart-outline";
+          } else if (route.name === "Social") {
+            // NEW: Social tab icon - using people icons
+            iconName = focused ? "people" : "people-outline";
           } else if (route.name === "Notes") {
             iconName = focused ? "document-text" : "document-text-outline";
           } else if (route.name === "Profile") {
@@ -146,6 +150,29 @@ function MainTabs() {
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Stats" component={StatsScreen} />
+      {/* NEW: Social Tab placed between Stats and Notes */}
+      <Tab.Screen
+        name="Social"
+        component={SocialScreen}
+        options={{
+          tabBarIcon: ({ focused, color, size }) => (
+            <View
+              style={{
+                backgroundColor: focused ? "#007AFF20" : "transparent",
+                borderRadius: 20,
+                padding: 8,
+                transform: [{ scale: focused ? 1.1 : 1 }],
+              }}
+            >
+              <Ionicons
+                name={focused ? "people" : "people-outline"}
+                size={size}
+                color={focused ? "#007AFF" : color}
+              />
+            </View>
+          ),
+        }}
+      />
       <Tab.Screen name="Notes" component={NotesStack} />
       <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
