@@ -815,12 +815,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   // ENHANCED: Handle edit routine
   const handleEditRoutine = (routine: RoutineWithCompletion) => {
+    console.log("🔧 EDIT ROUTINE CLICKED:", routine.name); // Debug log
     setRoutineToEdit(routine);
     setEditFormData({
       name: routine.name,
       description: routine.description || "",
     });
     setShowEditRoutineModal(true);
+    console.log("📝 EDIT MODAL SHOULD SHOW:", true); // Debug log
   };
 
   // ENHANCED: Save edited routine
