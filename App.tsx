@@ -129,6 +129,24 @@ function MainTabs() {
           } else if (route.name === "Social") {
             // NEW: Social tab icon - using people icons
             iconName = focused ? "people" : "people-outline";
+
+            // NEW: Return custom styled icon for Social tab
+            return (
+              <View
+                style={{
+                  backgroundColor: focused ? "#007AFF20" : "transparent",
+                  borderRadius: 20,
+                  padding: 8,
+                  transform: [{ scale: focused ? 1.1 : 1 }],
+                }}
+              >
+                <Ionicons
+                  name={iconName}
+                  size={size}
+                  color={focused ? "#007AFF" : color}
+                />
+              </View>
+            );
           } else if (route.name === "Notes") {
             iconName = focused ? "document-text" : "document-text-outline";
           } else if (route.name === "Profile") {
@@ -151,28 +169,7 @@ function MainTabs() {
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Stats" component={StatsScreen} />
       {/* NEW: Social Tab placed between Stats and Notes */}
-      <Tab.Screen
-        name="Social"
-        component={SocialScreen}
-        options={{
-          tabBarIcon: ({ focused, color, size }) => (
-            <View
-              style={{
-                backgroundColor: focused ? "#007AFF20" : "transparent",
-                borderRadius: 20,
-                padding: 8,
-                transform: [{ scale: focused ? 1.1 : 1 }],
-              }}
-            >
-              <Ionicons
-                name={focused ? "people" : "people-outline"}
-                size={size}
-                color={focused ? "#007AFF" : color}
-              />
-            </View>
-          ),
-        }}
-      />
+      <Tab.Screen name="Social" component={SocialScreen} />
       <Tab.Screen name="Notes" component={NotesStack} />
       <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
