@@ -607,17 +607,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
 
-        // FIXED: Much more responsive movement calculation
-        // Use actual screen position and item spacing for accurate tracking
-        const itemSpacing = 80; // Approximate height of each routine item + margin
+        // FIXED: Balanced movement calculation - not too fast, not too slow
+        const itemSpacing = 100; // Balanced spacing value
 
-        // FIXED: Reduce damping significantly for more responsive movement
+        // FIXED: Medium responsiveness - balanced between 0.5 (too slow) and 0.85 (too fast)
         const movementRatio = gestureState.dy / itemSpacing;
-        const responsiveMovement = movementRatio * 0.85; // Much higher multiplier for responsiveness
+        const balancedMovement = movementRatio * 0.68; // Sweet spot between responsiveness and control
 
         const newIndex = Math.max(
           0,
-          Math.min(routines.length - 1, Math.round(index + responsiveMovement))
+          Math.min(routines.length - 1, Math.round(index + balancedMovement))
         );
 
         // ENHANCED: Show drop zone indicator
