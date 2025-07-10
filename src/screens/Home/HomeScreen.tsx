@@ -18,6 +18,7 @@ import {
   Animated,
   PanResponder,
   Dimensions, // ENHANCED: Added for better calculations
+  TextInput, // ENHANCED: Added for edit functionality
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
@@ -76,6 +77,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     routine: RoutineWithCompletion;
     section: "daily" | "weekly";
   } | null>(null);
+
+  // ENHANCED: Edit routine modal state
+  const [showEditRoutineModal, setShowEditRoutineModal] = useState(false);
+  const [routineToEdit, setRoutineToEdit] =
+    useState<RoutineWithCompletion | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    description: "",
+  });
 
   // ENHANCED: Animated values for smooth interactions
   const dragY = useRef(new Animated.Value(0)).current;
@@ -803,7 +813,55 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ENHANCED: Cancel delete
+  // ENHANCED: Handle edit routine
+  const handleEditRoutine = (routine: RoutineWithCompletion) => {
+    setRoutineToEdit(routine);
+    setEditFormData({
+      name: routine.name,
+      description: routine.description || "",
+    });
+    setShowEditRoutineModal(true);
+  };
+
+  // ENHANCED: Save edited routine
+  const saveEditedRoutine = async () => {
+    if (!routineToEdit || !editFormData.name.trim()) {
+      Alert.alert("Error", "Routine name is required");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("user_routines")
+        .update({
+          name: editFormData.name.trim(),
+          description: editFormData.description.trim() || null,
+        })
+        .eq("id", routineToEdit.id);
+
+      if (error) throw error;
+
+      // Refresh data to reflect changes
+      await loadData();
+
+      // Reset state
+      setShowEditRoutineModal(false);
+      setRoutineToEdit(null);
+      setEditFormData({ name: "", description: "" });
+
+      console.log("✅ ROUTINE UPDATED:", editFormData.name);
+    } catch (error) {
+      console.error("Error updating routine:", error);
+      Alert.alert("Error", "Failed to update routine");
+    }
+  };
+
+  // ENHANCED: Cancel edit routine
+  const cancelEditRoutine = () => {
+    setShowEditRoutineModal(false);
+    setRoutineToEdit(null);
+    setEditFormData({ name: "", description: "" });
+  };
   const cancelDelete = () => {
     setShowDeleteConfirm(false);
     setRoutineToDelete(null);
@@ -968,14 +1026,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </View>
           </TouchableOpacity>
 
-          {/* ENHANCED: Edit mode - show delete button, Normal mode - show drag handle */}
+          {/* ENHANCED: Edit mode - show edit and delete buttons, Normal mode - show drag handle */}
           {isInEditMode ? (
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => handleDeleteRoutine(routine, section)}
-            >
-              <Ionicons name="remove-circle" size={24} color="#ff4444" />
-            </TouchableOpacity>
+            <View style={styles.editModeButtons}>
+              {/* ENHANCED: Edit routine button */}
+              <TouchableOpacity
+                style={styles.editRoutineButton}
+                onPress={() => handleEditRoutine(routine)}
+              >
+                <Ionicons name="create-outline" size={20} color="#007AFF" />
+              </TouchableOpacity>
+              {/* Delete routine button */}
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={() => handleDeleteRoutine(routine, section)}
+              >
+                <Ionicons name="remove-circle" size={24} color="#ff4444" />
+              </TouchableOpacity>
+            </View>
           ) : (
             <View
               style={[
@@ -1175,17 +1243,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
             <Ionicons name="trophy" size={24} color="#ffd700" />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Weekly Goals
-            </Text>
-            {/* FIXED: Timer right next to Weekly Goals title */}
-            <View style={[styles.weekTimer, { backgroundColor: colors.card }]}>
-              <Ionicons name="time" size={12} color="#007AFF" />
-              <Text
-                style={[styles.weekTimerText, { color: colors.textSecondary }]}
-              >
-                {weekTimeRemaining}
+            <View style={styles.titleAndTimer}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Weekly Goals
               </Text>
+              {/* FIXED: Timer directly next to Weekly Goals title */}
+              <View
+                style={[styles.weekTimer, { backgroundColor: colors.card }]}
+              >
+                <Ionicons name="time" size={12} color="#007AFF" />
+                <Text
+                  style={[
+                    styles.weekTimerText,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {weekTimeRemaining}
+                </Text>
+              </View>
             </View>
             {/* ENHANCED: Edit button for weekly goals */}
             <TouchableOpacity
@@ -1545,14 +1620,70 @@ const styles = StyleSheet.create({
   editButtonActive: {
     backgroundColor: "rgba(52, 199, 89, 0.1)",
   },
+  // ENHANCED: Title and timer container for proper positioning
+  titleAndTimer: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 8,
+  },
+  // ENHANCED: Edit mode buttons container
+  editModeButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  // ENHANCED: Edit routine button styles
+  editRoutineButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: "rgba(0, 122, 255, 0.1)",
+  },
   // ENHANCED: Delete button styles
   deleteButton: {
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  // ENHANCED: Edit modal styles
+  editModalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  inputGroup: {
+    marginBottom: 24,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  inputContainer: {
+    position: "relative",
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    minWidth: 44,
-    minHeight: 44,
+    fontSize: 16,
+    paddingRight: 60, // Space for character count
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: "top",
+    paddingTop: 12,
+  },
+  charCount: {
+    position: "absolute",
+    bottom: 12,
+    right: 16,
+    fontSize: 12,
   },
   // ENHANCED: Delete modal styles
   deleteModalOverlay: {
