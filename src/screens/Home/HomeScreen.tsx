@@ -607,6 +607,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
 
+        // FIXED: Constrain movement within the current section
+        // Don't allow dragging beyond the section boundaries
+        const maxRoutines = routines.length - 1;
+
         // FIXED: Balanced movement calculation - not too fast, not too slow
         const itemSpacing = 100; // Balanced spacing value
 
@@ -614,13 +618,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         const movementRatio = gestureState.dy / itemSpacing;
         const balancedMovement = movementRatio * 0.68; // Sweet spot between responsiveness and control
 
+        // FIXED: Strictly constrain to current section boundaries
         const newIndex = Math.max(
           0,
-          Math.min(routines.length - 1, Math.round(index + balancedMovement))
+          Math.min(
+            maxRoutines, // Use section-specific max
+            Math.round(index + balancedMovement)
+          )
         );
 
-        // ENHANCED: Show drop zone indicator
-        if (newIndex !== dropZoneIndex) {
+        // ENHANCED: Show drop zone indicator ONLY within the same section
+        if (
+          newIndex !== dropZoneIndex &&
+          newIndex >= 0 &&
+          newIndex <= maxRoutines
+        ) {
           setDropZoneIndex(newIndex);
 
           // Animate drop zone indicator
@@ -631,9 +643,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           }).start();
         }
 
-        // Perform reordering only when crossing significant boundaries
-        if (newIndex !== lastSwapIndex && newIndex !== index) {
-          console.log("🔄 REORDERING:", {
+        // Perform reordering only when crossing significant boundaries WITHIN the same section
+        if (
+          newIndex !== lastSwapIndex &&
+          newIndex !== index &&
+          newIndex >= 0 &&
+          newIndex <= maxRoutines
+        ) {
+          console.log("🔄 REORDERING within", section, ":", {
             from: index,
             to: newIndex,
             fingerMovement: gestureState.dy,
@@ -648,6 +665,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           newRoutines.splice(index, 1);
           newRoutines.splice(newIndex, 0, draggedItem);
 
+          // FIXED: Only update the correct section
           if (section === "daily") {
             setDailyRoutines(newRoutines);
           } else {
@@ -751,8 +769,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     const panResponder = createPanResponder(index, section);
     const isBeingDragged =
       isDragging && draggedIndex === index && draggedSection === section;
+
+    // FIXED: Only show drop zone if we're dragging within the same section
     const isDropZone =
-      dropZoneIndex === index && isDragActive && !isBeingDragged;
+      dropZoneIndex === index &&
+      isDragActive &&
+      !isBeingDragged &&
+      draggedSection === section; // Key fix: only same section
 
     return (
       <Animated.View
