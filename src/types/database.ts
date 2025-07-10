@@ -9,6 +9,12 @@ export interface Database {
           avatar_url: string | null;
           created_at: string;
           updated_at: string;
+          // NEW: Social features
+          current_streak: number | null;
+          longest_streak: number | null;
+          last_streak_update: string | null;
+          display_name: string | null;
+          show_in_leaderboard: boolean | null;
         };
         Insert: {
           id: string;
@@ -17,6 +23,12 @@ export interface Database {
           avatar_url?: string | null;
           created_at?: string;
           updated_at?: string;
+          // NEW: Social features
+          current_streak?: number | null;
+          longest_streak?: number | null;
+          last_streak_update?: string | null;
+          display_name?: string | null;
+          show_in_leaderboard?: boolean | null;
         };
         Update: {
           id?: string;
@@ -25,6 +37,12 @@ export interface Database {
           avatar_url?: string | null;
           created_at?: string;
           updated_at?: string;
+          // NEW: Social features
+          current_streak?: number | null;
+          longest_streak?: number | null;
+          last_streak_update?: string | null;
+          display_name?: string | null;
+          show_in_leaderboard?: boolean | null;
         };
       };
       routine_templates: {
@@ -222,15 +240,55 @@ export interface Database {
           updated_at?: string;
         };
       };
+      // NEW: Leaderboard view type
+      leaderboard_view: {
+        Row: {
+          id: string;
+          display_name: string;
+          current_streak: number;
+          longest_streak: number;
+          join_date: string;
+          rank: number;
+        };
+      };
+    };
+    Views: {
+      leaderboard_view: {
+        Row: {
+          id: string;
+          display_name: string;
+          current_streak: number;
+          longest_streak: number;
+          join_date: string;
+          rank: number;
+        };
+      };
+    };
+    Functions: {
+      update_user_streaks: {
+        Args: {
+          user_id: string;
+          new_current_streak: number;
+          new_longest_streak: number;
+        };
+        Returns: void;
+      };
     };
   };
 }
 
 // Additional types for the app
-export type Profile = Database['public']['Tables']['profiles']['Row'];
-export type UserRoutine = Database['public']['Tables']['user_routines']['Row'];
-export type RoutineTemplate = Database['public']['Tables']['routine_templates']['Row'];
-export type RoutineCompletion = Database['public']['Tables']['routine_completions']['Row'];
-export type Note = Database['public']['Tables']['notes']['Row'];
-export type UserSettings = Database['public']['Tables']['user_settings']['Row'];
-export type UserDayRoutine = Database['public']['Tables']['user_day_routines']['Row'];
+export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+export type UserRoutine = Database["public"]["Tables"]["user_routines"]["Row"];
+export type RoutineTemplate =
+  Database["public"]["Tables"]["routine_templates"]["Row"];
+export type RoutineCompletion =
+  Database["public"]["Tables"]["routine_completions"]["Row"];
+export type Note = Database["public"]["Tables"]["notes"]["Row"];
+export type UserSettings = Database["public"]["Tables"]["user_settings"]["Row"];
+export type UserDayRoutine =
+  Database["public"]["Tables"]["user_day_routines"]["Row"];
+
+// NEW: Social types
+export type LeaderboardUser =
+  Database["public"]["Views"]["leaderboard_view"]["Row"];
