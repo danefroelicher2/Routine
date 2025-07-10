@@ -1178,6 +1178,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Weekly Goals
             </Text>
+            {/* FIXED: Timer right next to Weekly Goals title */}
             <View style={[styles.weekTimer, { backgroundColor: colors.card }]}>
               <Ionicons name="time" size={12} color="#007AFF" />
               <Text
