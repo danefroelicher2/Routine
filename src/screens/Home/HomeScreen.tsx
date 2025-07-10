@@ -17,7 +17,6 @@ import {
   Modal,
   Animated,
   PanResponder,
-  Vibration, // ENHANCED: Added for haptic feedback
   Dimensions, // ENHANCED: Added for better calculations
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -66,7 +65,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // ENHANCED: New drag state for improved UX
   const [dropZoneIndex, setDropZoneIndex] = useState<number | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
-  const [itemHeights, setItemHeights] = useState<Record<string, number>>({});
 
   // ENHANCED: Animated values for smooth interactions
   const dragY = useRef(new Animated.Value(0)).current;
@@ -560,29 +558,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ENHANCED: Calculate dynamic item height based on content
-  const calculateItemHeight = (routine: RoutineWithCompletion): number => {
-    let baseHeight = 65; // Base height for minimal content
-    if (routine.description) baseHeight += 20; // Add space for description
-    if (routine.target_value && routine.target_unit) baseHeight += 18; // Add space for target
-    return baseHeight;
-  };
-
   // ENHANCED: Pan responder for drag and drop with improved UX
   const createPanResponder = (index: number, section: "daily" | "weekly") => {
     return PanResponder.create({
-      // More sensitive gesture detection for better responsiveness
+      // FIXED: Immediate drag response - capture touch from start
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        return false; // Don't capture immediately, let onMove handle it
+      },
+
       onMoveShouldSetPanResponder: (evt, gestureState) => {
         const { dx, dy } = gestureState;
-        // Allow both vertical and slight horizontal movement but prioritize vertical
-        return Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx) * 0.7;
+        // FIXED: Lower threshold for immediate response
+        return Math.abs(dy) > 3 && Math.abs(dy) > Math.abs(dx) * 0.5;
       },
 
       onPanResponderGrant: () => {
         console.log("🎯 DRAG STARTED:", { index, section });
 
-        // ENHANCED: Haptic feedback on drag start
-        Vibration.vibrate(50);
+        // REMOVED: All haptic feedback/vibration
 
         // Set drag state
         setIsDragging(true);
@@ -609,22 +602,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       },
 
       onPanResponderMove: (evt, gestureState) => {
-        // Update drag position
+        // FIXED: More precise finger tracking - use raw gesture movement
         dragY.setValue(gestureState.dy);
 
         const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
 
-        // ENHANCED: Dynamic item height calculation
-        const currentRoutine = routines[index];
-        const itemHeight = calculateItemHeight(currentRoutine);
+        // FIXED: Much more responsive movement calculation
+        // Use actual screen position and item spacing for accurate tracking
+        const itemSpacing = 80; // Approximate height of each routine item + margin
 
-        // Calculate new position with more precision
+        // FIXED: Reduce damping significantly for more responsive movement
+        const movementRatio = gestureState.dy / itemSpacing;
+        const responsiveMovement = movementRatio * 0.85; // Much higher multiplier for responsiveness
+
         const newIndex = Math.max(
           0,
-          Math.min(
-            routines.length - 1,
-            Math.round(index + gestureState.dy / itemHeight)
-          )
+          Math.min(routines.length - 1, Math.round(index + responsiveMovement))
         );
 
         // ENHANCED: Show drop zone indicator
@@ -639,12 +632,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           }).start();
         }
 
-        // Perform reordering with haptic feedback
+        // Perform reordering only when crossing significant boundaries
         if (newIndex !== lastSwapIndex && newIndex !== index) {
-          console.log("🔄 REORDERING:", { from: index, to: newIndex });
+          console.log("🔄 REORDERING:", {
+            from: index,
+            to: newIndex,
+            fingerMovement: gestureState.dy,
+          });
 
-          // ENHANCED: Subtle haptic feedback during reordering
-          Vibration.vibrate(25);
+          // REMOVED: Haptic feedback during reordering
 
           setLastSwapIndex(newIndex);
 
@@ -670,10 +666,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           changed: originalIndex !== draggedIndex,
         });
 
-        // ENHANCED: Stronger haptic feedback on successful drop
-        if (originalIndex !== draggedIndex) {
-          Vibration.vibrate([0, 100]); // Double vibration for successful reorder
-        }
+        // REMOVED: All haptic feedback on drop
 
         // Reset drag state
         setIsDragging(false);
