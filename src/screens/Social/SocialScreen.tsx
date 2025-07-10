@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../services/supabase";
 import { useTheme } from "../../../ThemeContext";
+import SocialStatsCard from "./SocialStatsCard";
 
 const { width } = Dimensions.get("window");
 
@@ -50,6 +51,14 @@ export default function SocialScreen() {
   const [displayName, setDisplayName] = useState("");
   const [showInLeaderboard, setShowInLeaderboard] = useState(true);
   const [updating, setUpdating] = useState(false);
+  
+  // NEW: Community stats
+  const [communityStats, setCommunityStats] = useState({
+    totalUsers: 0,
+    activeToday: 0,
+    averageStreak: 0,
+    topStreak: 0,
+  });
 
   // Theme
   const { colors } = useTheme();
@@ -68,6 +77,7 @@ export default function SocialScreen() {
         loadLeaderboard(),
         loadUserProfile(),
         updateUserStreaks(),
+        loadCommunityStats(), // NEW: Load community stats
       ]);
     } catch (error) {
       console.error("Error loading social data:", error);
@@ -77,6 +87,49 @@ export default function SocialScreen() {
       setRefreshing(false);
     }
   };
+
+  // NEW: Load community statistics
+  const loadCommunityStats = async () => {
+    try {
+      // Get total users count
+      const { count: totalUsers } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("show_in_leaderboard", true);
+
+      // Get users active today (have current_streak > 0)
+      const { count: activeToday } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .gt("current_streak", 0)
+        .eq("show_in_leaderboard", true);
+
+      // Get average and top streak from leaderboard
+      const { data: streakData } = await supabase
+        .from("profiles")
+        .select("current_streak, longest_streak")
+        .eq("show_in_leaderboard", true)
+        .gt("current_streak", 0);
+
+      let averageStreak = 0;
+      let topStreak = 0;
+
+      if (streakData && streakData.length > 0) {
+        const totalStreak = streakData.reduce((sum, user) => sum + (user.current_streak || 0), 0);
+        averageStreak = Math.round(totalStreak / streakData.length);
+        topStreak = Math.max(...streakData.map(user => user.longest_streak || 0));
+      }
+
+      setCommunityStats({
+        totalUsers: totalUsers || 0,
+        activeToday: activeToday || 0,
+        averageStreak,
+        topStreak,
+      });
+
+    } catch (error) {
+      console.error("Error loading community stats:", error);
+    }
 
   // Load leaderboard data from our view
   const loadLeaderboard = async () => {
@@ -97,16 +150,12 @@ export default function SocialScreen() {
   // Load current user's profile and settings
   const loadUserProfile = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
         .from("profiles")
-        .select(
-          "id, display_name, show_in_leaderboard, current_streak, longest_streak"
-        )
+        .select("id, display_name, show_in_leaderboard, current_streak, longest_streak")
         .eq("id", user.id)
         .single();
 
@@ -136,34 +185,27 @@ export default function SocialScreen() {
   // Update user's streak data based on their actual performance
   const updateUserStreaks = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       // Calculate streaks using the same logic as StatsScreen
-      const [completionsResult, userRoutinesResult, dayRoutinesResult] =
-        await Promise.all([
-          supabase
-            .from("routine_completions")
-            .select("completion_date, routine_id")
-            .eq("user_id", user.id)
-            .order("completion_date", { ascending: false }),
-          supabase
-            .from("user_routines")
-            .select("id, is_weekly")
-            .eq("user_id", user.id),
-          supabase
-            .from("user_day_routines")
-            .select("routine_id, day_of_week")
-            .eq("user_id", user.id),
-        ]);
+      const [completionsResult, userRoutinesResult, dayRoutinesResult] = await Promise.all([
+        supabase
+          .from("routine_completions")
+          .select("completion_date, routine_id")
+          .eq("user_id", user.id)
+          .order("completion_date", { ascending: false }),
+        supabase
+          .from("user_routines")
+          .select("id, is_weekly")
+          .eq("user_id", user.id),
+        supabase
+          .from("user_day_routines")
+          .select("routine_id, day_of_week")
+          .eq("user_id", user.id),
+      ]);
 
-      if (
-        completionsResult.error ||
-        userRoutinesResult.error ||
-        dayRoutinesResult.error
-      ) {
+      if (completionsResult.error || userRoutinesResult.error || dayRoutinesResult.error) {
         throw new Error("Failed to fetch streak data");
       }
 
@@ -172,33 +214,27 @@ export default function SocialScreen() {
       const dayRoutines = dayRoutinesResult.data || [];
 
       // Calculate streaks (same logic as StatsScreen)
-      const { currentStreak, longestStreak } = calculateStreaks(
-        completions,
-        userRoutines,
-        dayRoutines
-      );
+      const { currentStreak, longestStreak } = calculateStreaks(completions, userRoutines, dayRoutines);
 
       // Update the profile with calculated streaks
-      const { error: updateError } = await supabase.rpc("update_user_streaks", {
-        user_id: user.id,
-        new_current_streak: currentStreak,
-        new_longest_streak: longestStreak,
-      });
+      const { error: updateError } = await supabase
+        .rpc("update_user_streaks", {
+          user_id: user.id,
+          new_current_streak: currentStreak,
+          new_longest_streak: longestStreak,
+        });
 
       if (updateError) {
         console.error("Error updating streaks:", updateError);
       }
+
     } catch (error) {
       console.error("Error updating user streaks:", error);
     }
   };
 
   // Calculate streaks helper function (adapted from StatsScreen logic)
-  const calculateStreaks = (
-    completions: any[],
-    userRoutines: any[],
-    dayRoutines: any[]
-  ) => {
+  const calculateStreaks = (completions: any[], userRoutines: any[], dayRoutines: any[]) => {
     const successDays = new Set<string>();
     const today = new Date().toISOString().split("T")[0];
 
@@ -227,11 +263,8 @@ export default function SocialScreen() {
         (routine) => !routine.is_weekly && dailyRoutineIds.includes(routine.id)
       );
 
-      const allCompleted =
-        dailyRoutines.length > 0 &&
-        dailyRoutines.every((routine) =>
-          completedRoutineIds.includes(routine.id)
-        );
+      const allCompleted = dailyRoutines.length > 0 && 
+        dailyRoutines.every((routine) => completedRoutineIds.includes(routine.id));
 
       if (allCompleted) {
         successDays.add(dateStr);
@@ -264,8 +297,7 @@ export default function SocialScreen() {
       for (let i = 1; i < successDatesArray.length; i++) {
         const prevDate = new Date(successDatesArray[i - 1]);
         const currDate = new Date(successDatesArray[i]);
-        const dayDiff =
-          (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
+        const dayDiff = (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
 
         if (dayDiff === 1) {
           currentLength++;
@@ -283,12 +315,10 @@ export default function SocialScreen() {
   // Handle profile settings update
   const updateProfile = async () => {
     if (updating) return;
-
+    
     setUpdating(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { error } = await supabase
@@ -304,6 +334,7 @@ export default function SocialScreen() {
       setShowSettings(false);
       await loadSocialData(); // Refresh data
       Alert.alert("Success", "Profile updated successfully!");
+
     } catch (error) {
       console.error("Error updating profile:", error);
       Alert.alert("Error", "Failed to update profile");
@@ -335,13 +366,7 @@ export default function SocialScreen() {
   };
 
   // Render individual leaderboard item
-  const renderLeaderboardItem = ({
-    item,
-    index,
-  }: {
-    item: LeaderboardUser;
-    index: number;
-  }) => {
+  const renderLeaderboardItem = ({ item, index }: { item: LeaderboardUser; index: number }) => {
     const isCurrentUser = userProfile?.id === item.id;
     const streakDiff = item.current_streak - item.longest_streak;
 
@@ -350,9 +375,7 @@ export default function SocialScreen() {
         style={[
           styles.leaderboardItem,
           {
-            backgroundColor: isCurrentUser
-              ? `${colors.primary}15`
-              : colors.surface,
+            backgroundColor: isCurrentUser ? `${colors.primary}15` : colors.surface,
             borderColor: isCurrentUser ? colors.primary : colors.border,
             borderWidth: isCurrentUser ? 2 : 1,
           },
@@ -407,17 +430,12 @@ export default function SocialScreen() {
           <Text style={[styles.headerTitle, { color: colors.text }]}>
             Leaderboard
           </Text>
-          <Text
-            style={[styles.headerSubtitle, { color: colors.textSecondary }]}
-          >
+          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
             See how you rank against other users
           </Text>
         </View>
         <TouchableOpacity
-          style={[
-            styles.settingsButton,
-            { backgroundColor: colors.background },
-          ]}
+          style={[styles.settingsButton, { backgroundColor: colors.background }]}
           onPress={() => setShowSettings(true)}
         >
           <Ionicons name="settings-outline" size={20} color={colors.text} />
@@ -426,18 +444,12 @@ export default function SocialScreen() {
 
       {/* User's current position */}
       {userProfile?.show_in_leaderboard && userRank && (
-        <View
-          style={[styles.userRankCard, { backgroundColor: colors.background }]}
-        >
+        <View style={[styles.userRankCard, { backgroundColor: colors.background }]}>
           <View style={styles.userRankLeft}>
-            <Text
-              style={[styles.yourRankLabel, { color: colors.textSecondary }]}
-            >
+            <Text style={[styles.yourRankLabel, { color: colors.textSecondary }]}>
               Your Rank
             </Text>
-            <Text
-              style={[styles.yourRank, { color: getTrophyColor(userRank) }]}
-            >
+            <Text style={[styles.yourRank, { color: getTrophyColor(userRank) }]}>
               {getRankDisplay(userRank)}
             </Text>
           </View>
@@ -448,12 +460,7 @@ export default function SocialScreen() {
                 {userProfile.current_streak} days
               </Text>
             </View>
-            <Text
-              style={[
-                styles.userLongestStreak,
-                { color: colors.textSecondary },
-              ]}
-            >
+            <Text style={[styles.userLongestStreak, { color: colors.textSecondary }]}>
               Best: {userProfile.longest_streak} days
             </Text>
           </View>
@@ -461,9 +468,7 @@ export default function SocialScreen() {
       )}
 
       {!userProfile?.show_in_leaderboard && (
-        <View
-          style={[styles.hiddenCard, { backgroundColor: colors.background }]}
-        >
+        <View style={[styles.hiddenCard, { backgroundColor: colors.background }]}>
           <Ionicons name="eye-off" size={24} color={colors.textSecondary} />
           <Text style={[styles.hiddenText, { color: colors.textSecondary }]}>
             You're hidden from the leaderboard
@@ -476,15 +481,21 @@ export default function SocialScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Community Stats Card */}
+      <SocialStatsCard
+        totalUsers={communityStats.totalUsers}
+        activeToday={communityStats.activeToday}
+        averageStreak={communityStats.averageStreak}
+        topStreak={communityStats.topStreak}
+      />
     </View>
   );
 
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-      >
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
@@ -496,9 +507,7 @@ export default function SocialScreen() {
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={leaderboard}
         renderItem={renderLeaderboardItem}
@@ -521,19 +530,10 @@ export default function SocialScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <SafeAreaView
-          style={[
-            styles.modalContainer,
-            { backgroundColor: colors.background },
-          ]}
-        >
-          <View
-            style={[styles.modalHeader, { borderBottomColor: colors.border }]}
-          >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setShowSettings(false)}>
-              <Text style={[styles.modalCancel, { color: colors.primary }]}>
-                Cancel
-              </Text>
+              <Text style={[styles.modalCancel, { color: colors.primary }]}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               Social Settings
@@ -542,9 +542,7 @@ export default function SocialScreen() {
               {updating ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Text style={[styles.modalSave, { color: colors.primary }]}>
-                  Save
-                </Text>
+                <Text style={[styles.modalSave, { color: colors.primary }]}>Save</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -555,12 +553,7 @@ export default function SocialScreen() {
               <Text style={[styles.settingLabel, { color: colors.text }]}>
                 Display Name
               </Text>
-              <Text
-                style={[
-                  styles.settingDescription,
-                  { color: colors.textSecondary },
-                ]}
-              >
+              <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
                 This is how other users will see you on the leaderboard
               </Text>
               <TextInput
@@ -587,12 +580,7 @@ export default function SocialScreen() {
                   <Text style={[styles.settingLabel, { color: colors.text }]}>
                     Show on Leaderboard
                   </Text>
-                  <Text
-                    style={[
-                      styles.settingDescription,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
+                  <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
                     Let other users see your ranking and streaks
                   </Text>
                 </View>
@@ -606,22 +594,10 @@ export default function SocialScreen() {
             </View>
 
             {/* Privacy Notice */}
-            <View
-              style={[
-                styles.privacyNotice,
-                { backgroundColor: colors.surface },
-              ]}
-            >
-              <Ionicons
-                name="shield-checkmark"
-                size={20}
-                color={colors.primary}
-              />
-              <Text
-                style={[styles.privacyText, { color: colors.textSecondary }]}
-              >
-                Your email and personal information are never shared. Only your
-                display name and streak counts are visible to other users.
+            <View style={[styles.privacyNotice, { backgroundColor: colors.surface }]}>
+              <Ionicons name="shield-checkmark" size={20} color={colors.primary} />
+              <Text style={[styles.privacyText, { color: colors.textSecondary }]}>
+                Your email and personal information are never shared. Only your display name and streak counts are visible to other users.
               </Text>
             </View>
           </View>
