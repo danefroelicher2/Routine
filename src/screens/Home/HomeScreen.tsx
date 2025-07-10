@@ -24,6 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
 import { UserRoutine } from "../../types/database";
 import { useTheme } from "../../../ThemeContext";
+import { StreakSyncService } from "../../services/StreakSyncService"; // NEW: Import streak sync service
 
 interface RoutineWithCompletion extends UserRoutine {
   isCompleted: boolean;
@@ -106,6 +107,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     { name: "Fri", value: 5 },
     { name: "Sat", value: 6 },
   ];
+
+  // NEW: Sync streak data in background
+  const syncStreaksAfterCompletion = async (userId: string) => {
+    try {
+      // Sync streak data for social leaderboard
+      await StreakSyncService.checkAndSyncUserStreaks(userId);
+    } catch (error) {
+      console.error("Error syncing streaks after completion:", error);
+      // Don't show error to user, this is background sync
+    }
+  };
 
   // Create a function to get time period and generate seed for consistent randomness
   const getTimePeriodInfo = () => {
@@ -209,6 +221,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
+
+      // NEW: Sync streak data when user opens the app (background operation)
+      StreakSyncService.checkAndSyncUserStreaks(user.id);
 
       // Load profile
       const { data: profileData } = await supabase
@@ -502,6 +517,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       // NEW: After any completion change, check if all daily routines are complete
       await checkDailyCompletionStatus(user.id);
+
+      // NEW: Sync streak data for social leaderboard (background operation)
+      syncStreaksAfterCompletion(user.id);
 
       // Reload data to reflect changes
       await loadData();
