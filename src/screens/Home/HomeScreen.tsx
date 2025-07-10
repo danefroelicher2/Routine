@@ -66,6 +66,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [dropZoneIndex, setDropZoneIndex] = useState<number | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
 
+  // ENHANCED: Edit mode state for delete functionality
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editSection, setEditSection] = useState<"daily" | "weekly" | null>(
+    null
+  );
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [routineToDelete, setRoutineToDelete] = useState<{
+    routine: RoutineWithCompletion;
+    section: "daily" | "weekly";
+  } | null>(null);
+
   // ENHANCED: Animated values for smooth interactions
   const dragY = useRef(new Animated.Value(0)).current;
   const dragScale = useRef(new Animated.Value(1)).current; // Scale animation for dragged item
@@ -731,7 +742,72 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     });
   };
 
-  // Save routine order to database
+  // ENHANCED: Toggle edit mode for specific section
+  const toggleEditMode = (section: "daily" | "weekly") => {
+    if (isEditMode && editSection === section) {
+      // Exit edit mode
+      setIsEditMode(false);
+      setEditSection(null);
+    } else {
+      // Enter edit mode for this section
+      setIsEditMode(true);
+      setEditSection(section);
+    }
+  };
+
+  // ENHANCED: Handle delete routine
+  const handleDeleteRoutine = (
+    routine: RoutineWithCompletion,
+    section: "daily" | "weekly"
+  ) => {
+    setRoutineToDelete({ routine, section });
+    setShowDeleteConfirm(true);
+  };
+
+  // ENHANCED: Confirm delete routine
+  const confirmDeleteRoutine = async () => {
+    if (!routineToDelete) return;
+
+    try {
+      const { routine, section } = routineToDelete;
+
+      // Delete from database
+      const { error } = await supabase
+        .from("user_routines")
+        .update({ is_active: false }) // Soft delete by setting is_active to false
+        .eq("id", routine.id);
+
+      if (error) throw error;
+
+      // If it's a daily routine, also remove day assignments
+      if (section === "daily") {
+        const { error: dayError } = await supabase
+          .from("user_day_routines")
+          .delete()
+          .eq("routine_id", routine.id);
+
+        if (dayError) throw dayError;
+      }
+
+      // Refresh data to reflect changes
+      await loadData();
+
+      // Reset state
+      setShowDeleteConfirm(false);
+      setRoutineToDelete(null);
+
+      console.log("✅ ROUTINE DELETED:", routine.name);
+    } catch (error) {
+      console.error("Error deleting routine:", error);
+      Alert.alert("Error", "Failed to delete routine");
+    }
+  };
+
+  // ENHANCED: Cancel delete
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setRoutineToDelete(null);
+  };
   const saveRoutineOrder = async (section: "daily" | "weekly") => {
     try {
       const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
@@ -776,6 +852,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       isDragActive &&
       !isBeingDragged &&
       draggedSection === section; // Key fix: only same section
+
+    // ENHANCED: Check if this section is in edit mode
+    const isInEditMode = isEditMode && editSection === section;
 
     return (
       <Animated.View
@@ -889,49 +968,61 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </View>
           </TouchableOpacity>
 
-          {/* ENHANCED: Improved drag handle with better visual feedback */}
-          <View
-            style={[
-              styles.dragHandle,
-              isBeingDragged && styles.dragHandleActive,
-            ]}
-            {...panResponder.panHandlers}
-          >
+          {/* ENHANCED: Edit mode - show delete button, Normal mode - show drag handle */}
+          {isInEditMode ? (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDeleteRoutine(routine, section)}
+            >
+              <Ionicons name="remove-circle" size={24} color="#ff4444" />
+            </TouchableOpacity>
+          ) : (
             <View
-              style={[styles.dragIcon, isBeingDragged && styles.dragIconActive]}
+              style={[
+                styles.dragHandle,
+                isBeingDragged && styles.dragHandleActive,
+              ]}
+              {...panResponder.panHandlers}
             >
               <View
                 style={[
-                  styles.dragLine,
-                  {
-                    backgroundColor: isBeingDragged
-                      ? "#007AFF"
-                      : colors.textTertiary,
-                  },
+                  styles.dragIcon,
+                  isBeingDragged && styles.dragIconActive,
                 ]}
-              />
-              <View
-                style={[
-                  styles.dragLine,
-                  {
-                    backgroundColor: isBeingDragged
-                      ? "#007AFF"
-                      : colors.textTertiary,
-                  },
-                ]}
-              />
-              <View
-                style={[
-                  styles.dragLine,
-                  {
-                    backgroundColor: isBeingDragged
-                      ? "#007AFF"
-                      : colors.textTertiary,
-                  },
-                ]}
-              />
+              >
+                <View
+                  style={[
+                    styles.dragLine,
+                    {
+                      backgroundColor: isBeingDragged
+                        ? "#007AFF"
+                        : colors.textTertiary,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.dragLine,
+                    {
+                      backgroundColor: isBeingDragged
+                        ? "#007AFF"
+                        : colors.textTertiary,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.dragLine,
+                    {
+                      backgroundColor: isBeingDragged
+                        ? "#007AFF"
+                        : colors.textTertiary,
+                    },
+                  ]}
+                />
+              </View>
             </View>
-          </View>
+          )}
         </View>
       </Animated.View>
     );
@@ -1025,6 +1116,26 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Daily Routines
             </Text>
+            {/* ENHANCED: Edit button for daily routines */}
+            <TouchableOpacity
+              onPress={() => toggleEditMode("daily")}
+              style={[
+                styles.editButton,
+                isEditMode &&
+                  editSection === "daily" &&
+                  styles.editButtonActive,
+              ]}
+            >
+              <Ionicons
+                name={
+                  isEditMode && editSection === "daily" ? "checkmark" : "pencil"
+                }
+                size={18}
+                color={
+                  isEditMode && editSection === "daily" ? "#34c759" : "#666"
+                }
+              />
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={() =>
                 navigation.navigate("AddRoutine", {
@@ -1075,6 +1186,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 {weekTimeRemaining}
               </Text>
             </View>
+            {/* ENHANCED: Edit button for weekly goals */}
+            <TouchableOpacity
+              onPress={() => toggleEditMode("weekly")}
+              style={[
+                styles.editButton,
+                isEditMode &&
+                  editSection === "weekly" &&
+                  styles.editButtonActive,
+              ]}
+            >
+              <Ionicons
+                name={
+                  isEditMode && editSection === "weekly"
+                    ? "checkmark"
+                    : "pencil"
+                }
+                size={18}
+                color={
+                  isEditMode && editSection === "weekly" ? "#34c759" : "#666"
+                }
+              />
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={() =>
                 navigation.navigate("AddRoutine", { isWeekly: true })
@@ -1108,6 +1241,49 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           )}
         </View>
       </ScrollView>
+
+      {/* ENHANCED: Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteConfirm}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.deleteModalOverlay}>
+          <View
+            style={[
+              styles.deleteModalContent,
+              { backgroundColor: colors.surface },
+            ]}
+          >
+            <Text style={[styles.deleteModalTitle, { color: colors.text }]}>
+              Delete Routine
+            </Text>
+            <Text
+              style={[
+                styles.deleteModalMessage,
+                { color: colors.textSecondary },
+              ]}
+            >
+              Are you sure you want to delete "{routineToDelete?.routine.name}"?
+              This action cannot be undone.
+            </Text>
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.cancelButton]}
+                onPress={cancelDelete}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.confirmDeleteButton]}
+                onPress={confirmDeleteRoutine}
+              >
+                <Text style={styles.confirmDeleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Day Routine Assignment Modal */}
       <Modal
@@ -1357,6 +1533,83 @@ const styles = StyleSheet.create({
   },
   dayBoxIndicatorActive: {
     backgroundColor: "#34c759",
+  },
+  // ENHANCED: Edit button styles
+  editButton: {
+    padding: 8,
+    marginRight: 8,
+    borderRadius: 6,
+    backgroundColor: "rgba(102, 102, 102, 0.1)",
+  },
+  editButtonActive: {
+    backgroundColor: "rgba(52, 199, 89, 0.1)",
+  },
+  // ENHANCED: Delete button styles
+  deleteButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minWidth: 44,
+    minHeight: 44,
+  },
+  // ENHANCED: Delete modal styles
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  deleteModalContent: {
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 320,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  deleteModalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  deleteModalMessage: {
+    fontSize: 16,
+    lineHeight: 22,
+    marginBottom: 24,
+    textAlign: "center",
+  },
+  deleteModalButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  deleteModalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cancelButton: {
+    backgroundColor: "rgba(102, 102, 102, 0.1)",
+  },
+  cancelButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  confirmDeleteButton: {
+    backgroundColor: "#ff4444",
+  },
+  confirmDeleteButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
   // ENHANCED: Improved drag handle styles
   dragHandle: {
