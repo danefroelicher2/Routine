@@ -17,6 +17,8 @@ import {
   Modal,
   Animated,
   PanResponder,
+  Vibration, // ENHANCED: Added for haptic feedback
+  Dimensions, // ENHANCED: Added for better calculations
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
@@ -50,6 +52,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     Record<number, string[]>
   >({});
   const [userProfile, setUserProfile] = useState<any>(null);
+
+  // EXISTING DRAG STATE
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -59,7 +63,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     "daily" | "weekly" | null
   >(null);
 
+  // ENHANCED: New drag state for improved UX
+  const [dropZoneIndex, setDropZoneIndex] = useState<number | null>(null);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [itemHeights, setItemHeights] = useState<Record<string, number>>({});
+
+  // ENHANCED: Animated values for smooth interactions
   const dragY = useRef(new Animated.Value(0)).current;
+  const dragScale = useRef(new Animated.Value(1)).current; // Scale animation for dragged item
+  const dragOpacity = useRef(new Animated.Value(1)).current; // Opacity for drag effect
+  const dropZoneOpacity = useRef(new Animated.Value(0)).current; // Drop zone indicator
+
+  // Get screen dimensions for better calculations
+  const { width: screenWidth } = Dimensions.get("window");
 
   // Days of the week
   const daysOfWeek = [
@@ -318,7 +334,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     loadData().finally(() => setRefreshing(false));
   }, [loadData]);
 
-  // NEW: Function to check if all daily routines are completed
+  // Function to check if all daily routines are completed
   const checkDailyCompletionStatus = async (userId: string) => {
     try {
       const today = new Date();
@@ -544,24 +560,65 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // Pan responder for drag and drop
+  // ENHANCED: Calculate dynamic item height based on content
+  const calculateItemHeight = (routine: RoutineWithCompletion): number => {
+    let baseHeight = 65; // Base height for minimal content
+    if (routine.description) baseHeight += 20; // Add space for description
+    if (routine.target_value && routine.target_unit) baseHeight += 18; // Add space for target
+    return baseHeight;
+  };
+
+  // ENHANCED: Pan responder for drag and drop with improved UX
   const createPanResponder = (index: number, section: "daily" | "weekly") => {
     return PanResponder.create({
+      // More sensitive gesture detection for better responsiveness
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return Math.abs(gestureState.dy) > 10;
+        const { dx, dy } = gestureState;
+        // Allow both vertical and slight horizontal movement but prioritize vertical
+        return Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx) * 0.7;
       },
+
       onPanResponderGrant: () => {
+        console.log("🎯 DRAG STARTED:", { index, section });
+
+        // ENHANCED: Haptic feedback on drag start
+        Vibration.vibrate(50);
+
+        // Set drag state
         setIsDragging(true);
         setDraggedIndex(index);
         setDraggedSection(section);
         setOriginalIndex(index);
+        setIsDragActive(true);
         setScrollEnabled(false);
+
+        // ENHANCED: Animated feedback on drag start
+        Animated.parallel([
+          Animated.spring(dragScale, {
+            toValue: 1.05, // Slightly scale up the dragged item
+            useNativeDriver: false,
+            tension: 200,
+            friction: 8,
+          }),
+          Animated.timing(dragOpacity, {
+            toValue: 0.9, // Slightly transparent to show it's being dragged
+            duration: 150,
+            useNativeDriver: false,
+          }),
+        ]).start();
       },
+
       onPanResponderMove: (evt, gestureState) => {
+        // Update drag position
         dragY.setValue(gestureState.dy);
 
         const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
-        const itemHeight = 80;
+
+        // ENHANCED: Dynamic item height calculation
+        const currentRoutine = routines[index];
+        const itemHeight = calculateItemHeight(currentRoutine);
+
+        // Calculate new position with more precision
         const newIndex = Math.max(
           0,
           Math.min(
@@ -570,7 +627,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           )
         );
 
+        // ENHANCED: Show drop zone indicator
+        if (newIndex !== dropZoneIndex) {
+          setDropZoneIndex(newIndex);
+
+          // Animate drop zone indicator
+          Animated.timing(dropZoneOpacity, {
+            toValue: newIndex !== index ? 0.3 : 0,
+            duration: 150,
+            useNativeDriver: false,
+          }).start();
+        }
+
+        // Perform reordering with haptic feedback
         if (newIndex !== lastSwapIndex && newIndex !== index) {
+          console.log("🔄 REORDERING:", { from: index, to: newIndex });
+
+          // ENHANCED: Subtle haptic feedback during reordering
+          Vibration.vibrate(25);
+
           setLastSwapIndex(newIndex);
 
           const newRoutines = [...routines];
@@ -587,15 +662,57 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           setDraggedIndex(newIndex);
         }
       },
-      onPanResponderRelease: async () => {
-        setIsDragging(false);
-        setScrollEnabled(true);
-        dragY.setValue(0);
 
+      onPanResponderRelease: async (evt, gestureState) => {
+        console.log("🎯 DRAG ENDED:", {
+          originalIndex,
+          finalIndex: draggedIndex,
+          changed: originalIndex !== draggedIndex,
+        });
+
+        // ENHANCED: Stronger haptic feedback on successful drop
+        if (originalIndex !== draggedIndex) {
+          Vibration.vibrate([0, 100]); // Double vibration for successful reorder
+        }
+
+        // Reset drag state
+        setIsDragging(false);
+        setIsDragActive(false);
+        setScrollEnabled(true);
+        setDropZoneIndex(null);
+
+        // ENHANCED: Smooth animation back to normal state
+        Animated.parallel([
+          Animated.spring(dragY, {
+            toValue: 0,
+            useNativeDriver: false,
+            tension: 300,
+            friction: 10,
+          }),
+          Animated.spring(dragScale, {
+            toValue: 1,
+            useNativeDriver: false,
+            tension: 200,
+            friction: 8,
+          }),
+          Animated.timing(dragOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: false,
+          }),
+          Animated.timing(dropZoneOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: false,
+          }),
+        ]).start();
+
+        // Save to database if order changed
         if (originalIndex !== draggedIndex) {
           await saveRoutineOrder(section);
         }
 
+        // Reset all drag state
         setDraggedIndex(null);
         setDraggedSection(null);
         setOriginalIndex(null);
@@ -622,6 +739,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         if (error) throw error;
       }
+
+      console.log(
+        "💾 SAVED ORDER:",
+        section,
+        updates.map((u) => u.sort_order)
+      );
     } catch (error) {
       console.error("Error saving routine order:", error);
       Alert.alert("Error", "Failed to save routine order");
@@ -636,26 +759,69 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     const panResponder = createPanResponder(index, section);
     const isBeingDragged =
       isDragging && draggedIndex === index && draggedSection === section;
+    const isDropZone =
+      dropZoneIndex === index && isDragActive && !isBeingDragged;
 
     return (
       <Animated.View
         key={routine.id}
         style={[
           styles.routineItem,
+          // ENHANCED: Better visual feedback for dragged items
           isBeingDragged && {
-            transform: [{ translateY: dragY }],
-            elevation: 8,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.25,
-            shadowRadius: 8,
+            transform: [
+              { translateY: dragY },
+              { scale: dragScale }, // Add scale animation
+            ],
+            opacity: dragOpacity, // Add opacity animation
+            elevation: 12, // Higher elevation for more dramatic shadow
+            shadowColor: "#007AFF", // Colored shadow for better visibility
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.4,
+            shadowRadius: 12,
+            zIndex: 1000, // Ensure it's on top
+          },
+          // ENHANCED: Drop zone indicator
+          isDropZone && {
+            backgroundColor: colors.surface,
+            borderColor: "#007AFF",
+            borderWidth: 2,
+            borderStyle: "dashed",
+            opacity: 0.7,
           },
         ]}
       >
+        {/* ENHANCED: Drop zone indicator overlay */}
+        {isDropZone && (
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                backgroundColor: "#007AFF",
+                opacity: dropZoneOpacity,
+                borderRadius: 12,
+                justifyContent: "center",
+                alignItems: "center",
+              },
+            ]}
+          >
+            <Ionicons name="add" size={24} color="white" />
+          </Animated.View>
+        )}
+
         <View
           style={[
             styles.routineContent,
-            { backgroundColor: colors.card, borderColor: colors.border },
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              // ENHANCED: Better visual state for dragged items
+              ...(isBeingDragged && {
+                backgroundColor: colors.surface,
+                borderColor: "#007AFF",
+                borderWidth: 2,
+              }),
+            },
           ]}
         >
           <TouchableOpacity
@@ -708,24 +874,45 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </View>
           </TouchableOpacity>
 
-          <View style={styles.dragHandle} {...panResponder.panHandlers}>
-            <View style={styles.dragIcon}>
+          {/* ENHANCED: Improved drag handle with better visual feedback */}
+          <View
+            style={[
+              styles.dragHandle,
+              isBeingDragged && styles.dragHandleActive,
+            ]}
+            {...panResponder.panHandlers}
+          >
+            <View
+              style={[styles.dragIcon, isBeingDragged && styles.dragIconActive]}
+            >
               <View
                 style={[
                   styles.dragLine,
-                  { backgroundColor: colors.textTertiary },
+                  {
+                    backgroundColor: isBeingDragged
+                      ? "#007AFF"
+                      : colors.textTertiary,
+                  },
                 ]}
               />
               <View
                 style={[
                   styles.dragLine,
-                  { backgroundColor: colors.textTertiary },
+                  {
+                    backgroundColor: isBeingDragged
+                      ? "#007AFF"
+                      : colors.textTertiary,
+                  },
                 ]}
               />
               <View
                 style={[
                   styles.dragLine,
-                  { backgroundColor: colors.textTertiary },
+                  {
+                    backgroundColor: isBeingDragged
+                      ? "#007AFF"
+                      : colors.textTertiary,
+                  },
                 ]}
               />
             </View>
@@ -1156,23 +1343,33 @@ const styles = StyleSheet.create({
   dayBoxIndicatorActive: {
     backgroundColor: "#34c759",
   },
+  // ENHANCED: Improved drag handle styles
   dragHandle: {
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    minWidth: 40,
-    minHeight: 40,
+    minWidth: 44, // Larger touch target
+    minHeight: 44, // Larger touch target
+    borderRadius: 8, // Rounded corners
+  },
+  // ENHANCED: Active drag handle state
+  dragHandleActive: {
+    backgroundColor: "rgba(0, 122, 255, 0.1)", // Light blue background when active
   },
   dragIcon: {
     alignItems: "center",
     justifyContent: "center",
   },
+  // ENHANCED: Active drag icon state
+  dragIconActive: {
+    transform: [{ scale: 1.1 }], // Slightly larger when active
+  },
   dragLine: {
-    width: 18,
-    height: 2,
-    marginVertical: 1,
-    borderRadius: 1,
+    width: 20, // Slightly wider for better visibility
+    height: 3, // Slightly thicker
+    marginVertical: 1.5, // Better spacing
+    borderRadius: 1.5, // Rounded edges
   },
   modalContainer: {
     flex: 1,
