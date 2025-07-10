@@ -864,10 +864,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setRoutineToEdit(null);
     setEditFormData({ name: "", description: "" });
   };
+
   const cancelDelete = () => {
     setShowDeleteConfirm(false);
     setRoutineToDelete(null);
   };
+
   const saveRoutineOrder = async (section: "daily" | "weekly") => {
     try {
       const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
@@ -1320,6 +1322,95 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </ScrollView>
 
+      {/* ENHANCED: Edit Routine Modal - THE MISSING MODAL! */}
+      <Modal
+        visible={showEditRoutineModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView
+          style={[
+            styles.modalContainer,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          <View
+            style={[styles.modalHeader, { borderBottomColor: colors.border }]}
+          >
+            <TouchableOpacity onPress={cancelEditRoutine}>
+              <Text style={[styles.modalCancelButton, { color: "#666" }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Edit Routine
+            </Text>
+            <TouchableOpacity onPress={saveEditedRoutine}>
+              <Text style={[styles.modalCancelButton, { color: "#007AFF" }]}>
+                Save
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalContent}>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>
+                Title *
+              </Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+                placeholder="Enter routine title..."
+                placeholderTextColor={colors.textSecondary}
+                value={editFormData.name}
+                onChangeText={(text) =>
+                  setEditFormData({ ...editFormData, name: text })
+                }
+                maxLength={20}
+              />
+              <Text style={[styles.charCount, { color: colors.textSecondary }]}>
+                {editFormData.name.length}/20
+              </Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>
+                Description (Optional)
+              </Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  styles.textArea,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+                placeholder="Enter description..."
+                placeholderTextColor={colors.textSecondary}
+                value={editFormData.description}
+                onChangeText={(text) =>
+                  setEditFormData({ ...editFormData, description: text })
+                }
+                maxLength={35}
+                multiline
+                numberOfLines={3}
+              />
+              <Text style={[styles.charCount, { color: colors.textSecondary }]}>
+                {editFormData.description.length}/35
+              </Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
       {/* ENHANCED: Delete Confirmation Modal */}
       <Modal
         visible={showDeleteConfirm}
@@ -1651,41 +1742,53 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  // ENHANCED: Edit modal styles
-  editModalContent: {
+  // Modal styles
+  modalContainer: {
     flex: 1,
-    paddingHorizontal: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  modalCancelButton: {
+    fontSize: 16,
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 16,
     paddingTop: 20,
   },
   inputGroup: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   inputLabel: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "500",
     marginBottom: 8,
-  },
-  inputContainer: {
-    position: "relative",
   },
   textInput: {
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     fontSize: 16,
-    paddingRight: 60, // Space for character count
   },
   textArea: {
-    height: 100,
+    height: 80,
     textAlignVertical: "top",
-    paddingTop: 12,
   },
   charCount: {
-    position: "absolute",
-    bottom: 12,
-    right: 16,
     fontSize: 12,
+    textAlign: "right",
+    marginTop: 4,
   },
   // ENHANCED: Delete modal styles
   deleteModalOverlay: {
@@ -1772,29 +1875,6 @@ const styles = StyleSheet.create({
     height: 3, // Slightly thicker
     marginVertical: 1.5, // Better spacing
     borderRadius: 1.5, // Rounded edges
-  },
-  modalContainer: {
-    flex: 1,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  modalCancelButton: {
-    fontSize: 16,
-  },
-  modalContent: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
   },
   availableRoutineItem: {
     flexDirection: "row",
