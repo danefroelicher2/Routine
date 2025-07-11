@@ -11,9 +11,12 @@ import {
   Dimensions,
   Modal,
   Linking,
+  Image,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import * as ImagePicker from "expo-image-picker";
 import { supabase } from "../../services/supabase";
 import { Profile, UserSettings, UserRoutine } from "../../types/database";
 import { useTheme } from "../../../ThemeContext";
@@ -50,6 +53,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   // Help popup state
   const [showHelpModal, setShowHelpModal] = useState(false);
 
+  // NEW: Profile picture states
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [showImagePicker, setShowImagePicker] = useState(false);
+
   // NEW: Daily routines state
   const [dayRoutines, setDayRoutines] = useState<DayRoutines>({});
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
@@ -76,8 +83,21 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   useFocusEffect(
     useCallback(() => {
       loadProfileData();
+      requestPermissions();
     }, [])
   );
+
+  // NEW: Request camera and media library permissions
+  const requestPermissions = async () => {
+    const { status: cameraStatus } =
+      await ImagePicker.requestCameraPermissionsAsync();
+    const { status: mediaStatus } =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (cameraStatus !== "granted" || mediaStatus !== "granted") {
+      console.log("Camera or media library permissions not granted");
+    }
+  };
 
   // NEW: Function to load daily routines by day
   const loadDailyRoutines = async () => {
@@ -268,6 +288,95 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
     streaks.push(currentStreak);
     return streaks;
+  };
+
+  // NEW: Profile picture functions
+  const handleProfilePicturePress = () => {
+    setShowImagePicker(true);
+  };
+
+  const pickImage = async (useCamera: boolean = false) => {
+    try {
+      let result;
+
+      if (useCamera) {
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+      }
+
+      if (!result.canceled && result.assets[0]) {
+        setShowImagePicker(false);
+        await uploadProfilePicture(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "Failed to pick image");
+    }
+  };
+
+  const uploadProfilePicture = async (imageUri: string) => {
+    try {
+      setUploadingImage(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      // Create form data for upload
+      const filename = `${user.id}-${Date.now()}.jpg`;
+      const formData = new FormData();
+
+      // Convert image to blob for upload
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+
+      formData.append("file", blob as any, filename);
+
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filename, blob, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filename);
+
+      // Update profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: urlData.publicUrl })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      // Refresh profile data
+      await loadProfileData();
+
+      Alert.alert("Success", "Profile picture updated successfully!");
+    } catch (error) {
+      console.error("Error uploading profile picture:", error);
+      Alert.alert("Error", "Failed to upload profile picture");
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   // NEW: Toggle day expansion
@@ -617,13 +726,46 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
             },
           ]}
         >
-          <View style={styles.avatarContainer}>
-            <Ionicons
-              name="person-circle"
-              size={80}
-              color={colors.textSecondary}
-            />
-          </View>
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            onPress={handleProfilePicturePress}
+            disabled={uploadingImage}
+          >
+            {uploadingImage ? (
+              <View
+                style={[
+                  styles.avatarPlaceholder,
+                  { backgroundColor: colors.border },
+                ]}
+              >
+                <ActivityIndicator size="large" color="#007AFF" />
+              </View>
+            ) : profile?.avatar_url ? (
+              <Image
+                source={{ uri: profile.avatar_url }}
+                style={styles.avatarImage}
+                onError={() => {
+                  console.log("Error loading avatar image");
+                }}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.avatarPlaceholder,
+                  { backgroundColor: colors.border },
+                ]}
+              >
+                <Ionicons
+                  name="person"
+                  size={40}
+                  color={colors.textSecondary}
+                />
+              </View>
+            )}
+            <View style={styles.cameraIconContainer}>
+              <Ionicons name="camera" size={16} color="#fff" />
+            </View>
+          </TouchableOpacity>
           <Text style={[styles.userName, { color: colors.text }]}>
             {profile?.display_name || profile?.full_name || "User"}
           </Text>
@@ -713,6 +855,68 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         </View>
       </ScrollView>
 
+      {/* Image Picker Modal */}
+      <Modal
+        visible={showImagePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowImagePicker(false)}
+      >
+        <View style={styles.imagePickerOverlay}>
+          <View
+            style={[
+              styles.imagePickerContent,
+              { backgroundColor: colors.surface },
+            ]}
+          >
+            <Text style={[styles.imagePickerTitle, { color: colors.text }]}>
+              Change Profile Picture
+            </Text>
+
+            <TouchableOpacity
+              style={styles.imagePickerOption}
+              onPress={() => pickImage(true)}
+            >
+              <Ionicons name="camera" size={24} color="#007AFF" />
+              <Text
+                style={[styles.imagePickerOptionText, { color: colors.text }]}
+              >
+                Take Photo
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.imagePickerOption}
+              onPress={() => pickImage(false)}
+            >
+              <Ionicons name="images" size={24} color="#007AFF" />
+              <Text
+                style={[styles.imagePickerOptionText, { color: colors.text }]}
+              >
+                Choose from Library
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.imagePickerCancel,
+                { borderTopColor: colors.border },
+              ]}
+              onPress={() => setShowImagePicker(false)}
+            >
+              <Text
+                style={[
+                  styles.imagePickerCancelText,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Help Modal */}
       <Modal
         visible={showHelpModal}
@@ -795,6 +999,36 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: 15,
+    position: "relative",
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: "#007AFF",
+  },
+  avatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: "#007AFF",
+  },
+  cameraIconContainer: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#007AFF",
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   userName: {
     fontSize: 24,
@@ -1016,6 +1250,44 @@ const styles = StyleSheet.create({
   },
   menuItemSubtitle: {
     fontSize: 14,
+  },
+
+  // Image Picker Modal Styles
+  imagePickerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  imagePickerContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34, // Safe area padding
+  },
+  imagePickerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+  },
+  imagePickerOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  imagePickerOptionText: {
+    fontSize: 16,
+    marginLeft: 12,
+  },
+  imagePickerCancel: {
+    borderTopWidth: 1,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  imagePickerCancelText: {
+    fontSize: 16,
+    fontWeight: "500",
   },
 
   // Modal styles
