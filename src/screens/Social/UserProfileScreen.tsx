@@ -114,6 +114,8 @@ export default function UserProfileScreen({
   const loadUserProfile = async () => {
     setLoading(true);
     try {
+      console.log("🔄 Loading profile for user:", userId);
+
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
@@ -122,11 +124,18 @@ export default function UserProfileScreen({
 
       if (error) throw error;
 
+      console.log("✅ Profile data loaded:", data);
       setProfile(data);
       loadAchievements(data.current_streak || 0, data.longest_streak || 0);
       loadUserRoutines();
+
+      // Load avatar if it exists
       if (data.avatar_url) {
-        loadAvatarAsBase64(data.avatar_url);
+        console.log("🔄 Found user avatar_url, loading:", data.avatar_url);
+        await loadAvatarAsBase64(data.avatar_url);
+      } else {
+        console.log("ℹ️ No avatar_url found for user");
+        setAvatarData(null);
       }
     } catch (error) {
       console.error("Error loading user profile:", error);
@@ -136,21 +145,60 @@ export default function UserProfileScreen({
     }
   };
 
-  // Load avatar image
-  const loadAvatarAsBase64 = async (avatarUrl: string) => {
+  // Load avatar image from Supabase storage
+  const loadAvatarAsBase64 = async (avatarFileName: string) => {
     try {
-      const { data } = await supabase.storage
+      console.log("🔄 Loading user avatar file:", avatarFileName);
+
+      // Check if it's already a full URL (old format) or just a filename (new format)
+      if (avatarFileName.startsWith("http")) {
+        // Old format - try to extract filename or use direct URL
+        console.log("⚠️ Old format URL detected, trying direct fetch");
+        try {
+          const response = await fetch(avatarFileName);
+          if (response.ok) {
+            const blob = await response.blob();
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64data = reader.result as string;
+              console.log("✅ Avatar loaded from URL and converted to base64");
+              setAvatarData(base64data);
+            };
+            reader.readAsDataURL(blob);
+            return;
+          }
+        } catch (urlError) {
+          console.log("❌ Failed to load from URL, trying storage download");
+        }
+      }
+
+      // New format - download from Supabase storage using filename
+      const { data, error } = await supabase.storage
         .from("avatars")
-        .download(avatarUrl);
+        .download(avatarFileName);
+
+      if (error) {
+        console.error("❌ User avatar download error:", error);
+        setAvatarData(null);
+        return;
+      }
+
       if (data) {
+        console.log("✅ User avatar downloaded successfully");
         const reader = new FileReader();
-        reader.onload = () => {
-          setAvatarData(reader.result as string);
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          console.log("✅ User avatar converted to base64");
+          setAvatarData(base64data);
+        };
+        reader.onerror = (error) => {
+          console.error("❌ Error converting to base64:", error);
+          setAvatarData(null);
         };
         reader.readAsDataURL(data);
       }
     } catch (error) {
-      console.error("Error loading avatar:", error);
+      console.error("❌ User avatar loading failed:", error);
       setAvatarData(null);
     }
   };
@@ -254,7 +302,16 @@ export default function UserProfileScreen({
 
   const renderAvatar = () => {
     if (avatarData) {
-      return <Image source={{ uri: avatarData }} style={styles.avatarImage} />;
+      return (
+        <Image
+          source={{ uri: avatarData }}
+          style={styles.avatarImage}
+          onLoad={() => console.log("✅ Avatar image rendered successfully")}
+          onError={(error) =>
+            console.error("❌ Avatar image render error:", error)
+          }
+        />
+      );
     }
     return (
       <View
