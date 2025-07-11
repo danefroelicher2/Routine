@@ -27,7 +27,6 @@ interface ProfileScreenProps {
   navigation: any;
 }
 
-// Same achievement interface as StatsScreen
 interface Achievement {
   id: string;
   name: string;
@@ -36,7 +35,6 @@ interface Achievement {
   unlockedDate?: string;
 }
 
-// NEW: Interface for daily routines by day
 interface DayRoutines {
   [key: number]: UserRoutine[];
 }
@@ -46,30 +44,20 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Achievement state
   const [achievements, setAchievements] = useState<Achievement[]>([]);
-
-  // Help popup state
   const [showHelpModal, setShowHelpModal] = useState(false);
-
-  // NEW: Profile picture states
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showImagePicker, setShowImagePicker] = useState(false);
-
-  // NEW: Daily routines state
   const [dayRoutines, setDayRoutines] = useState<DayRoutines>({});
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
+  const [avatarData, setAvatarData] = useState<string | null>(null);
 
-  // NEW: Theme context
   const { colors } = useTheme();
 
-  // Achievement targets (same as StatsScreen)
   const ACHIEVEMENT_TARGETS = [
     3, 5, 7, 14, 30, 60, 100, 150, 200, 250, 300, 365,
   ];
 
-  // NEW: Days of the week mapping
   const DAYS_OF_WEEK = [
     { id: 0, name: "Sunday", short: "Sun" },
     { id: 1, name: "Monday", short: "Mon" },
@@ -87,7 +75,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }, [])
   );
 
-  // NEW: Request camera and media library permissions
   const requestPermissions = async () => {
     const { status: cameraStatus } =
       await ImagePicker.requestCameraPermissionsAsync();
@@ -99,7 +86,31 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
   };
 
-  // NEW: Function to load daily routines by day
+  // Convert image to base64 for reliable display
+  const loadAvatarAsBase64 = async (url: string) => {
+    try {
+      console.log("🔄 Loading avatar as base64:", url);
+      const response = await fetch(url);
+      if (response.ok) {
+        const blob = await response.blob();
+        const reader = new FileReader();
+        return new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => {
+            const base64data = reader.result as string;
+            console.log("✅ Base64 conversion successful");
+            resolve(base64data);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+      throw new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      console.log("❌ Base64 conversion failed:", error);
+      return null;
+    }
+  };
+
   const loadDailyRoutines = async () => {
     try {
       const {
@@ -107,7 +118,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get all user routines and day assignments
       const [routinesResult, dayAssignmentsResult] = await Promise.all([
         supabase
           .from("user_routines")
@@ -127,16 +137,12 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
       const routines = routinesResult.data || [];
       const dayAssignments = dayAssignmentsResult.data || [];
-
-      // Group routines by day
       const routinesByDay: DayRoutines = {};
 
-      // Initialize all days with empty arrays
       for (let i = 0; i < 7; i++) {
         routinesByDay[i] = [];
       }
 
-      // Map routines to their assigned days
       dayAssignments.forEach((assignment) => {
         const routine = routines.find((r) => r.id === assignment.routine_id);
         if (routine) {
@@ -157,7 +163,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Load profile
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
@@ -168,7 +173,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         throw profileError;
       }
 
-      // Load settings
       const { data: settingsData, error: settingsError } = await supabase
         .from("user_settings")
         .select("*")
@@ -182,10 +186,13 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       setProfile(profileData);
       setSettings(settingsData);
 
-      // Load achievements
-      await calculateAchievements(user.id);
+      // Load avatar as base64 if it exists
+      if (profileData?.avatar_url) {
+        const base64Avatar = await loadAvatarAsBase64(profileData.avatar_url);
+        setAvatarData(base64Avatar);
+      }
 
-      // NEW: Load daily routines
+      await calculateAchievements(user.id);
       await loadDailyRoutines();
     } catch (error) {
       console.error("Error loading profile:", error);
@@ -196,7 +203,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
   };
 
-  // Achievement calculation logic (same as before)
   const calculateAchievements = async (userId: string) => {
     try {
       const { data: completions, error } = await supabase
@@ -290,7 +296,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     return streaks;
   };
 
-  // NEW: Profile picture functions
   const handleProfilePicturePress = () => {
     setShowImagePicker(true);
   };
@@ -334,13 +339,26 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
+      // Convert to base64 immediately for instant display
+      console.log("🔄 Converting image to base64 for instant display...");
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      const reader = new FileReader();
+
+      reader.onloadend = () => {
+        const base64data = reader.result as string;
+        setAvatarData(base64data);
+        console.log("✅ Image displayed instantly via base64");
+      };
+      reader.readAsDataURL(blob);
+
       const fileExt = "jpg";
       const fileName = `${user.id}/avatar.${fileExt}`;
 
       console.log("🔄 Starting upload with filename:", fileName);
 
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
+      // Delete existing file first
+      await supabase.storage.from("avatars").remove([fileName]);
 
       // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -364,14 +382,11 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
       console.log("🔗 Public URL generated:", urlData.publicUrl);
 
-      // Add timestamp for cache busting
-      const timestampedUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-
-      // Update profile with new avatar URL (clean URL in database)
+      // Update profile in database
       const { error: updateError } = await supabase
         .from("profiles")
         .update({
-          avatar_url: urlData.publicUrl, // Store clean URL in DB
+          avatar_url: urlData.publicUrl,
           updated_at: new Date().toISOString(),
         })
         .eq("id", user.id);
@@ -383,21 +398,16 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
       console.log("✅ Profile updated successfully");
 
-      // Update local state with timestamped URL for immediate display
+      // Update local state
       setProfile((prev) =>
         prev
           ? {
               ...prev,
-              avatar_url: timestampedUrl, // Use timestamped URL for immediate display
+              avatar_url: urlData.publicUrl,
               updated_at: new Date().toISOString(),
             }
           : null
       );
-
-      // Wait a moment for the image to be fully processed
-      setTimeout(async () => {
-        await loadProfileData();
-      }, 1000);
 
       Alert.alert("Success", "Profile picture updated successfully!");
     } catch (error) {
@@ -408,7 +418,38 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
   };
 
-  // NEW: Toggle day expansion
+  const renderAvatar = () => {
+    if (uploadingImage) {
+      return (
+        <View
+          style={[styles.avatarPlaceholder, { backgroundColor: colors.border }]}
+        >
+          <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      );
+    }
+
+    if (avatarData) {
+      return (
+        <Image
+          source={{ uri: avatarData }}
+          style={styles.avatarImage}
+          onLoad={() => {
+            console.log("✅ Avatar loaded successfully from base64");
+          }}
+        />
+      );
+    }
+
+    return (
+      <View
+        style={[styles.avatarPlaceholder, { backgroundColor: colors.border }]}
+      >
+        <Ionicons name="person" size={40} color={colors.textSecondary} />
+      </View>
+    );
+  };
+
   const toggleDay = (dayId: number) => {
     const newExpandedDays = new Set(expandedDays);
     if (newExpandedDays.has(dayId)) {
@@ -435,7 +476,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     const mailto = `mailto:${email}?subject=${encodeURIComponent(
       subject
     )}&body=${encodeURIComponent(body)}`;
-
     Linking.openURL(mailto);
   };
 
@@ -449,18 +489,18 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
     const tierIndex = ACHIEVEMENT_TARGETS.indexOf(achievement.target);
     const badgeDesigns = [
-      { backgroundColor: "#FFE4B5", borderColor: "#DEB887", tier: "Bronze" },
-      { backgroundColor: "#FFE4B5", borderColor: "#DEB887", tier: "Bronze" },
-      { backgroundColor: "#FFE4B5", borderColor: "#DEB887", tier: "Bronze" },
-      { backgroundColor: "#E6E6FA", borderColor: "#D8BFD8", tier: "Silver" },
-      { backgroundColor: "#E6E6FA", borderColor: "#D8BFD8", tier: "Silver" },
-      { backgroundColor: "#E6E6FA", borderColor: "#D8BFD8", tier: "Silver" },
-      { backgroundColor: "#FFD700", borderColor: "#FFA500", tier: "Gold" },
-      { backgroundColor: "#FFD700", borderColor: "#FFA500", tier: "Gold" },
-      { backgroundColor: "#FFD700", borderColor: "#FFA500", tier: "Gold" },
-      { backgroundColor: "#E0BBE4", borderColor: "#D8BFD8", tier: "Platinum" },
-      { backgroundColor: "#E0BBE4", borderColor: "#D8BFD8", tier: "Platinum" },
-      { backgroundColor: "#FFB6C1", borderColor: "#FF69B4", tier: "Diamond" },
+      { backgroundColor: "#FFE4B5", borderColor: "#DEB887" },
+      { backgroundColor: "#FFE4B5", borderColor: "#DEB887" },
+      { backgroundColor: "#FFE4B5", borderColor: "#DEB887" },
+      { backgroundColor: "#E6E6FA", borderColor: "#D8BFD8" },
+      { backgroundColor: "#E6E6FA", borderColor: "#D8BFD8" },
+      { backgroundColor: "#E6E6FA", borderColor: "#D8BFD8" },
+      { backgroundColor: "#FFD700", borderColor: "#FFA500" },
+      { backgroundColor: "#FFD700", borderColor: "#FFA500" },
+      { backgroundColor: "#FFD700", borderColor: "#FFA500" },
+      { backgroundColor: "#E0BBE4", borderColor: "#D8BFD8" },
+      { backgroundColor: "#E0BBE4", borderColor: "#D8BFD8" },
+      { backgroundColor: "#FFB6C1", borderColor: "#FF69B4" },
     ];
 
     return {
@@ -489,7 +529,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     return badgeDesigns[tierIndex] || { tier: "Bronze", emoji: "🏅" };
   };
 
-  // NEW: Render daily routines section
   const renderDailyRoutinesSection = () => {
     return (
       <View
@@ -745,7 +784,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* User Section */}
         <View
           style={[
             styles.userSection,
@@ -760,58 +798,12 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
             onPress={handleProfilePicturePress}
             disabled={uploadingImage}
           >
-            {uploadingImage ? (
-              <View
-                style={[
-                  styles.avatarPlaceholder,
-                  { backgroundColor: colors.border },
-                ]}
-              >
-                <ActivityIndicator size="large" color="#007AFF" />
-              </View>
-            ) : profile?.avatar_url ? (
-              <Image
-                source={{
-                  uri: profile.avatar_url.includes("?")
-                    ? profile.avatar_url
-                    : `${profile.avatar_url}?t=${Date.now()}`,
-                }}
-                style={styles.avatarImage}
-                onError={(error) => {
-                  console.log(
-                    "❌ Error loading avatar image:",
-                    error.nativeEvent.error
-                  );
-                  console.log("❌ Failed URL:", profile.avatar_url);
-                }}
-                onLoad={() => {
-                  console.log("✅ Avatar image loaded successfully");
-                }}
-                onLoadStart={() => {
-                  console.log("🔄 Started loading avatar image...");
-                }}
-                onLoadEnd={() => {
-                  console.log("🏁 Finished loading avatar image");
-                }}
-              />
-            ) : (
-              <View
-                style={[
-                  styles.avatarPlaceholder,
-                  { backgroundColor: colors.border },
-                ]}
-              >
-                <Ionicons
-                  name="person"
-                  size={40}
-                  color={colors.textSecondary}
-                />
-              </View>
-            )}
+            {renderAvatar()}
             <View style={styles.cameraIconContainer}>
               <Ionicons name="camera" size={16} color="#fff" />
             </View>
           </TouchableOpacity>
+
           <Text style={[styles.userName, { color: colors.text }]}>
             {profile?.display_name || profile?.full_name || "User"}
           </Text>
@@ -827,10 +819,8 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           </Text>
         </View>
 
-        {/* NEW: Daily Routines Section */}
         {renderDailyRoutinesSection()}
 
-        {/* Achievements Section */}
         <View
           style={[
             styles.achievementsSection,
@@ -860,7 +850,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           {renderAchievementsSection()}
         </View>
 
-        {/* Menu Section */}
         <View style={styles.menuSection}>
           {menuItems.map((item, index) => (
             <TouchableOpacity
@@ -901,7 +890,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         </View>
       </ScrollView>
 
-      {/* Image Picker Modal */}
       <Modal
         visible={showImagePicker}
         transparent={true}
@@ -963,7 +951,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         </View>
       </Modal>
 
-      {/* Help Modal */}
       <Modal
         visible={showHelpModal}
         transparent={true}
@@ -1088,8 +1075,6 @@ const styles = StyleSheet.create({
   joinDate: {
     fontSize: 14,
   },
-
-  // NEW: Daily Routines Section Styles
   dailyRoutinesSection: {
     marginTop: 15,
     borderBottomWidth: 1,
@@ -1163,8 +1148,6 @@ const styles = StyleSheet.create({
   routineDescription: {
     fontSize: 12,
   },
-
-  // Achievements Section Styles
   achievementsSection: {
     paddingHorizontal: 20,
     paddingVertical: 20,
@@ -1260,8 +1243,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
   },
-
-  // Menu styles
   menuSection: {
     marginTop: 15,
   },
@@ -1297,8 +1278,6 @@ const styles = StyleSheet.create({
   menuItemSubtitle: {
     fontSize: 14,
   },
-
-  // Image Picker Modal Styles
   imagePickerOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -1307,7 +1286,7 @@ const styles = StyleSheet.create({
   imagePickerContent: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingBottom: 34, // Safe area padding
+    paddingBottom: 34,
   },
   imagePickerTitle: {
     fontSize: 18,
@@ -1335,8 +1314,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
   },
-
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
