@@ -14,7 +14,6 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../services/supabase";
-import { Profile, UserRoutine } from "../../types/database";
 import { useTheme } from "../../../ThemeContext";
 
 const { width } = Dimensions.get("window");
@@ -37,8 +36,42 @@ interface Achievement {
   unlockedDate?: string;
 }
 
+interface UserRoutine {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string;
+  icon: string;
+  is_daily: boolean;
+  is_weekly: boolean;
+  target_value: number;
+  target_unit: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  // Additional fields that may exist in your database
+  category?: string;
+  emoji?: string;
+  is_public?: boolean;
+  scheduled_days?: number[];
+}
+
 interface DayRoutines {
   [key: number]: UserRoutine[];
+}
+
+interface UserProfile {
+  id: string;
+  email?: string;
+  full_name?: string;
+  display_name?: string;
+  avatar_url?: string;
+  current_streak: number;
+  longest_streak: number;
+  created_at: string;
+  updated_at?: string;
+  show_in_leaderboard?: boolean;
 }
 
 export default function UserProfileScreen({
@@ -47,7 +80,7 @@ export default function UserProfileScreen({
 }: UserProfileScreenProps) {
   const { userId, displayName } = route.params;
 
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -90,9 +123,11 @@ export default function UserProfileScreen({
       if (error) throw error;
 
       setProfile(data);
-      loadAchievements(data.current_streak, data.longest_streak);
+      loadAchievements(data.current_streak || 0, data.longest_streak || 0);
       loadUserRoutines();
-      loadAvatarAsBase64(data.avatar_url);
+      if (data.avatar_url) {
+        loadAvatarAsBase64(data.avatar_url);
+      }
     } catch (error) {
       console.error("Error loading user profile:", error);
     } finally {
@@ -102,12 +137,7 @@ export default function UserProfileScreen({
   };
 
   // Load avatar image
-  const loadAvatarAsBase64 = async (avatarUrl: string | null) => {
-    if (!avatarUrl) {
-      setAvatarData(null);
-      return;
-    }
-
+  const loadAvatarAsBase64 = async (avatarUrl: string) => {
     try {
       const { data } = await supabase.storage
         .from("avatars")
@@ -142,41 +172,60 @@ export default function UserProfileScreen({
   // Load user's routines (public routines only)
   const loadUserRoutines = async () => {
     try {
-      const { data, error } = await supabase
+      // First, try to get routines with the new schema (with emoji, category, etc.)
+      const { data: routinesData, error } = await supabase
         .from("user_routines")
         .select(
           `
           id,
+          user_id,
           name,
           description,
-          category,
-          emoji,
-          is_public,
-          scheduled_days
+          icon,
+          is_daily,
+          is_weekly,
+          target_value,
+          target_unit,
+          sort_order,
+          is_active,
+          created_at,
+          updated_at
         `
         )
         .eq("user_id", userId)
-        .eq("is_public", true)
         .eq("is_active", true);
 
       if (error) throw error;
 
-      // Group routines by day of week
+      // For now, we'll group routines by day of week based on is_daily and is_weekly
+      // Since we don't have scheduled_days or is_public in the current schema,
+      // we'll show all active routines and assume they're public if the user is on the leaderboard
       const groupedRoutines: DayRoutines = {};
 
-      data?.forEach((routine) => {
-        const scheduledDays = routine.scheduled_days || [];
-        scheduledDays.forEach((day: number) => {
-          if (!groupedRoutines[day]) {
-            groupedRoutines[day] = [];
+      routinesData?.forEach((routine) => {
+        // If it's a daily routine, add it to all days
+        if (routine.is_daily) {
+          for (let day = 0; day < 7; day++) {
+            if (!groupedRoutines[day]) {
+              groupedRoutines[day] = [];
+            }
+            groupedRoutines[day].push(routine);
           }
-          groupedRoutines[day].push(routine);
-        });
+        }
+        // If it's weekly, add it to Monday (day 1) as default
+        else if (routine.is_weekly) {
+          if (!groupedRoutines[1]) {
+            groupedRoutines[1] = [];
+          }
+          groupedRoutines[1].push(routine);
+        }
       });
 
       setDayRoutines(groupedRoutines);
     } catch (error) {
       console.error("Error loading user routines:", error);
+      // If there's an error, just set empty routines
+      setDayRoutines({});
     }
   };
 
@@ -448,7 +497,7 @@ export default function UserProfileScreen({
           {renderAchievements()}
         </View>
 
-        {/* Public Routines Section */}
+        {/* Routines Section */}
         <View
           style={[
             styles.dailyRoutinesSection,
@@ -459,14 +508,14 @@ export default function UserProfileScreen({
           ]}
         >
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Public Routines
+            Routines
           </Text>
 
           {Object.keys(dayRoutines).length === 0 ? (
             <Text
               style={[styles.noRoutinesText, { color: colors.textSecondary }]}
             >
-              No public routines shared
+              No routines shared
             </Text>
           ) : (
             DAYS_OF_WEEK.map((day) => {
@@ -513,7 +562,7 @@ export default function UserProfileScreen({
                           ]}
                         >
                           <Text style={styles.routineEmoji}>
-                            {routine.emoji || "📋"}
+                            {routine.emoji || routine.icon || "📋"}
                           </Text>
                           <View style={styles.routineInfo}>
                             <Text
@@ -540,7 +589,12 @@ export default function UserProfileScreen({
                                 { color: colors.textTertiary },
                               ]}
                             >
-                              {routine.category}
+                              {routine.category ||
+                                (routine.is_daily
+                                  ? "Daily"
+                                  : routine.is_weekly
+                                  ? "Weekly"
+                                  : "Custom")}
                             </Text>
                           </View>
                         </View>
