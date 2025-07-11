@@ -325,6 +325,8 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
   };
 
+  // REPLACE the uploadProfilePicture function in ProfileScreen.tsx with this:
+
   const uploadProfilePicture = async (imageUri: string) => {
     try {
       setUploadingImage(true);
@@ -334,9 +336,12 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      // Create a simpler filename structure that works with the policy
+      // Create a unique filename with timestamp to avoid caching issues
       const fileExt = "jpg";
-      const fileName = `${user.id}/avatar.${fileExt}`;
+      const timestamp = Date.now();
+      const fileName = `${user.id}/avatar_${timestamp}.${fileExt}`;
+
+      console.log("🔄 Starting upload with filename:", fileName);
 
       // Convert image to blob for upload
       const response = await fetch(imageUri);
@@ -350,27 +355,53 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           upsert: true, // This allows overwriting existing files
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("❌ Upload error:", uploadError);
+        throw uploadError;
+      }
 
-      // Get public URL
+      console.log("✅ Upload successful:", uploadData);
+
+      // Get public URL with cache busting
       const { data: urlData } = supabase.storage
         .from("avatars")
         .getPublicUrl(fileName);
 
+      console.log("🔗 Public URL generated:", urlData.publicUrl);
+
       // Update profile with new avatar URL
       const { error: updateError } = await supabase
         .from("profiles")
-        .update({ avatar_url: urlData.publicUrl })
+        .update({
+          avatar_url: urlData.publicUrl,
+          updated_at: new Date().toISOString(), // Force profile update timestamp
+        })
         .eq("id", user.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("❌ Profile update error:", updateError);
+        throw updateError;
+      }
 
-      // Refresh profile data
+      console.log("✅ Profile updated successfully");
+
+      // IMMEDIATE state update for instant UI feedback
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              avatar_url: urlData.publicUrl,
+              updated_at: new Date().toISOString(),
+            }
+          : null
+      );
+
+      // Then refresh profile data from database to ensure consistency
       await loadProfileData();
 
       Alert.alert("Success", "Profile picture updated successfully!");
     } catch (error) {
-      console.error("Error uploading profile picture:", error);
+      console.error("❌ Error uploading profile picture:", error);
       Alert.alert("Error", "Failed to upload profile picture");
     } finally {
       setUploadingImage(false);
@@ -729,6 +760,8 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
             onPress={handleProfilePicturePress}
             disabled={uploadingImage}
           >
+            // REPLACE the avatar image display section in ProfileScreen.tsx: //
+            Find this part in your render function and replace it:
             {uploadingImage ? (
               <View
                 style={[
@@ -740,10 +773,18 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
               </View>
             ) : profile?.avatar_url ? (
               <Image
-                source={{ uri: profile.avatar_url }}
+                source={{
+                  uri: profile.avatar_url + `?t=${Date.now()}`, // Cache busting
+                }}
                 style={styles.avatarImage}
-                onError={() => {
-                  console.log("Error loading avatar image");
+                onError={(error) => {
+                  console.log(
+                    "❌ Error loading avatar image:",
+                    error.nativeEvent.error
+                  );
+                }}
+                onLoad={() => {
+                  console.log("✅ Avatar image loaded successfully");
                 }}
               />
             ) : (
