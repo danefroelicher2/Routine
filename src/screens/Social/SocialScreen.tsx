@@ -32,6 +32,10 @@ interface LeaderboardUser {
   join_date: string;
 }
 
+interface SocialScreenProps {
+  navigation: any; // Add navigation prop
+}
+
 interface UserProfile {
   id: string;
   display_name?: string;
@@ -40,7 +44,7 @@ interface UserProfile {
   longest_streak: number;
 }
 
-export default function SocialScreen() {
+export default function SocialScreen({ navigation }: SocialScreenProps) {
   // State management
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -293,7 +297,7 @@ export default function SocialScreen() {
     return `#${rank}`;
   };
 
-  // Render individual leaderboard item
+  // UPDATED: Render individual leaderboard item with clickable functionality
   const renderLeaderboardItem = ({
     item,
     index,
@@ -304,8 +308,18 @@ export default function SocialScreen() {
     const isCurrentUser = userProfile?.id === item.id;
     const streakDiff = item.current_streak - item.longest_streak;
 
+    // FUNCTION: Handle user profile navigation
+    const handleUserPress = () => {
+      if (!isCurrentUser) {
+        navigation.navigate("UserProfile", {
+          userId: item.id,
+          displayName: item.display_name,
+        });
+      }
+    };
+
     return (
-      <View
+      <TouchableOpacity
         style={[
           styles.leaderboardItem,
           {
@@ -314,27 +328,53 @@ export default function SocialScreen() {
             borderWidth: isCurrentUser ? 2 : 1,
           },
         ]}
+        onPress={handleUserPress}
+        activeOpacity={isCurrentUser ? 1 : 0.7} // Disable press effect for current user
       >
         {/* Rank */}
         <View style={styles.rankContainer}>
-          <Text style={[styles.rankText, { color: getTrophyColor(item.rank) }]}>
+          <Text
+            style={[
+              styles.rankText,
+              {
+                color: getTrophyColor(item.rank),
+                fontSize: item.rank <= 3 ? 20 : 18,
+              },
+            ]}
+          >
             {getRankDisplay(item.rank)}
           </Text>
         </View>
 
         {/* User Info */}
         <View style={styles.userInfo}>
-          <Text
-            style={[
-              styles.displayName,
-              { color: colors.text },
-              isCurrentUser && { fontWeight: "bold" },
-            ]}
-            numberOfLines={1}
-          >
-            {item.display_name}
-            {isCurrentUser && " (You)"}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Text
+              style={[
+                styles.displayName,
+                { color: colors.text },
+                isCurrentUser && { fontWeight: "bold" },
+              ]}
+              numberOfLines={1}
+            >
+              {item.display_name}
+            </Text>
+            {!isCurrentUser && (
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={colors.textTertiary}
+                style={{ marginLeft: 4 }}
+              />
+            )}
+            {isCurrentUser && (
+              <Text
+                style={[styles.youLabel, { color: "#007AFF", marginLeft: 6 }]}
+              >
+                (You)
+              </Text>
+            )}
+          </View>
           <Text style={[styles.joinDate, { color: colors.textSecondary }]}>
             Member since {new Date(item.join_date).toLocaleDateString()}
           </Text>
@@ -344,15 +384,28 @@ export default function SocialScreen() {
         <View style={styles.streakInfo}>
           <View style={styles.streakContainer}>
             <Ionicons name="flame" size={16} color="#ff6b35" />
-            <Text style={[styles.currentStreak, { color: "#ff6b35" }]}>
+            <Text
+              style={[
+                styles.currentStreak,
+                {
+                  color: "#ff6b35",
+                  fontWeight: isCurrentUser ? "bold" : "600",
+                },
+              ]}
+            >
               {item.current_streak}
             </Text>
           </View>
           <Text style={[styles.longestStreak, { color: colors.textSecondary }]}>
             Best: {item.longest_streak}
           </Text>
+          {streakDiff > 0 && (
+            <Text style={[styles.streakDiff, { color: "#FF6B35" }]}>
+              +{streakDiff} 🔥
+            </Text>
+          )}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -701,6 +754,14 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 8,
     borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   rankContainer: {
     width: 50,
@@ -718,6 +779,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 2,
+  },
+  youLabel: {
+    fontSize: 12,
+    fontWeight: "600",
   },
   joinDate: {
     fontSize: 12,
@@ -737,6 +802,11 @@ const styles = StyleSheet.create({
   },
   longestStreak: {
     fontSize: 12,
+  },
+  streakDiff: {
+    fontSize: 10,
+    fontWeight: "600",
+    marginTop: 2,
   },
   modalContainer: {
     flex: 1,
