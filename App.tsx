@@ -22,6 +22,7 @@ import HomeScreen from "./src/screens/Home/HomeScreen";
 import AddRoutineScreen from "./src/screens/Home/AddRoutineScreen";
 import StatsScreen from "./src/screens/Stats/StatsScreen";
 import SocialScreen from "./src/screens/Social/SocialScreen"; // NEW: Social Screen Import
+import UserProfileScreen from "./src/screens/Social/UserProfileScreen"; // NEW: User Profile Screen
 import NotesScreen from "./src/screens/Notes/NotesScreen";
 import NoteDetailScreen from "./src/screens/Notes/NoteDetailScreen";
 import ProfileScreen from "./src/screens/Profile/ProfileScreen";
@@ -43,6 +44,36 @@ function HomeStack() {
       <Stack.Screen
         name="AddRoutine"
         component={AddRoutineScreen}
+        options={{ headerShown: false }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+// NEW: Stack Navigator for Social (includes user profiles)
+function SocialStack() {
+  const { colors } = useTheme();
+
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: colors.surface,
+        },
+        headerTintColor: "#007AFF",
+        headerTitleStyle: {
+          color: colors.text,
+        },
+      }}
+    >
+      <Stack.Screen
+        name="SocialMain"
+        component={SocialScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="UserProfile"
+        component={UserProfileScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
@@ -168,8 +199,8 @@ function MainTabs() {
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Stats" component={StatsScreen} />
-      {/* NEW: Social Tab placed between Stats and Notes */}
-      <Tab.Screen name="Social" component={SocialScreen} />
+      {/* UPDATED: Social Tab now uses SocialStack instead of SocialScreen */}
+      <Tab.Screen name="Social" component={SocialStack} />
       <Tab.Screen name="Notes" component={NotesStack} />
       <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
