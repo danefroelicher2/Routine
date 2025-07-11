@@ -325,8 +325,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
   };
 
-  // REPLACE the uploadProfilePicture function in ProfileScreen.tsx with this:
-
   const uploadProfilePicture = async (imageUri: string) => {
     try {
       setUploadingImage(true);
@@ -336,23 +334,20 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      // Create a unique filename with timestamp to avoid caching issues
       const fileExt = "jpg";
-      const timestamp = Date.now();
-      const fileName = `${user.id}/avatar_${timestamp}.${fileExt}`;
+      const fileName = `${user.id}/avatar.${fileExt}`;
 
       console.log("🔄 Starting upload with filename:", fileName);
 
-      // Convert image to blob for upload
       const response = await fetch(imageUri);
       const blob = await response.blob();
 
-      // Upload to Supabase Storage with the user ID as folder structure
+      // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(fileName, blob, {
           cacheControl: "3600",
-          upsert: true, // This allows overwriting existing files
+          upsert: true,
         });
 
       if (uploadError) {
@@ -362,19 +357,22 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
       console.log("✅ Upload successful:", uploadData);
 
-      // Get public URL with cache busting
+      // Get public URL
       const { data: urlData } = supabase.storage
         .from("avatars")
         .getPublicUrl(fileName);
 
       console.log("🔗 Public URL generated:", urlData.publicUrl);
 
-      // Update profile with new avatar URL
+      // Add timestamp for cache busting
+      const timestampedUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      // Update profile with new avatar URL (clean URL in database)
       const { error: updateError } = await supabase
         .from("profiles")
         .update({
-          avatar_url: urlData.publicUrl,
-          updated_at: new Date().toISOString(), // Force profile update timestamp
+          avatar_url: urlData.publicUrl, // Store clean URL in DB
+          updated_at: new Date().toISOString(),
         })
         .eq("id", user.id);
 
@@ -385,19 +383,21 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
       console.log("✅ Profile updated successfully");
 
-      // IMMEDIATE state update for instant UI feedback
+      // Update local state with timestamped URL for immediate display
       setProfile((prev) =>
         prev
           ? {
               ...prev,
-              avatar_url: urlData.publicUrl,
+              avatar_url: timestampedUrl, // Use timestamped URL for immediate display
               updated_at: new Date().toISOString(),
             }
           : null
       );
 
-      // Then refresh profile data from database to ensure consistency
-      await loadProfileData();
+      // Wait a moment for the image to be fully processed
+      setTimeout(async () => {
+        await loadProfileData();
+      }, 1000);
 
       Alert.alert("Success", "Profile picture updated successfully!");
     } catch (error) {
@@ -553,7 +553,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                       No routines scheduled for {day.name}
                     </Text>
                   ) : (
-                    routinesForDay.map((routine, index) => (
+                    routinesForDay.map((routine) => (
                       <View
                         key={routine.id}
                         style={[
@@ -760,8 +760,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
             onPress={handleProfilePicturePress}
             disabled={uploadingImage}
           >
-            // REPLACE the avatar image display section in ProfileScreen.tsx: //
-            Find this part in your render function and replace it:
             {uploadingImage ? (
               <View
                 style={[
@@ -774,7 +772,9 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
             ) : profile?.avatar_url ? (
               <Image
                 source={{
-                  uri: profile.avatar_url + `?t=${Date.now()}`, // Cache busting
+                  uri: profile.avatar_url.includes("?")
+                    ? profile.avatar_url
+                    : `${profile.avatar_url}?t=${Date.now()}`,
                 }}
                 style={styles.avatarImage}
                 onError={(error) => {
@@ -782,9 +782,16 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                     "❌ Error loading avatar image:",
                     error.nativeEvent.error
                   );
+                  console.log("❌ Failed URL:", profile.avatar_url);
                 }}
                 onLoad={() => {
                   console.log("✅ Avatar image loaded successfully");
+                }}
+                onLoadStart={() => {
+                  console.log("🔄 Started loading avatar image...");
+                }}
+                onLoadEnd={() => {
+                  console.log("🏁 Finished loading avatar image");
                 }}
               />
             ) : (
@@ -1157,7 +1164,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  // Achievements Section Styles (unchanged)
+  // Achievements Section Styles
   achievementsSection: {
     paddingHorizontal: 20,
     paddingVertical: 20,
@@ -1254,7 +1261,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Menu styles (unchanged)
+  // Menu styles
   menuSection: {
     marginTop: 15,
   },
