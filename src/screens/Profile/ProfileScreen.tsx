@@ -334,22 +334,20 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      // Create form data for upload
-      const filename = `${user.id}-${Date.now()}.jpg`;
-      const formData = new FormData();
+      // Create a simpler filename structure that works with the policy
+      const fileExt = "jpg";
+      const fileName = `${user.id}/avatar.${fileExt}`;
 
       // Convert image to blob for upload
       const response = await fetch(imageUri);
       const blob = await response.blob();
 
-      formData.append("file", blob as any, filename);
-
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage with the user ID as folder structure
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(filename, blob, {
+        .upload(fileName, blob, {
           cacheControl: "3600",
-          upsert: false,
+          upsert: true, // This allows overwriting existing files
         });
 
       if (uploadError) throw uploadError;
@@ -357,7 +355,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       // Get public URL
       const { data: urlData } = supabase.storage
         .from("avatars")
-        .getPublicUrl(filename);
+        .getPublicUrl(fileName);
 
       // Update profile with new avatar URL
       const { error: updateError } = await supabase
