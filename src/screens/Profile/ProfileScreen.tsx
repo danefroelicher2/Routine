@@ -86,53 +86,89 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
   };
 
-  // FIXED: Convert image to base64 for reliable display - Enhanced for iOS
-  const loadAvatarAsBase64 = async (avatarFileName: string) => {
+  // FIXED: Enhanced avatar loading function with comprehensive validation
+  const loadAvatarAsBase64 = async (
+    avatarFileName: string
+  ): Promise<string | null> => {
     try {
       console.log("🔄 Loading avatar as base64:", avatarFileName);
 
+      if (!avatarFileName || typeof avatarFileName !== "string") {
+        console.error("❌ Invalid avatar filename:", avatarFileName);
+        return null;
+      }
+
       // Check if it's already a full URL (current format) or just a filename (old format)
       if (avatarFileName.startsWith("http")) {
-        // Current format - try to fetch from URL first
         console.log("🔗 URL format detected, trying direct fetch");
+
         try {
           const response = await fetch(avatarFileName);
-          if (response.ok) {
-            const blob = await response.blob();
-            const reader = new FileReader();
-            return new Promise<string>((resolve, reject) => {
-              reader.onloadend = () => {
-                const base64data = reader.result as string;
-                console.log(
-                  "✅ Avatar loaded from URL and converted to base64"
-                );
-                resolve(base64data);
-              };
-              reader.onerror = (error) => {
-                console.error("❌ FileReader error:", error);
-                reject(error);
-              };
-              reader.readAsDataURL(blob);
-            });
-          } else {
-            console.log(
-              `❌ HTTP ${response.status} - trying to extract filename from URL`
-            );
-            throw new Error(`HTTP ${response.status}`);
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
-        } catch (urlError) {
+
+          const blob = await response.blob();
+
+          if (blob.size === 0) {
+            throw new Error("Downloaded blob is empty");
+          }
+
+          if (!blob.type.startsWith("image/")) {
+            throw new Error(`Invalid content type: ${blob.type}`);
+          }
+
           console.log(
-            "❌ Failed to load from URL, trying to extract filename and use storage download"
+            "✅ Image downloaded, size:",
+            blob.size,
+            "type:",
+            blob.type
           );
+
+          return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+
+            reader.onloadend = () => {
+              const result = reader.result;
+
+              if (!result || typeof result !== "string") {
+                reject(new Error("FileReader returned invalid result"));
+                return;
+              }
+
+              if (!result.startsWith("data:image/")) {
+                reject(new Error("Invalid base64 format"));
+                return;
+              }
+
+              console.log("✅ Avatar loaded from URL and converted to base64");
+              resolve(result);
+            };
+
+            reader.onerror = () => {
+              reject(new Error("FileReader failed"));
+            };
+
+            reader.readAsDataURL(blob);
+          });
+        } catch (urlError) {
+          console.log("❌ Failed to load from URL:", urlError);
 
           // Try to extract filename from URL and download from storage
           try {
             const url = new URL(avatarFileName);
             const pathParts = url.pathname.split("/");
-            const fileName = pathParts[pathParts.length - 1];
+            let fileName = pathParts[pathParts.length - 1];
 
-            if (fileName && fileName.includes("/")) {
-              // Filename looks like "user-id/avatar.jpg"
+            if (fileName && fileName.includes(encodeURIComponent("/"))) {
+              fileName = decodeURIComponent(fileName);
+            }
+
+            if (
+              fileName &&
+              (fileName.includes("/") || fileName.includes("avatar"))
+            ) {
               console.log(
                 `🔄 Extracted filename: ${fileName}, trying storage download`
               );
@@ -141,23 +177,48 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 .from("avatars")
                 .download(fileName);
 
-              if (!error && data) {
-                const reader = new FileReader();
-                return new Promise<string>((resolve, reject) => {
-                  reader.onloadend = () => {
-                    const base64data = reader.result as string;
-                    console.log(
-                      "✅ Avatar loaded from storage and converted to base64"
-                    );
-                    resolve(base64data);
-                  };
-                  reader.onerror = reject;
-                  reader.readAsDataURL(data);
-                });
+              if (error) {
+                throw error;
               }
+
+              if (!data || data.size === 0) {
+                throw new Error("Downloaded file is empty");
+              }
+
+              return new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+
+                reader.onloadend = () => {
+                  const result = reader.result;
+
+                  if (!result || typeof result !== "string") {
+                    reject(new Error("FileReader returned invalid result"));
+                    return;
+                  }
+
+                  if (!result.startsWith("data:")) {
+                    reject(new Error("Invalid base64 format"));
+                    return;
+                  }
+
+                  console.log(
+                    "✅ Avatar loaded from storage and converted to base64"
+                  );
+                  resolve(result);
+                };
+
+                reader.onerror = () => {
+                  reject(new Error("FileReader failed"));
+                };
+
+                reader.readAsDataURL(data);
+              });
             }
           } catch (extractError) {
-            console.log("❌ Could not extract filename from URL");
+            console.log(
+              "❌ Could not extract filename from URL:",
+              extractError
+            );
           }
 
           throw urlError;
@@ -165,6 +226,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       } else {
         // Old format - download from Supabase storage using filename
         console.log("📁 Filename format detected, using storage download");
+
         const { data, error } = await supabase.storage
           .from("avatars")
           .download(avatarFileName);
@@ -174,27 +236,39 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           throw error;
         }
 
-        if (data) {
-          console.log("✅ Avatar downloaded from storage successfully");
-          const reader = new FileReader();
-          return new Promise<string>((resolve, reject) => {
-            reader.onloadend = () => {
-              const base64data = reader.result as string;
-              console.log("✅ Avatar converted to base64");
-              resolve(base64data);
-            };
-            reader.onerror = (error) => {
-              console.error("❌ Error converting to base64:", error);
-              reject(error);
-            };
-            reader.readAsDataURL(data);
-          });
+        if (!data || data.size === 0) {
+          throw new Error("Downloaded file is empty");
         }
-      }
 
-      return null;
+        return new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+
+          reader.onloadend = () => {
+            const result = reader.result;
+
+            if (!result || typeof result !== "string") {
+              reject(new Error("FileReader returned invalid result"));
+              return;
+            }
+
+            if (!result.startsWith("data:")) {
+              reject(new Error("Invalid base64 format"));
+              return;
+            }
+
+            console.log("✅ Avatar converted to base64");
+            resolve(result);
+          };
+
+          reader.onerror = () => {
+            reject(new Error("FileReader failed"));
+          };
+
+          reader.readAsDataURL(data);
+        });
+      }
     } catch (error) {
-      console.log("❌ Avatar loading failed:", error);
+      console.error("❌ Avatar loading failed:", error);
       return null;
     }
   };
@@ -244,7 +318,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
   };
 
-  // FIXED: Enhanced profile data loading with better avatar handling
+  // FIXED: Profile data loading with avatar persistence protection
   const loadProfileData = async () => {
     try {
       const {
@@ -275,21 +349,32 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       setProfile(profileData);
       setSettings(settingsData);
 
-      // IMPROVED: Load avatar with better error handling
-      if (profileData?.avatar_url) {
-        console.log("🔄 Found avatar_url, loading:", profileData.avatar_url);
+      // CRITICAL FIX: Only load avatar if we don't already have one displayed
+      // This prevents overriding the avatar after a successful upload
+      if (profileData?.avatar_url && !avatarData) {
+        console.log(
+          "🔄 Found avatar_url and no current avatar, loading:",
+          profileData.avatar_url
+        );
         try {
           const base64Avatar = await loadAvatarAsBase64(profileData.avatar_url);
-          setAvatarData(base64Avatar);
           if (base64Avatar) {
+            setAvatarData(base64Avatar);
             console.log("✅ Avatar loaded successfully on profile load");
           } else {
             console.log("⚠️ Avatar URL exists but failed to load image data");
           }
         } catch (avatarError) {
           console.error("❌ Avatar loading error:", avatarError);
-          setAvatarData(null);
+          // Don't set to null if we have existing avatar data
+          if (!avatarData) {
+            setAvatarData(null);
+          }
         }
+      } else if (avatarData) {
+        console.log(
+          "ℹ️ Avatar already displayed, skipping reload to prevent override"
+        );
       } else {
         console.log("ℹ️ No avatar_url found");
         setAvatarData(null);
@@ -433,41 +518,106 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
   };
 
-  // FIXED: Enhanced upload function with persistence verification
+  // FIXED: Enhanced upload function with comprehensive validation and error handling
   const uploadProfilePicture = async (imageUri: string) => {
     try {
       setUploadingImage(true);
+      console.log("🔄 Starting upload process for:", imageUri);
 
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      // Convert to base64 immediately for instant display
-      console.log("🔄 Converting image to base64 for instant display...");
+      // ENHANCED: Better image validation and processing
+      console.log("🔄 Fetching image from URI...");
       const response = await fetch(imageUri);
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch image: ${response.status} ${response.statusText}`
+        );
+      }
+
       const blob = await response.blob();
+      console.log(
+        "✅ Image blob created, size:",
+        blob.size,
+        "type:",
+        blob.type
+      );
 
-      // Set the base64 data immediately for instant display
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64data = reader.result as string;
-        setAvatarData(base64data);
-        console.log("✅ Image displayed instantly via base64");
-      };
-      reader.readAsDataURL(blob);
+      // Validate blob
+      if (blob.size === 0) {
+        throw new Error("Image blob is empty");
+      }
 
+      if (!blob.type.startsWith("image/")) {
+        throw new Error(`Invalid image type: ${blob.type}`);
+      }
+
+      // ENHANCED: More robust base64 conversion with validation
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onloadend = () => {
+          const result = reader.result;
+
+          if (!result || typeof result !== "string") {
+            console.error("❌ FileReader result is invalid:", typeof result);
+            reject(new Error("FileReader returned invalid result"));
+            return;
+          }
+
+          // Validate base64 format
+          if (!result.startsWith("data:image/")) {
+            console.error("❌ Invalid base64 format:", result.substring(0, 50));
+            reject(new Error("Invalid base64 format"));
+            return;
+          }
+
+          console.log(
+            "✅ Base64 conversion successful, length:",
+            result.length
+          );
+          console.log("🔍 Base64 preview:", result.substring(0, 50) + "...");
+          resolve(result);
+        };
+
+        reader.onerror = (error) => {
+          console.error("❌ FileReader error:", error);
+          reject(new Error("FileReader failed"));
+        };
+
+        reader.onabort = () => {
+          console.error("❌ FileReader aborted");
+          reject(new Error("FileReader aborted"));
+        };
+
+        reader.readAsDataURL(blob);
+      });
+
+      const base64data = await base64Promise;
+
+      // Set avatar immediately with validated data
+      setAvatarData(base64data);
+      console.log("✅ Avatar set in state immediately");
+
+      // Continue with upload to storage
       const fileExt = "jpg";
       const fileName = `${user.id}/avatar.${fileExt}`;
 
-      console.log("🔄 Starting upload with filename:", fileName);
+      console.log("🔄 Starting storage upload with filename:", fileName);
 
       // Delete existing file first
       try {
         await supabase.storage.from("avatars").remove([fileName]);
         console.log("🗑️ Existing avatar removed");
       } catch (removeError) {
-        console.log("ℹ️ No existing avatar to remove or removal failed");
+        console.log(
+          "ℹ️ No existing avatar to remove or removal failed:",
+          removeError
+        );
       }
 
       // Upload to Supabase Storage
@@ -479,11 +629,11 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         });
 
       if (uploadError) {
-        console.error("❌ Upload error:", uploadError);
+        console.error("❌ Storage upload error:", uploadError);
         throw uploadError;
       }
 
-      console.log("✅ Upload successful:", uploadData);
+      console.log("✅ Storage upload successful:", uploadData);
 
       // Get public URL
       const { data: urlData } = supabase.storage
@@ -502,13 +652,13 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         .eq("id", user.id);
 
       if (updateError) {
-        console.error("❌ Profile update error:", updateError);
+        console.error("❌ Database update error:", updateError);
         throw updateError;
       }
 
-      console.log("✅ Profile updated successfully in database");
+      console.log("✅ Database updated successfully");
 
-      // Update local state
+      // Update local profile state
       setProfile((prev) =>
         prev
           ? {
@@ -519,37 +669,27 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           : null
       );
 
-      // IMPORTANT FIX: Reload the avatar from the saved URL to ensure persistence
-      // This ensures the avatar loads properly on next app launch
-      setTimeout(async () => {
-        console.log(
-          "🔄 Reloading avatar from saved URL to verify persistence..."
-        );
-        const reloadedBase64 = await loadAvatarAsBase64(urlData.publicUrl);
-        if (reloadedBase64) {
-          setAvatarData(reloadedBase64);
-          console.log("✅ Avatar persistence verified");
-        }
-      }, 1000);
-
+      console.log("✅ Upload process completed successfully");
       Alert.alert("Success", "Profile picture updated successfully!");
     } catch (error) {
-      console.error("❌ Error uploading profile picture:", error);
+      console.error("❌ Upload failed:", error);
+
+      // Show detailed error to user
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
       Alert.alert(
-        "Error",
-        "Failed to upload profile picture. Please try again."
+        "Upload Failed",
+        `Failed to upload profile picture: ${errorMessage}`
       );
 
-      // Reload the previous avatar if upload failed
-      if (profile?.avatar_url) {
-        const previousBase64 = await loadAvatarAsBase64(profile.avatar_url);
-        setAvatarData(previousBase64);
-      }
+      // Clear the avatar data on failure
+      setAvatarData(null);
     } finally {
       setUploadingImage(false);
     }
   };
 
+  // FIXED: Enhanced renderAvatar with validation and error handling
   const renderAvatar = () => {
     if (uploadingImage) {
       return (
@@ -562,12 +702,54 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
 
     if (avatarData) {
+      // CRITICAL FIX: Validate base64 data before rendering
+      const isValidBase64 =
+        avatarData.startsWith("data:image/") ||
+        avatarData.startsWith("data:application/");
+
+      if (!isValidBase64) {
+        console.error(
+          "❌ Invalid base64 data format:",
+          avatarData.substring(0, 50)
+        );
+        // Clear invalid data and show placeholder
+        setAvatarData(null);
+        return (
+          <View
+            style={[
+              styles.avatarPlaceholder,
+              { backgroundColor: colors.border },
+            ]}
+          >
+            <Ionicons name="person" size={40} color={colors.textSecondary} />
+          </View>
+        );
+      }
+
       return (
         <Image
           source={{ uri: avatarData }}
           style={styles.avatarImage}
           onLoad={() => {
             console.log("✅ Avatar loaded successfully from base64");
+          }}
+          onError={(error) => {
+            console.error(
+              "❌ Avatar image load error details:",
+              JSON.stringify(error, null, 2)
+            );
+            console.error(
+              "❌ Failed avatar data preview:",
+              avatarData.substring(0, 100)
+            );
+            // Clear bad avatar data so user can try again
+            setAvatarData(null);
+          }}
+          onLoadStart={() => {
+            console.log("🔄 Avatar load started");
+          }}
+          onLoadEnd={() => {
+            console.log("✅ Avatar load ended");
           }}
         />
       );
@@ -592,9 +774,22 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     setExpandedDays(newExpandedDays);
   };
 
+  // FIXED: Refresh function that preserves avatar state
   const onRefresh = async () => {
     setRefreshing(true);
+
+    // Store current avatar to prevent it from being cleared
+    const currentAvatar = avatarData;
+
     await loadProfileData();
+
+    // If we had an avatar before refresh and it got cleared, restore it
+    if (currentAvatar && !avatarData) {
+      console.log("🔄 Restoring avatar after refresh");
+      setAvatarData(currentAvatar);
+    }
+
+    setRefreshing(false);
   };
 
   const showHelpSupport = () => {
