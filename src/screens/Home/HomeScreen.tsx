@@ -17,14 +17,14 @@ import {
   Modal,
   Animated,
   PanResponder,
-  Dimensions, // ENHANCED: Added for better calculations
-  TextInput, // ENHANCED: Added for edit functionality
+  Dimensions,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
 import { UserRoutine } from "../../types/database";
 import { useTheme } from "../../../ThemeContext";
-import { StreakSyncService } from "../../services/StreakSyncService"; // NEW: Import streak sync service
+import { StreakSyncService } from "../../services/StreakSyncService";
 
 interface RoutineWithCompletion extends UserRoutine {
   isCompleted: boolean;
@@ -34,6 +34,14 @@ interface RoutineWithCompletion extends UserRoutine {
 interface HomeScreenProps {
   navigation: any;
 }
+
+// ✅ CRITICAL FIX: Utility function to get local date string consistently
+const getLocalDateString = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
@@ -90,9 +98,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   // ENHANCED: Animated values for smooth interactions
   const dragY = useRef(new Animated.Value(0)).current;
-  const dragScale = useRef(new Animated.Value(1)).current; // Scale animation for dragged item
-  const dragOpacity = useRef(new Animated.Value(1)).current; // Opacity for drag effect
-  const dropZoneOpacity = useRef(new Animated.Value(0)).current; // Drop zone indicator
+  const dragScale = useRef(new Animated.Value(1)).current;
+  const dragOpacity = useRef(new Animated.Value(1)).current;
+  const dropZoneOpacity = useRef(new Animated.Value(0)).current;
 
   // Get screen dimensions for better calculations
   const { width: screenWidth } = Dimensions.get("window");
@@ -111,11 +119,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // NEW: Sync streak data in background
   const syncStreaksAfterCompletion = async (userId: string) => {
     try {
-      // Sync streak data for social leaderboard
       await StreakSyncService.checkAndSyncUserStreaks(userId);
     } catch (error) {
       console.error("Error syncing streaks after completion:", error);
-      // Don't show error to user, this is background sync
     }
   };
 
@@ -123,7 +129,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const getTimePeriodInfo = () => {
     const now = new Date();
     const hour = now.getHours();
-    const dateString = now.toISOString().split("T")[0];
+    const dateString = getLocalDateString(now);
 
     let timePeriod: string;
     if (hour >= 5 && hour < 12) {
@@ -214,7 +220,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return greetingArray[greetingIndex];
   }, [userProfile?.full_name]);
 
-  // Load all user routines and day assignments
+  // ✅ ENHANCED: Load data with LOCAL TIMEZONE fixes
   const loadData = useCallback(async () => {
     try {
       const {
@@ -234,7 +240,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       setUserProfile(profileData);
 
-      // Calculate week start (Monday)
+      // ✅ CRITICAL FIX: Calculate week start using local timezone
       const now = new Date();
       const currentDay = now.getDay();
       const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
@@ -242,9 +248,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       weekStart.setDate(now.getDate() - daysFromMonday);
       weekStart.setHours(0, 0, 0, 0);
 
-      // Get today's date string
-      const today = new Date();
-      const todayStr = today.toISOString().split("T")[0];
+      // ✅ CRITICAL FIX: Query completions using local date strings
+      const todayStr = getLocalDateString(now);
+      const weekStartStr = getLocalDateString(weekStart);
 
       // Load routines, completions, and day assignments
       const [
@@ -268,12 +274,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           .from("routine_completions")
           .select("*")
           .eq("user_id", user.id)
-          .gte("week_start_date", weekStart.toISOString().split("T")[0])
+          .gte("week_start_date", weekStartStr)
           .lt(
             "week_start_date",
-            new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000)
-              .toISOString()
-              .split("T")[0]
+            getLocalDateString(
+              new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000)
+            )
           ),
         supabase.from("user_day_routines").select("*").eq("user_id", user.id),
       ]);
@@ -368,18 +374,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     loadData().finally(() => setRefreshing(false));
   }, [loadData]);
 
-  // Function to check if all daily routines are completed
+  // ✅ ENHANCED: Function to check if all daily routines are completed with LOCAL TIMEZONE
   const checkDailyCompletionStatus = async (userId: string) => {
     try {
+      // ✅ CRITICAL FIX: Use local timezone for today
       const today = new Date();
-      const todayStr = today.toISOString().split("T")[0];
-      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const todayStr = getLocalDateString(today);
+      const dayOfWeek = today.getDay();
 
-      console.log("🔍 CHECKING DAILY COMPLETION STATUS:");
-      console.log("  - Date:", todayStr);
+      console.log("🔍 CHECKING DAILY COMPLETION STATUS (FIXED):");
+      console.log("  - Date (LOCAL):", todayStr);
       console.log("  - Day of week:", dayOfWeek);
 
-      // Get all the data we need to check completion
       const [completionsResult, userRoutinesResult, dayRoutinesResult] =
         await Promise.all([
           supabase
@@ -406,7 +412,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       const userRoutines = userRoutinesResult.data || [];
       const todayRoutineAssignments = dayRoutinesResult.data || [];
 
-      // Get daily routines for today
       const todayDailyRoutineIds = todayRoutineAssignments.map(
         (a) => a.routine_id
       );
@@ -415,17 +420,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           !routine.is_weekly && todayDailyRoutineIds.includes(routine.id)
       );
 
-      // Get completed routine IDs for today
       const completedRoutineIds = todayCompletions.map((c) => c.routine_id);
 
-      // Check if ALL daily routines are completed
       const allCompleted =
         todayDailyRoutines.length > 0 &&
         todayDailyRoutines.every((routine) =>
           completedRoutineIds.includes(routine.id)
         );
 
-      console.log("📋 COMPLETION CHECK RESULTS:");
+      console.log("📋 COMPLETION CHECK RESULTS (FIXED):");
       console.log(
         "  - Required routines today:",
         todayDailyRoutines.map((r) => r.name)
@@ -436,7 +439,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (allCompleted) {
         console.log("🎉 ALL DAILY ROUTINES COMPLETED!");
         console.log("  - Stats calendar should show GREEN for today");
-        console.log("  - Date:", todayStr);
+        console.log("  - Date (LOCAL):", todayStr);
       } else {
         const missing = todayDailyRoutines.filter(
           (r) => !completedRoutineIds.includes(r.id)
@@ -454,7 +457,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ENHANCED toggleRoutineCompletion function with real-time completion checking
+  // ✅ ENHANCED toggleRoutineCompletion function with LOCAL TIMEZONE fixes
   const toggleRoutineCompletion = async (
     routine: RoutineWithCompletion,
     isWeekly: boolean
@@ -479,11 +482,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         console.log("  - Completion removed for today");
       } else {
         // CHECKING a routine
-        // CRITICAL FIX: Always use today's date for completion, regardless of selectedDay
+        // ✅ CRITICAL FIX: Always use today's LOCAL date for completion, regardless of selectedDay
         const today = new Date();
-        const completionDate = today.toISOString().split("T")[0];
+        const completionDate = getLocalDateString(today);
 
-        // Original logic preserved for weekly routine week calculation
         let weekStartDate = null;
         if (isWeekly) {
           const now = new Date();
@@ -492,34 +494,33 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           const weekStart = new Date(now);
           weekStart.setDate(now.getDate() - daysFromMonday);
           weekStart.setHours(0, 0, 0, 0);
-          weekStartDate = weekStart.toISOString().split("T")[0];
+          weekStartDate = getLocalDateString(weekStart);
         }
 
         const { error } = await supabase.from("routine_completions").insert({
           user_id: user.id,
           routine_id: routine.id,
-          completion_date: completionDate, // Always today's date
+          completion_date: completionDate, // ✅ FIXED: Using local date
           week_start_date: weekStartDate,
         });
 
         if (error) throw error;
 
-        console.log("✅ ROUTINE CHECKED:");
+        console.log("✅ ROUTINE CHECKED (FIXED):");
         console.log("  - Routine:", routine.name);
-        console.log("  - Completion date:", completionDate);
-        console.log("  - Today's date:", completionDate);
-        console.log("  - Selected day in UI:", selectedDay);
-        console.log(
-          "  - Is for TODAY:",
-          completionDate === today.toISOString().split("T")[0]
-        );
+        console.log("  - Completion date (LOCAL):", completionDate);
       }
 
-      // NEW: After any completion change, check if all daily routines are complete
-      await checkDailyCompletionStatus(user.id);
+      // Check if all daily routines are now completed
+      const allCompleted = await checkDailyCompletionStatus(user.id);
 
-      // NEW: Sync streak data for social leaderboard (background operation)
-      syncStreaksAfterCompletion(user.id);
+      if (allCompleted) {
+        console.log("🎯 ALL DAILY ROUTINES COMPLETED FOR TODAY!");
+        console.log("  - This should trigger GREEN in Stats calendar");
+      }
+
+      // Sync streaks in background
+      await syncStreaksAfterCompletion(user.id);
 
       // Reload data to reflect changes
       await loadData();
@@ -597,26 +598,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ENHANCED: Pan responder for drag and drop with improved UX
+  // ✅ RESTORED: Original Pan responder for drag and drop
   const createPanResponder = (index: number, section: "daily" | "weekly") => {
     return PanResponder.create({
-      // FIXED: Immediate drag response - capture touch from start
-      onStartShouldSetPanResponder: (evt, gestureState) => {
-        return false; // Don't capture immediately, let onMove handle it
-      },
-
       onMoveShouldSetPanResponder: (evt, gestureState) => {
         const { dx, dy } = gestureState;
-        // FIXED: Lower threshold for immediate response
         return Math.abs(dy) > 3 && Math.abs(dy) > Math.abs(dx) * 0.5;
       },
 
       onPanResponderGrant: () => {
-        console.log("🎯 DRAG STARTED:", { index, section });
-
-        // REMOVED: All haptic feedback/vibration
-
-        // Set drag state
         setIsDragging(true);
         setDraggedIndex(index);
         setDraggedSection(section);
@@ -624,16 +614,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setIsDragActive(true);
         setScrollEnabled(false);
 
-        // ENHANCED: Animated feedback on drag start
         Animated.parallel([
           Animated.spring(dragScale, {
-            toValue: 1.05, // Slightly scale up the dragged item
+            toValue: 1.05,
             useNativeDriver: false,
             tension: 200,
             friction: 8,
           }),
           Animated.timing(dragOpacity, {
-            toValue: 0.9, // Slightly transparent to show it's being dragged
+            toValue: 0.9,
             duration: 150,
             useNativeDriver: false,
           }),
@@ -641,32 +630,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       },
 
       onPanResponderMove: (evt, gestureState) => {
-        // FIXED: More precise finger tracking - use raw gesture movement
         dragY.setValue(gestureState.dy);
 
         const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
-
-        // FIXED: Constrain movement within the current section
-        // Don't allow dragging beyond the section boundaries
         const maxRoutines = routines.length - 1;
-
-        // FIXED: Balanced movement calculation - not too fast, not too slow
-        const itemSpacing = 100; // Balanced spacing value
-
-        // FIXED: Medium responsiveness - balanced between 0.5 (too slow) and 0.85 (too fast)
+        const itemSpacing = 100;
         const movementRatio = gestureState.dy / itemSpacing;
-        const balancedMovement = movementRatio * 0.68; // Sweet spot between responsiveness and control
+        const balancedMovement = movementRatio * 0.68;
 
-        // FIXED: Strictly constrain to current section boundaries
         const newIndex = Math.max(
           0,
-          Math.min(
-            maxRoutines, // Use section-specific max
-            Math.round(index + balancedMovement)
-          )
+          Math.min(maxRoutines, Math.round(index + balancedMovement))
         );
 
-        // ENHANCED: Show drop zone indicator ONLY within the same section
         if (
           newIndex !== dropZoneIndex &&
           newIndex >= 0 &&
@@ -674,7 +650,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         ) {
           setDropZoneIndex(newIndex);
 
-          // Animate drop zone indicator
           Animated.timing(dropZoneOpacity, {
             toValue: newIndex !== index ? 0.3 : 0,
             duration: 150,
@@ -682,21 +657,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           }).start();
         }
 
-        // Perform reordering only when crossing significant boundaries WITHIN the same section
         if (
           newIndex !== lastSwapIndex &&
           newIndex !== index &&
           newIndex >= 0 &&
           newIndex <= maxRoutines
         ) {
-          console.log("🔄 REORDERING within", section, ":", {
-            from: index,
-            to: newIndex,
-            fingerMovement: gestureState.dy,
-          });
-
-          // REMOVED: Haptic feedback during reordering
-
           setLastSwapIndex(newIndex);
 
           const newRoutines = [...routines];
@@ -704,7 +670,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           newRoutines.splice(index, 1);
           newRoutines.splice(newIndex, 0, draggedItem);
 
-          // FIXED: Only update the correct section
           if (section === "daily") {
             setDailyRoutines(newRoutines);
           } else {
@@ -716,21 +681,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       },
 
       onPanResponderRelease: async (evt, gestureState) => {
-        console.log("🎯 DRAG ENDED:", {
-          originalIndex,
-          finalIndex: draggedIndex,
-          changed: originalIndex !== draggedIndex,
-        });
-
-        // REMOVED: All haptic feedback on drop
-
-        // Reset drag state
         setIsDragging(false);
         setIsDragActive(false);
         setScrollEnabled(true);
         setDropZoneIndex(null);
 
-        // ENHANCED: Smooth animation back to normal state
         Animated.parallel([
           Animated.spring(dragY, {
             toValue: 0,
@@ -751,143 +706,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           }),
           Animated.timing(dropZoneOpacity, {
             toValue: 0,
-            duration: 200,
+            duration: 150,
             useNativeDriver: false,
           }),
         ]).start();
 
-        // Save to database if order changed
-        if (originalIndex !== draggedIndex) {
-          await saveRoutineOrder(section);
-        }
-
-        // Reset all drag state
         setDraggedIndex(null);
         setDraggedSection(null);
         setOriginalIndex(null);
         setLastSwapIndex(null);
+
+        if (originalIndex !== draggedIndex) {
+          await saveRoutineOrder(section);
+        }
       },
     });
   };
 
-  // ENHANCED: Toggle edit mode for specific section
-  const toggleEditMode = (section: "daily" | "weekly") => {
-    if (isEditMode && editSection === section) {
-      // Exit edit mode
-      setIsEditMode(false);
-      setEditSection(null);
-    } else {
-      // Enter edit mode for this section
-      setIsEditMode(true);
-      setEditSection(section);
-    }
-  };
-
-  // ENHANCED: Handle delete routine
-  const handleDeleteRoutine = (
-    routine: RoutineWithCompletion,
-    section: "daily" | "weekly"
-  ) => {
-    setRoutineToDelete({ routine, section });
-    setShowDeleteConfirm(true);
-  };
-
-  // ENHANCED: Confirm delete routine
-  const confirmDeleteRoutine = async () => {
-    if (!routineToDelete) return;
-
-    try {
-      const { routine, section } = routineToDelete;
-
-      // Delete from database
-      const { error } = await supabase
-        .from("user_routines")
-        .update({ is_active: false }) // Soft delete by setting is_active to false
-        .eq("id", routine.id);
-
-      if (error) throw error;
-
-      // If it's a daily routine, also remove day assignments
-      if (section === "daily") {
-        const { error: dayError } = await supabase
-          .from("user_day_routines")
-          .delete()
-          .eq("routine_id", routine.id);
-
-        if (dayError) throw dayError;
-      }
-
-      // Refresh data to reflect changes
-      await loadData();
-
-      // Reset state
-      setShowDeleteConfirm(false);
-      setRoutineToDelete(null);
-
-      console.log("✅ ROUTINE DELETED:", routine.name);
-    } catch (error) {
-      console.error("Error deleting routine:", error);
-      Alert.alert("Error", "Failed to delete routine");
-    }
-  };
-
-  // ENHANCED: Handle edit routine
-  const handleEditRoutine = (routine: RoutineWithCompletion) => {
-    console.log("🔧 EDIT ROUTINE CLICKED:", routine.name); // Debug log
-    setRoutineToEdit(routine);
-    setEditFormData({
-      name: routine.name,
-      description: routine.description || "",
-    });
-    setShowEditRoutineModal(true);
-    console.log("📝 EDIT MODAL SHOULD SHOW:", true); // Debug log
-  };
-
-  // ENHANCED: Save edited routine
-  const saveEditedRoutine = async () => {
-    if (!routineToEdit || !editFormData.name.trim()) {
-      Alert.alert("Error", "Routine name is required");
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from("user_routines")
-        .update({
-          name: editFormData.name.trim(),
-          description: editFormData.description.trim() || null,
-        })
-        .eq("id", routineToEdit.id);
-
-      if (error) throw error;
-
-      // Refresh data to reflect changes
-      await loadData();
-
-      // Reset state
-      setShowEditRoutineModal(false);
-      setRoutineToEdit(null);
-      setEditFormData({ name: "", description: "" });
-
-      console.log("✅ ROUTINE UPDATED:", editFormData.name);
-    } catch (error) {
-      console.error("Error updating routine:", error);
-      Alert.alert("Error", "Failed to update routine");
-    }
-  };
-
-  // ENHANCED: Cancel edit routine
-  const cancelEditRoutine = () => {
-    setShowEditRoutineModal(false);
-    setRoutineToEdit(null);
-    setEditFormData({ name: "", description: "" });
-  };
-
-  const cancelDelete = () => {
-    setShowDeleteConfirm(false);
-    setRoutineToDelete(null);
-  };
-
+  // Save routine order to database
   const saveRoutineOrder = async (section: "daily" | "weekly") => {
     try {
       const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
@@ -905,18 +741,90 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         if (error) throw error;
       }
-
-      console.log(
-        "💾 SAVED ORDER:",
-        section,
-        updates.map((u) => u.sort_order)
-      );
     } catch (error) {
       console.error("Error saving routine order:", error);
       Alert.alert("Error", "Failed to save routine order");
     }
   };
 
+  // ✅ RESTORED: Edit mode functions
+  const toggleEditMode = (section: "daily" | "weekly") => {
+    if (isEditMode && editSection === section) {
+      setIsEditMode(false);
+      setEditSection(null);
+    } else {
+      setIsEditMode(true);
+      setEditSection(section);
+    }
+  };
+
+  const handleDeleteRoutine = (
+    routine: RoutineWithCompletion,
+    section: "daily" | "weekly"
+  ) => {
+    setRoutineToDelete({ routine, section });
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteRoutine = async () => {
+    if (!routineToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("user_routines")
+        .update({ is_active: false })
+        .eq("id", routineToDelete.routine.id);
+
+      if (error) throw error;
+
+      setShowDeleteConfirm(false);
+      setRoutineToDelete(null);
+      setIsEditMode(false);
+      await loadData();
+    } catch (error) {
+      console.error("Error deleting routine:", error);
+      Alert.alert("Error", "Failed to delete routine");
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setRoutineToDelete(null);
+  };
+
+  const handleEditRoutine = (routine: RoutineWithCompletion) => {
+    setRoutineToEdit(routine);
+    setEditFormData({
+      name: routine.name,
+      description: routine.description || "",
+    });
+    setShowEditRoutineModal(true);
+  };
+
+  const saveEditedRoutine = async () => {
+    if (!routineToEdit) return;
+
+    try {
+      const { error } = await supabase
+        .from("user_routines")
+        .update({
+          name: editFormData.name,
+          description: editFormData.description,
+        })
+        .eq("id", routineToEdit.id);
+
+      if (error) throw error;
+
+      setShowEditRoutineModal(false);
+      setRoutineToEdit(null);
+      await loadData();
+    } catch (error) {
+      console.error("Error updating routine:", error);
+      Alert.alert("Error", "Failed to update routine");
+    }
+  };
+
+  // ✅ RESTORED: Original routine item rendering with full TouchableOpacity
   const renderRoutineItem = (
     routine: RoutineWithCompletion,
     index: number,
@@ -925,15 +833,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     const panResponder = createPanResponder(index, section);
     const isBeingDragged =
       isDragging && draggedIndex === index && draggedSection === section;
-
-    // FIXED: Only show drop zone if we're dragging within the same section
     const isDropZone =
       dropZoneIndex === index &&
       isDragActive &&
       !isBeingDragged &&
-      draggedSection === section; // Key fix: only same section
-
-    // ENHANCED: Check if this section is in edit mode
+      draggedSection === section;
     const isInEditMode = isEditMode && editSection === section;
 
     return (
@@ -941,21 +845,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         key={routine.id}
         style={[
           styles.routineItem,
-          // ENHANCED: Better visual feedback for dragged items
           isBeingDragged && {
-            transform: [
-              { translateY: dragY },
-              { scale: dragScale }, // Add scale animation
-            ],
-            opacity: dragOpacity, // Add opacity animation
-            elevation: 12, // Higher elevation for more dramatic shadow
-            shadowColor: "#007AFF", // Colored shadow for better visibility
+            transform: [{ translateY: dragY }, { scale: dragScale }] as any,
+            opacity: dragOpacity,
+            elevation: 12,
+            shadowColor: "#007AFF",
             shadowOffset: { width: 0, height: 6 },
             shadowOpacity: 0.4,
             shadowRadius: 12,
-            zIndex: 1000, // Ensure it's on top
+            zIndex: 1000,
           },
-          // ENHANCED: Drop zone indicator
           isDropZone && {
             backgroundColor: colors.surface,
             borderColor: "#007AFF",
@@ -965,7 +864,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           },
         ]}
       >
-        {/* ENHANCED: Drop zone indicator overlay */}
+        {/* Drop zone indicator overlay */}
         {isDropZone && (
           <Animated.View
             style={[
@@ -987,9 +886,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           style={[
             styles.routineContent,
             {
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-              // ENHANCED: Better visual state for dragged items
+              backgroundColor: colors.surface,
+              borderColor: routine.isCompleted ? "#007AFF" : colors.border,
               ...(isBeingDragged && {
                 backgroundColor: colors.surface,
                 borderColor: "#007AFF",
@@ -998,6 +896,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             },
           ]}
         >
+          {/* ✅ RESTORED: Full TouchableOpacity for entire routine item */}
           <TouchableOpacity
             style={styles.routineLeft}
             onPress={() =>
@@ -1009,9 +908,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               style={[
                 styles.checkbox,
                 {
-                  borderColor: routine.isCompleted
-                    ? "#007AFF"
-                    : colors.textSecondary,
+                  borderColor: routine.isCompleted ? "#007AFF" : colors.border,
                 },
                 routine.isCompleted && styles.checkboxCompleted,
               ]}
@@ -1041,24 +938,27 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 </Text>
               )}
               {routine.target_value && routine.target_unit && (
-                <Text style={styles.routineTarget}>
+                <Text
+                  style={[
+                    styles.routineTarget,
+                    { color: colors.textSecondary },
+                  ]}
+                >
                   Target: {routine.target_value} {routine.target_unit}
                 </Text>
               )}
             </View>
           </TouchableOpacity>
 
-          {/* ENHANCED: Edit mode - show edit and delete buttons, Normal mode - show drag handle */}
+          {/* Edit mode - show edit and delete buttons, Normal mode - show drag handle */}
           {isInEditMode ? (
             <View style={styles.editModeButtons}>
-              {/* ENHANCED: Edit routine button */}
               <TouchableOpacity
                 style={styles.editRoutineButton}
                 onPress={() => handleEditRoutine(routine)}
               >
                 <Ionicons name="create-outline" size={20} color="#007AFF" />
               </TouchableOpacity>
-              {/* Delete routine button */}
               <TouchableOpacity
                 style={styles.deleteButton}
                 onPress={() => handleDeleteRoutine(routine, section)}
@@ -1151,13 +1051,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </Text>
         </View>
 
+        {/* ✅ RESTORED: Original calendar container */}
         <View
           style={[
             styles.calendarContainer,
-            {
-              backgroundColor: colors.surface,
-              borderBottomColor: colors.border,
-            },
+            { backgroundColor: colors.surface },
           ]}
         >
           <View style={styles.calendarGrid}>
@@ -1192,6 +1090,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     style={[
                       styles.dayBoxIndicator,
                       hasRoutines && styles.dayBoxIndicatorActive,
+                      {
+                        backgroundColor: hasRoutines
+                          ? isSelected
+                            ? "#fff"
+                            : "#007AFF"
+                          : "transparent",
+                      },
                     ]}
                   />
                 </TouchableOpacity>
@@ -1200,13 +1105,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
+        {/* ✅ RESTORED: Original Daily Routines Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
             <Ionicons name="today" size={24} color="#007AFF" />
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Daily Routines
             </Text>
-            {/* ENHANCED: Edit button for daily routines */}
             <TouchableOpacity
               onPress={() => toggleEditMode("daily")}
               style={[
@@ -1227,12 +1132,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() =>
-                navigation.navigate("AddRoutine", {
-                  selectedDay,
-                  isWeekly: false,
-                })
-              }
+              onPress={() => {
+                loadAvailableRoutines();
+                setShowDayRoutineModal(true);
+              }}
               style={styles.addButton}
             >
               <Ionicons name="add" size={20} color="#007AFF" />
@@ -1262,29 +1165,23 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           )}
         </View>
 
+        {/* ✅ RESTORED: Original Weekly Routines Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="trophy" size={24} color="#ffd700" />
-            <View style={styles.titleAndTimer}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Weekly Goals
-              </Text>
-              {/* FIXED: Timer directly next to Weekly Goals title */}
-              <View
-                style={[styles.weekTimer, { backgroundColor: colors.card }]}
+            <Ionicons name="calendar" size={24} color="#007AFF" />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Weekly Goals
+            </Text>
+            <View
+              style={[styles.weekTimer, { backgroundColor: colors.background }]}
+            >
+              <Ionicons name="time" size={16} color={colors.textSecondary} />
+              <Text
+                style={[styles.weekTimerText, { color: colors.textSecondary }]}
               >
-                <Ionicons name="time" size={12} color="#007AFF" />
-                <Text
-                  style={[
-                    styles.weekTimerText,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {weekTimeRemaining}
-                </Text>
-              </View>
+                {weekTimeRemaining}
+              </Text>
             </View>
-            {/* ENHANCED: Edit button for weekly goals */}
             <TouchableOpacity
               onPress={() => toggleEditMode("weekly")}
               style={[
@@ -1307,10 +1204,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() =>
-                navigation.navigate("AddRoutine", { isWeekly: true })
-              }
               style={styles.addButton}
+              onPress={() => navigation.navigate("AddRoutine")}
             >
               <Ionicons name="add" size={20} color="#007AFF" />
             </TouchableOpacity>
@@ -1325,7 +1220,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Text
                 style={[styles.emptyStateText, { color: colors.textSecondary }]}
               >
-                No weekly routines set up yet
+                No weekly goals yet
               </Text>
               <Text
                 style={[
@@ -1333,123 +1228,29 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   { color: colors.textTertiary },
                 ]}
               >
-                Add weekly goals to track longer-term habits!
+                Create weekly goals to track larger objectives!
               </Text>
             </View>
           )}
         </View>
       </ScrollView>
 
-      {/* ENHANCED: Edit Routine Modal - THE MISSING MODAL! */}
-      <Modal
-        visible={showEditRoutineModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <SafeAreaView
-          style={[
-            styles.modalContainer,
-            { backgroundColor: colors.background },
-          ]}
-        >
-          <View
-            style={[styles.modalHeader, { borderBottomColor: colors.border }]}
-          >
-            <TouchableOpacity onPress={cancelEditRoutine}>
-              <Text style={[styles.modalCancelButton, { color: "#666" }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Edit Routine
-            </Text>
-            <TouchableOpacity onPress={saveEditedRoutine}>
-              <Text style={[styles.modalCancelButton, { color: "#007AFF" }]}>
-                Save
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.modalContent}>
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>
-                Title *
-              </Text>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
-                    color: colors.text,
-                  },
-                ]}
-                placeholder="Enter routine title..."
-                placeholderTextColor={colors.textSecondary}
-                value={editFormData.name}
-                onChangeText={(text) =>
-                  setEditFormData({ ...editFormData, name: text })
-                }
-                maxLength={20}
-              />
-              <Text style={[styles.charCount, { color: colors.textSecondary }]}>
-                {editFormData.name.length}/20
-              </Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>
-                Description (Optional)
-              </Text>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  styles.textArea,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
-                    color: colors.text,
-                  },
-                ]}
-                placeholder="Enter description..."
-                placeholderTextColor={colors.textSecondary}
-                value={editFormData.description}
-                onChangeText={(text) =>
-                  setEditFormData({ ...editFormData, description: text })
-                }
-                maxLength={35}
-                multiline
-                numberOfLines={3}
-              />
-              <Text style={[styles.charCount, { color: colors.textSecondary }]}>
-                {editFormData.description.length}/35
-              </Text>
-            </View>
-          </View>
-        </SafeAreaView>
-      </Modal>
-
-      {/* ENHANCED: Delete Confirmation Modal */}
+      {/* ✅ RESTORED: Delete Confirmation Modal */}
       <Modal
         visible={showDeleteConfirm}
-        transparent={true}
+        transparent
         animationType="fade"
+        onRequestClose={cancelDelete}
       >
-        <View style={styles.deleteModalOverlay}>
+        <View style={styles.modalOverlay}>
           <View
-            style={[
-              styles.deleteModalContent,
-              { backgroundColor: colors.surface },
-            ]}
+            style={[styles.deleteModal, { backgroundColor: colors.surface }]}
           >
             <Text style={[styles.deleteModalTitle, { color: colors.text }]}>
               Delete Routine
             </Text>
             <Text
-              style={[
-                styles.deleteModalMessage,
-                { color: colors.textSecondary },
-              ]}
+              style={[styles.deleteModalText, { color: colors.textSecondary }]}
             >
               Are you sure you want to delete "{routineToDelete?.routine.name}"?
               This action cannot be undone.
@@ -1472,7 +1273,80 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </Modal>
 
-      {/* Day Routine Assignment Modal */}
+      {/* ✅ RESTORED: Edit Routine Modal */}
+      <Modal
+        visible={showEditRoutineModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditRoutineModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.editModal, { backgroundColor: colors.surface }]}>
+            <View style={styles.editModalHeader}>
+              <TouchableOpacity onPress={() => setShowEditRoutineModal(false)}>
+                <Text style={[styles.editModalCancel, { color: "#007AFF" }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <Text style={[styles.editModalTitle, { color: colors.text }]}>
+                Edit Routine
+              </Text>
+              <TouchableOpacity onPress={saveEditedRoutine}>
+                <Text style={[styles.editModalSave, { color: "#007AFF" }]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.editModalContent}>
+              <Text style={[styles.editModalLabel, { color: colors.text }]}>
+                Name
+              </Text>
+              <TextInput
+                style={[
+                  styles.editModalInput,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+                value={editFormData.name}
+                onChangeText={(text) =>
+                  setEditFormData((prev) => ({ ...prev, name: text }))
+                }
+                placeholder="Routine name"
+                placeholderTextColor={colors.textTertiary}
+              />
+
+              <Text style={[styles.editModalLabel, { color: colors.text }]}>
+                Description
+              </Text>
+              <TextInput
+                style={[
+                  styles.editModalInput,
+                  styles.editModalTextArea,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+                value={editFormData.description}
+                onChangeText={(text) =>
+                  setEditFormData((prev) => ({ ...prev, description: text }))
+                }
+                placeholder="Description (optional)"
+                placeholderTextColor={colors.textTertiary}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ✅ RESTORED: Day Routine Assignment Modal */}
       <Modal
         visible={showDayRoutineModal}
         animationType="slide"
@@ -1508,7 +1382,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   style={[
                     styles.availableRoutineItem,
                     {
-                      backgroundColor: colors.card,
+                      backgroundColor: colors.surface,
                       borderBottomColor: colors.border,
                     },
                   ]}
@@ -1520,8 +1394,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 >
                   <View style={styles.routineIcon}>
                     <Ionicons
-                      name={(routine.icon as any) || "checkmark-circle"}
-                      size={24}
+                      name={routine.icon as any}
+                      size={20}
                       color="#007AFF"
                     />
                   </View>
@@ -1575,10 +1449,56 @@ const styles = StyleSheet.create({
   headerDate: {
     fontSize: 16,
   },
+  calendarContainer: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  dayBox: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+    marginHorizontal: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  dayBoxToday: {
+    backgroundColor: "rgba(0, 122, 255, 0.1)",
+    borderColor: "#007AFF",
+  },
+  dayBoxSelected: {
+    backgroundColor: "#007AFF",
+  },
+  dayBoxName: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  dayBoxNameToday: {
+    color: "#007AFF",
+    fontWeight: "600",
+  },
+  dayBoxNameSelected: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  dayBoxIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 4,
+  },
+  dayBoxIndicatorActive: {
+    opacity: 1,
+  },
   section: {
     marginVertical: 8,
     paddingVertical: 16,
     paddingHorizontal: 16,
+    marginHorizontal: 16,
+    borderRadius: 12,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -1593,6 +1513,14 @@ const styles = StyleSheet.create({
   },
   addButton: {
     padding: 4,
+  },
+  editButton: {
+    padding: 6,
+    marginRight: 8,
+    borderRadius: 12,
+  },
+  editButtonActive: {
+    backgroundColor: "#34c759",
   },
   weekTimer: {
     flexDirection: "row",
@@ -1654,178 +1582,43 @@ const styles = StyleSheet.create({
   },
   routineTarget: {
     fontSize: 12,
-    color: "#007AFF",
     marginTop: 2,
-    fontWeight: "500",
+    fontStyle: "italic",
   },
-  emptyState: {
-    alignItems: "center",
-    paddingVertical: 40,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    textAlign: "center",
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    textAlign: "center",
-    marginTop: 8,
-  },
-  calendarContainer: {
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-  },
-  calendarGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  dayBox: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 12,
-    marginHorizontal: 2,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "transparent",
-    minHeight: 65,
-    justifyContent: "center",
-  },
-  dayBoxToday: {
-    backgroundColor: "#e6f3ff",
-    borderColor: "#007AFF",
-  },
-  dayBoxSelected: {
-    backgroundColor: "#007AFF",
-    borderColor: "#007AFF",
-  },
-  dayBoxName: {
-    fontSize: 13,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  dayBoxNameToday: {
-    color: "#007AFF",
-    fontWeight: "700",
-  },
-  dayBoxNameSelected: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-  dayBoxIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  dayBoxIndicatorActive: {
-    backgroundColor: "#34c759",
-  },
-  // ENHANCED: Edit button styles
-  editButton: {
-    padding: 8,
-    marginRight: 8,
-    borderRadius: 6,
-    backgroundColor: "rgba(102, 102, 102, 0.1)",
-  },
-  editButtonActive: {
-    backgroundColor: "rgba(52, 199, 89, 0.1)",
-  },
-  // ENHANCED: Title and timer container for proper positioning
-  titleAndTimer: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    gap: 8,
-  },
-  // ENHANCED: Edit mode buttons container
   editModeButtons: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  // ENHANCED: Edit routine button styles
   editRoutineButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: "rgba(0, 122, 255, 0.1)",
+    padding: 8,
   },
-  // ENHANCED: Delete button styles
   deleteButton: {
+    padding: 4,
+  },
+  emptyState: {
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 32,
   },
-  // Modal styles
-  modalContainer: {
-    flex: 1,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  modalCancelButton: {
-    fontSize: 16,
-  },
-  modalContent: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 20,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  inputLabel: {
+  emptyStateText: {
     fontSize: 16,
     fontWeight: "500",
     marginBottom: 8,
   },
-  textInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
+  emptyStateSubtext: {
+    fontSize: 14,
+    textAlign: "center",
   },
-  textArea: {
-    height: 80,
-    textAlignVertical: "top",
-  },
-  charCount: {
-    fontSize: 12,
-    textAlign: "right",
-    marginTop: 4,
-  },
-  // ENHANCED: Delete modal styles
-  deleteModalOverlay: {
+  modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 20,
   },
-  deleteModalContent: {
+  deleteModal: {
+    marginHorizontal: 40,
     borderRadius: 16,
     padding: 24,
-    width: "100%",
-    maxWidth: 320,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
   },
   deleteModalTitle: {
     fontSize: 20,
@@ -1833,7 +1626,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: "center",
   },
-  deleteModalMessage: {
+  deleteModalText: {
     fontSize: 16,
     lineHeight: 22,
     marginBottom: 24,
@@ -1866,33 +1659,73 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  // ENHANCED: Improved drag handle styles
-  dragHandle: {
+  editModal: {
+    marginHorizontal: 20,
+    borderRadius: 16,
+    maxHeight: "80%",
+  },
+  editModalHeader: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minWidth: 44, // Larger touch target
-    minHeight: 44, // Larger touch target
-    borderRadius: 8, // Rounded corners
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0, 0, 0, 0.1)",
   },
-  // ENHANCED: Active drag handle state
-  dragHandleActive: {
-    backgroundColor: "rgba(0, 122, 255, 0.1)", // Light blue background when active
+  editModalCancel: {
+    fontSize: 16,
   },
-  dragIcon: {
+  editModalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  editModalSave: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  editModalContent: {
+    padding: 20,
+  },
+  editModalLabel: {
+    fontSize: 16,
+    fontWeight: "500",
+    marginBottom: 8,
+  },
+  editModalInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  editModalTextArea: {
+    height: 80,
+    textAlignVertical: "top",
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
   },
-  // ENHANCED: Active drag icon state
-  dragIconActive: {
-    transform: [{ scale: 1.1 }], // Slightly larger when active
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
   },
-  dragLine: {
-    width: 20, // Slightly wider for better visibility
-    height: 3, // Slightly thicker
-    marginVertical: 1.5, // Better spacing
-    borderRadius: 1.5, // Rounded edges
+  modalCancelButton: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  modalContent: {
+    flex: 1,
+    padding: 16,
   },
   availableRoutineItem: {
     flexDirection: "row",
@@ -1911,6 +1744,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+  },
+  dragHandle: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minWidth: 44,
+    minHeight: 44,
+    borderRadius: 8,
+  },
+  dragHandleActive: {
+    backgroundColor: "rgba(0, 122, 255, 0.1)",
+  },
+  dragIcon: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dragIconActive: {
+    transform: [{ scale: 1.1 }],
+  },
+  dragLine: {
+    width: 20,
+    height: 3,
+    marginVertical: 1.5,
+    borderRadius: 1.5,
   },
 });
 
