@@ -94,6 +94,9 @@ export interface Database {
           is_active: boolean | null;
           created_at: string;
           updated_at: string;
+          // NEW: Calendar-specific fields
+          scheduled_time: string | null;      // Format: "HH:MM"
+          estimated_duration: number | null;  // Duration in minutes
         };
         Insert: {
           id?: string;
@@ -109,6 +112,9 @@ export interface Database {
           is_active?: boolean | null;
           created_at?: string;
           updated_at?: string;
+          // NEW: Calendar-specific fields
+          scheduled_time?: string | null;
+          estimated_duration?: number | null;
         };
         Update: {
           id?: string;
@@ -124,6 +130,9 @@ export interface Database {
           is_active?: boolean | null;
           created_at?: string;
           updated_at?: string;
+          // NEW: Calendar-specific fields
+          scheduled_time?: string | null;
+          estimated_duration?: number | null;
         };
       };
       user_day_routines: {

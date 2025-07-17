@@ -34,9 +34,22 @@ import { useTheme } from "../../../ThemeContext";
 import { StreakSyncService } from "../../services/StreakSyncService";
 
 // NEW: Calendar-specific interfaces
-interface ScheduledRoutine extends UserRoutine {
-  scheduled_time?: string; // Format: "HH:MM"
-  estimated_duration?: number; // Duration in minutes
+interface ScheduledRoutine {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  is_daily: boolean | null;
+  is_weekly: boolean | null;
+  target_value: number | null;
+  target_unit: string | null;
+  sort_order: number | null;
+  is_active: boolean | null;
+  created_at: string;
+  updated_at: string;
+  scheduled_time: string | null; // Format: "HH:MM"
+  estimated_duration: number | null; // Duration in minutes
   isCompleted: boolean;
   completionId?: string;
 }
@@ -46,9 +59,22 @@ interface TimeSlot {
   routines: ScheduledRoutine[];
 }
 
-interface RoutineWithCompletion extends UserRoutine {
-  scheduled_time?: string; // Add this property
-  estimated_duration?: number; // Add this property
+interface RoutineWithCompletion {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  is_daily: boolean | null;
+  is_weekly: boolean | null;
+  target_value: number | null;
+  target_unit: string | null;
+  sort_order: number | null;
+  is_active: boolean | null;
+  created_at: string;
+  updated_at: string;
+  scheduled_time: string | null;
+  estimated_duration: number | null;
   isCompleted: boolean;
   completionId?: string;
 }
@@ -793,6 +819,9 @@ const styles = StyleSheet.create({
   // Day picker styles
   dayPicker: {
     marginTop: 8,
+  },
+  dayPickerContent: {
+    paddingHorizontal: 4,
   },
   dayButton: {
     paddingHorizontal: 16,
