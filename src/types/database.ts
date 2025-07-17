@@ -1,3 +1,8 @@
+// ============================================
+// COMPLETE DATABASE TYPES WITH AI INTEGRATION
+// Replace your entire src/types/database.ts with this
+// ============================================
+
 export interface Database {
   public: {
     Tables: {
@@ -240,7 +245,7 @@ export interface Database {
           updated_at?: string;
         };
       };
-      // NEW: Leaderboard view type
+      // NEW: Leaderboard view type (kept from your original)
       leaderboard_view: {
         Row: {
           id: string;
@@ -249,6 +254,62 @@ export interface Database {
           longest_streak: number;
           join_date: string;
           rank: number;
+        };
+      };
+      // NEW: AI Chat Tables
+      chat_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          created_at: string;
+          updated_at: string;
+          is_active: boolean;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title?: string;
+          created_at?: string;
+          updated_at?: string;
+          is_active?: boolean;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          created_at?: string;
+          updated_at?: string;
+          is_active?: boolean;
+        };
+      };
+      chat_messages: {
+        Row: {
+          id: string;
+          session_id: string;
+          user_id: string;
+          role: 'user' | 'assistant' | 'system';
+          content: string;
+          metadata: Record<string, any>;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          user_id: string;
+          role: 'user' | 'assistant' | 'system';
+          content: string;
+          metadata?: Record<string, any>;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          user_id?: string;
+          role?: 'user' | 'assistant' | 'system';
+          content?: string;
+          metadata?: Record<string, any>;
+          created_at?: string;
         };
       };
     };
@@ -265,6 +326,7 @@ export interface Database {
       };
     };
     Functions: {
+      // Existing function (kept from your original)
       update_user_streaks: {
         Args: {
           user_id: string;
@@ -273,11 +335,19 @@ export interface Database {
         };
         Returns: void;
       };
+      // NEW: AI function
+      get_user_schedule_context: {
+        Args: {
+          target_user_id: string;
+          target_day?: number;
+        };
+        Returns: Record<string, any>;
+      };
     };
   };
 }
 
-// Additional types for the app
+// Additional types for the app (kept all your existing types)
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type UserRoutine = Database["public"]["Tables"]["user_routines"]["Row"];
 export type RoutineTemplate =
@@ -289,6 +359,31 @@ export type UserSettings = Database["public"]["Tables"]["user_settings"]["Row"];
 export type UserDayRoutine =
   Database["public"]["Tables"]["user_day_routines"]["Row"];
 
-// NEW: Social types
+// NEW: Social types (kept from your original)
 export type LeaderboardUser =
   Database["public"]["Views"]["leaderboard_view"]["Row"];
+
+// NEW: AI Chat types
+export type ChatSession = Database["public"]["Tables"]["chat_sessions"]["Row"];
+export type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];
+
+// NEW: AI Schedule Context interface
+export interface ScheduleContext {
+  user_profile: {
+    display_name: string;
+    current_streak: number;
+    longest_streak: number;
+  };
+  routines: Array<{
+    name: string;
+    description: string;
+    icon: string;
+    is_daily: boolean;
+    is_weekly: boolean;
+    target_value: number;
+    target_unit: string;
+    scheduled_days: number[];
+  }>;
+  target_day: number | null;
+  generated_at: string;
+}
