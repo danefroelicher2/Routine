@@ -1,7 +1,7 @@
 // ============================================
-// ENHANCED HOMESCREEN WITH CALENDAR TOGGLE
-// This adds calendar view while preserving ALL existing functionality
-// Replace your src/screens/Home/HomeScreen.tsx with this
+// COMPLETE WORKING HOMESCREEN WITH CALENDAR TOGGLE
+// This preserves ALL existing functionality + adds calendar view
+// Replace your entire src/screens/Home/HomeScreen.tsx with this
 // ============================================
 
 import React, {
@@ -25,7 +25,7 @@ import {
   PanResponder,
   Dimensions,
   TextInput,
-  Switch, // NEW: For calendar toggle
+  Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
@@ -33,7 +33,7 @@ import { UserRoutine } from "../../types/database";
 import { useTheme } from "../../../ThemeContext";
 import { StreakSyncService } from "../../services/StreakSyncService";
 
-// NEW: Calendar-specific interfaces
+// Calendar-specific interfaces
 interface ScheduledRoutine {
   id: string;
   user_id: string;
@@ -48,8 +48,8 @@ interface ScheduledRoutine {
   is_active: boolean | null;
   created_at: string;
   updated_at: string;
-  scheduled_time: string | null; // Format: "HH:MM"
-  estimated_duration: number | null; // Duration in minutes
+  scheduled_time: string | null;
+  estimated_duration: number | null;
   isCompleted: boolean;
   completionId?: string;
 }
@@ -86,7 +86,7 @@ interface HomeScreenProps {
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
 
-  // EXISTING STATE - All preserved exactly as is
+  // ALL EXISTING STATE - Preserved exactly as before
   const [dailyRoutines, setDailyRoutines] = useState<RoutineWithCompletion[]>([]);
   const [weeklyRoutines, setWeeklyRoutines] = useState<RoutineWithCompletion[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -128,11 +128,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const dragOpacity = useRef(new Animated.Value(1)).current;
   const dropZoneOpacity = useRef(new Animated.Value(0)).current;
 
-  // NEW STATE - Calendar functionality only
-  const [isCalendarView, setIsCalendarView] = useState(false); // Toggle state
+  // NEW: Calendar view state
+  const [isCalendarView, setIsCalendarView] = useState(false);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [calendarHours] = useState(() => {
-    // Generate hours from 6 AM to 11 PM
     const hours = [];
     for (let i = 6; i <= 23; i++) {
       hours.push(i);
@@ -154,14 +153,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     { name: "Sat", value: 6 },
   ];
 
-  // NEW: Generate calendar data from existing routines
+  // Generate calendar data
   const generateCalendarData = useCallback(() => {
     const slots: TimeSlot[] = calendarHours.map(hour => ({
       hour,
       routines: []
     }));
 
-    // Add daily routines with scheduled times to appropriate slots
     dailyRoutines.forEach(routine => {
       if (routine.scheduled_time) {
         const [hours, minutes] = routine.scheduled_time.split(':').map(Number);
@@ -169,7 +167,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         if (slotIndex !== -1) {
           slots[slotIndex].routines.push({
             ...routine,
-            estimated_duration: routine.estimated_duration || 30, // Default 30 min
+            estimated_duration: routine.estimated_duration || 30,
           });
         }
       }
@@ -178,7 +176,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setTimeSlots(slots);
   }, [dailyRoutines, calendarHours]);
 
-  // NEW: Format time for display
+  // Format time for display
   const formatTime = (hour: number): string => {
     if (hour === 0) return "12:00 AM";
     if (hour === 12) return "12:00 PM";
@@ -231,7 +229,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return timePeriodVariations[index];
   }, []);
 
-  // EXISTING useEffect and functions - All preserved
   useEffect(() => {
     loadData();
   }, [selectedDay]);
@@ -244,7 +241,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return () => clearInterval(interval);
   }, []);
 
-  // NEW: Update calendar when view changes
   useEffect(() => {
     if (isCalendarView) {
       generateCalendarData();
@@ -368,10 +364,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ALL OTHER EXISTING FUNCTIONS PRESERVED...
-  // (toggleRoutine, saveRoutineOrder, createDragHandlers, etc.)
-  // I'll include the key ones but keeping this focused on the new calendar feature
-
   const toggleRoutine = async (routine: RoutineWithCompletion, section: "daily" | "weekly") => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -419,7 +411,74 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // NEW: Calendar view render function
+  // EXISTING: Load available routines for day modal
+  const loadAvailableRoutines = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("user_routines")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .eq("is_weekly", false)
+        .order("name");
+
+      if (error) throw error;
+
+      setAvailableRoutines(data || []);
+    } catch (error) {
+      console.error("Error loading available routines:", error);
+    }
+  };
+
+  // EXISTING: Toggle routine for specific day
+  const toggleRoutineForDay = async (routineId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const currentRoutines = daySpecificRoutines[selectedDay] || [];
+      const isAssigned = currentRoutines.includes(routineId);
+
+      if (isAssigned) {
+        // Remove routine from day
+        const { error } = await supabase
+          .from("user_day_routines")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("routine_id", routineId)
+          .eq("day_of_week", selectedDay);
+
+        if (error) throw error;
+      } else {
+        // Add routine to day
+        const { error } = await supabase
+          .from("user_day_routines")
+          .insert({
+            user_id: user.id,
+            routine_id: routineId,
+            day_of_week: selectedDay,
+          });
+
+        if (error) throw error;
+      }
+
+      await loadData();
+    } catch (error) {
+      console.error("Error toggling routine for day:", error);
+      Alert.alert("Error", "Failed to update routine schedule");
+    }
+  };
+
+  // EXISTING: Open day routine modal
+  const openDayRoutineModal = () => {
+    loadAvailableRoutines();
+    setShowDayRoutineModal(true);
+  };
+
+  // Calendar view render
   const renderCalendarView = () => {
     return (
       <ScrollView style={styles.calendarContainer} showsVerticalScrollIndicator={false}>
@@ -435,7 +494,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 <TouchableOpacity
                   style={styles.emptySlot}
                   onPress={() => {
-                    // TODO: Open time-specific routine picker
                     Alert.alert("Add Routine", `Add a routine for ${formatTime(slot.hour)}`);
                   }}
                 >
@@ -493,10 +551,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     );
   };
 
-  // EXISTING render functions preserved...
+  // EXISTING: Render daily routines
   const renderDailyRoutines = () => {
     if (isCalendarView) {
-      return null; // Don't render in calendar view
+      return null;
     }
 
     return (
@@ -508,7 +566,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </Text>
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => navigation.navigate("AddRoutine")}
+            onPress={openDayRoutineModal}
           >
             <Ionicons name="add" size={24} color="#007AFF" />
           </TouchableOpacity>
@@ -568,9 +626,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     );
   };
 
+  // EXISTING: Render weekly routines
   const renderWeeklyRoutines = () => {
     if (isCalendarView) {
-      return null; // Don't render in calendar view
+      return null;
     }
 
     return (
@@ -644,7 +703,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* ENHANCED HEADER with Calendar Toggle */}
+      {/* HEADER with Calendar Toggle */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
@@ -660,7 +719,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </Text>
           </View>
 
-          {/* NEW: Calendar Toggle */}
+          {/* Calendar Toggle */}
           <View style={styles.headerRight}>
             <View style={styles.toggleContainer}>
               <Ionicons
@@ -686,45 +745,42 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Day Picker - Only show in list view */}
-        {!isCalendarView && (
-          <View style={styles.dayPicker}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.dayPickerContent}
-            >
-              {daysOfWeek.map((day) => (
-                <TouchableOpacity
-                  key={day.value}
+        {/* RESTORED: Day Picker - Always show */}
+        <View style={styles.dayPicker}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.dayPickerContent}
+          >
+            {daysOfWeek.map((day) => (
+              <TouchableOpacity
+                key={day.value}
+                style={[
+                  styles.dayButton,
+                  selectedDay === day.value && styles.dayButtonActive,
+                  {
+                    backgroundColor: selectedDay === day.value ? "#007AFF" : colors.surface,
+                    borderColor: colors.border
+                  }
+                ]}
+                onPress={() => setSelectedDay(day.value)}
+              >
+                <Text
                   style={[
-                    styles.dayButton,
-                    selectedDay === day.value && styles.dayButtonActive,
-                    {
-                      backgroundColor: selectedDay === day.value ? "#007AFF" : colors.surface,
-                      borderColor: colors.border
-                    }
+                    styles.dayButtonText,
+                    { color: selectedDay === day.value ? "#FFFFFF" : colors.text }
                   ]}
-                  onPress={() => setSelectedDay(day.value)}
                 >
-                  <Text
-                    style={[
-                      styles.dayButtonText,
-                      { color: selectedDay === day.value ? "#FFFFFF" : colors.text }
-                    ]}
-                  >
-                    {day.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+                  {day.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
       </View>
 
       {/* CONTENT - Switch between views */}
       {isCalendarView ? (
-        // NEW: Calendar View
         <View style={styles.calendarViewContainer}>
           <View style={styles.calendarHeader}>
             <Text style={[styles.calendarTitle, { color: colors.text }]}>
@@ -732,9 +788,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </Text>
             <TouchableOpacity
               style={[styles.addCalendarButton, { backgroundColor: "#007AFF" }]}
-              onPress={() => {
-                Alert.alert("Add Routine", "Calendar-specific routine creation coming soon!");
-              }}
+              onPress={() => navigation.navigate("AddRoutine")}
             >
               <Ionicons name="add" size={20} color="#FFFFFF" />
               <Text style={styles.addCalendarButtonText}>Add</Text>
@@ -743,7 +797,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           {renderCalendarView()}
         </View>
       ) : (
-        // EXISTING: List View (completely preserved)
         <ScrollView
           style={styles.scrollView}
           refreshControl={
@@ -760,13 +813,74 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           {renderWeeklyRoutines()}
         </ScrollView>
       )}
+
+      {/* RESTORED: Day Routine Modal */}
+      <Modal
+        visible={showDayRoutineModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setShowDayRoutineModal(false)}>
+              <Text style={[styles.modalCancel, { color: "#007AFF" }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {daysOfWeek.find(d => d.value === selectedDay)?.name} Routines
+            </Text>
+            <TouchableOpacity onPress={() => navigation.navigate("AddRoutine")}>
+              <Text style={[styles.modalAdd, { color: "#007AFF" }]}>New</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            <Text style={[styles.modalInstructions, { color: colors.textSecondary }]}>
+              Select which routines to include on {daysOfWeek.find(d => d.value === selectedDay)?.name}s:
+            </Text>
+
+            {availableRoutines.map((routine) => {
+              const isAssigned = (daySpecificRoutines[selectedDay] || []).includes(routine.id);
+              return (
+                <TouchableOpacity
+                  key={routine.id}
+                  style={[
+                    styles.availableRoutineItem,
+                    {
+                      backgroundColor: isAssigned ? "#E8F5E8" : colors.surface,
+                      borderColor: isAssigned ? "#4CAF50" : colors.border
+                    }
+                  ]}
+                  onPress={() => toggleRoutineForDay(routine.id)}
+                >
+                  <View style={styles.routineIcon}>
+                    <Ionicons name={routine.icon as any || "checkbox"} size={20} color="#007AFF" />
+                  </View>
+                  <View style={styles.routineInfo}>
+                    <Text style={[styles.routineName, { color: colors.text }]}>
+                      {routine.name}
+                    </Text>
+                    {routine.description && (
+                      <Text style={[styles.routineDescription, { color: colors.textSecondary }]}>
+                        {routine.description}
+                      </Text>
+                    )}
+                  </View>
+                  <Ionicons
+                    name={isAssigned ? "checkmark-circle" : "add-circle"}
+                    size={24}
+                    color={isAssigned ? "#34c759" : "#007AFF"}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
 
-// ENHANCED STYLES - Existing styles preserved + new calendar styles
 const styles = StyleSheet.create({
-  // EXISTING STYLES - All preserved exactly
   container: {
     flex: 1,
   },
@@ -795,8 +909,6 @@ const styles = StyleSheet.create({
   headerDate: {
     fontSize: 16,
   },
-
-  // NEW: Header right with toggle
   headerRight: {
     alignItems: 'flex-end',
   },
@@ -815,8 +927,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     transform: [{ scale: 0.8 }],
   },
-
-  // Day picker styles
   dayPicker: {
     marginTop: 8,
   },
@@ -837,8 +947,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
-
-  // EXISTING SECTION STYLES - All preserved
   section: {
     marginVertical: 8,
     paddingVertical: 16,
@@ -871,8 +979,6 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontWeight: "500",
   },
-
-  // EXISTING ROUTINE ITEM STYLES - All preserved
   routineItem: {
     marginBottom: 12,
   },
@@ -925,7 +1031,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 
-  // NEW: Calendar View Styles
+  // Calendar View Styles
   calendarViewContainer: {
     flex: 1,
   },
@@ -1040,7 +1146,58 @@ const styles = StyleSheet.create({
   calendarRoutineOptions: {
     padding: 4,
   },
+
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  modalCancel: {
+    fontSize: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  modalAdd: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  modalInstructions: {
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  availableRoutineItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  routineIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f0f8ff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
 });
 
 export default HomeScreen;
-
