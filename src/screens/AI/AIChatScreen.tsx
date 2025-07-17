@@ -1,5 +1,5 @@
 // ============================================
-// AI CHAT SCREEN WITH MARKDOWN SUPPORT
+// AI CHAT SCREEN WITH CLAUDE-LIKE UI
 // Replace your entire src/screens/AI/AIChatScreen.tsx with this
 // ============================================
 
@@ -115,19 +115,8 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
         try {
             const connected = await aiService.testConnection();
             setIsConnected(connected);
-
-            if (!connected) {
-                Alert.alert(
-                    'AI Not Connected',
-                    'Please add your DeepSeek API key in the app settings.',
-                    [
-                        { text: 'Cancel' },
-                        { text: 'Open Settings', onPress: () => navigation.navigate('AISettings') }
-                    ]
-                );
-            }
         } catch (error) {
-            console.error('Connection check failed:', error);
+            console.error('Error checking AI connection:', error);
             setIsConnected(false);
         }
     };
@@ -261,7 +250,7 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     ];
 
     /**
-     * Render individual message with markdown support
+     * Render individual message with Claude-like styling
      */
     const renderMessage = ({ item }: { item: ChatMessageWithLoading }) => {
         const isUser = item.role === 'user';
@@ -269,117 +258,135 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
 
         return (
             <View style={[
-                styles.messageContainer,
-                isUser ? styles.userMessage : styles.assistantMessage,
+                styles.messageRow,
+                isUser ? styles.userMessageRow : styles.assistantMessageRow,
             ]}>
+                {/* Avatar */}
                 {!isUser && (
-                    <View style={[styles.avatarContainer, { backgroundColor: colors.surface }]}>
-                        <Ionicons name="chatbubble-ellipses" size={20} color="#007AFF" />
+                    <View style={styles.avatarContainer}>
+                        <View style={[styles.avatar, { backgroundColor: colors.surface }]}>
+                            <Ionicons name="sparkles" size={16} color="#007AFF" />
+                        </View>
                     </View>
                 )}
 
+                {/* Message Content */}
                 <View style={[
-                    styles.messageBubble,
-                    {
-                        backgroundColor: isUser ? '#007AFF' : colors.surface,
-                        borderColor: colors.border,
-                    },
+                    styles.messageContent,
+                    isUser ? styles.userMessageContent : styles.assistantMessageContent,
                 ]}>
-                    {isLoading ? (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="small" color={colors.textSecondary} />
-                            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-                                AI is thinking...
-                            </Text>
-                        </View>
-                    ) : isUser ? (
-                        // User messages - plain text (no markdown)
-                        <Text style={[
-                            styles.messageText,
-                            { color: '#FFFFFF' },
-                        ]}>
-                            {item.content}
-                        </Text>
-                    ) : (
-                        // AI messages - render with markdown
-                        <Markdown
-                            style={{
-                                body: {
-                                    color: colors.text,
-                                    fontSize: 16,
-                                    lineHeight: 22,
-                                    fontFamily: 'System',
-                                },
-                                paragraph: {
-                                    marginTop: 0,
-                                    marginBottom: 8,
-                                    color: colors.text,
-                                    fontSize: 16,
-                                    lineHeight: 22,
-                                },
-                                strong: {
-                                    fontWeight: 'bold',
-                                    color: colors.text,
-                                },
-                                em: {
-                                    fontStyle: 'italic',
-                                    color: colors.text,
-                                },
-                                code_inline: {
-                                    backgroundColor: colors.border,
-                                    paddingHorizontal: 4,
-                                    paddingVertical: 2,
-                                    borderRadius: 4,
-                                    fontFamily: 'monospace',
-                                    fontSize: 14,
-                                    color: colors.text,
-                                },
-                                bullet_list: {
-                                    marginVertical: 4,
-                                },
-                                ordered_list: {
-                                    marginVertical: 4,
-                                },
-                                list_item: {
-                                    marginVertical: 2,
-                                    color: colors.text,
-                                    fontSize: 16,
-                                },
-                                blockquote: {
-                                    backgroundColor: colors.border,
-                                    borderLeftWidth: 4,
-                                    borderLeftColor: '#007AFF',
-                                    paddingLeft: 12,
-                                    paddingVertical: 8,
-                                    marginVertical: 4,
-                                },
-                                heading1: {
-                                    fontSize: 18,
-                                    fontWeight: 'bold',
-                                    marginVertical: 8,
-                                    color: colors.text,
-                                },
-                                heading2: {
-                                    fontSize: 17,
-                                    fontWeight: '600',
-                                    marginVertical: 6,
-                                    color: colors.text,
-                                },
-                                text: {
-                                    color: colors.text,
-                                    fontSize: 16,
-                                    lineHeight: 22,
-                                },
-                            }}
-                        >
-                            {item.content}
-                        </Markdown>
-                    )}
+                    <View style={[
+                        styles.messageBubble,
+                        {
+                            backgroundColor: isUser ? '#007AFF' : colors.surface,
+                            borderColor: isUser ? '#007AFF' : colors.border,
+                        },
+                    ]}>
+                        {isLoading ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="small" color="#007AFF" />
+                                <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                                    AI is thinking...
+                                </Text>
+                            </View>
+                        ) : (
+                            <Markdown
+                                style={{
+                                    body: {
+                                        color: isUser ? '#FFFFFF' : colors.text,
+                                        fontSize: 16,
+                                        lineHeight: 24,
+                                        margin: 0,
+                                    },
+                                    paragraph: {
+                                        color: isUser ? '#FFFFFF' : colors.text,
+                                        fontSize: 16,
+                                        lineHeight: 24,
+                                        marginTop: 0,
+                                        marginBottom: 12,
+                                    },
+                                    code_inline: {
+                                        backgroundColor: isUser ? 'rgba(255,255,255,0.2)' : colors.border,
+                                        color: isUser ? '#FFFFFF' : colors.text,
+                                        paddingHorizontal: 4,
+                                        paddingVertical: 2,
+                                        borderRadius: 4,
+                                        fontSize: 14,
+                                        fontFamily: 'Courier',
+                                    },
+                                    code_block: {
+                                        backgroundColor: isUser ? 'rgba(255,255,255,0.1)' : colors.border,
+                                        color: isUser ? '#FFFFFF' : colors.text,
+                                        padding: 12,
+                                        borderRadius: 8,
+                                        fontSize: 14,
+                                        fontFamily: 'Courier',
+                                        marginVertical: 8,
+                                    },
+                                    bullet_list: {
+                                        marginVertical: 4,
+                                    },
+                                    ordered_list: {
+                                        marginVertical: 4,
+                                    },
+                                    list_item: {
+                                        color: isUser ? '#FFFFFF' : colors.text,
+                                        fontSize: 16,
+                                        lineHeight: 24,
+                                        marginBottom: 4,
+                                    },
+                                    blockquote: {
+                                        backgroundColor: isUser ? 'rgba(255,255,255,0.1)' : colors.border,
+                                        borderLeftWidth: 4,
+                                        borderLeftColor: isUser ? '#FFFFFF' : '#007AFF',
+                                        paddingLeft: 12,
+                                        paddingVertical: 8,
+                                        marginVertical: 8,
+                                        borderRadius: 4,
+                                    },
+                                    heading1: {
+                                        fontSize: 20,
+                                        fontWeight: 'bold',
+                                        color: isUser ? '#FFFFFF' : colors.text,
+                                        marginBottom: 8,
+                                        marginTop: 16,
+                                    },
+                                    heading2: {
+                                        fontSize: 18,
+                                        fontWeight: '600',
+                                        color: isUser ? '#FFFFFF' : colors.text,
+                                        marginBottom: 6,
+                                        marginTop: 12,
+                                    },
+                                    heading3: {
+                                        fontSize: 16,
+                                        fontWeight: '600',
+                                        color: isUser ? '#FFFFFF' : colors.text,
+                                        marginBottom: 4,
+                                        marginTop: 8,
+                                    },
+                                    strong: {
+                                        fontWeight: 'bold',
+                                        color: isUser ? '#FFFFFF' : colors.text,
+                                    },
+                                    em: {
+                                        fontStyle: 'italic',
+                                        color: isUser ? '#FFFFFF' : colors.text,
+                                    },
+                                }}
+                            >
+                                {item.content}
+                            </Markdown>
+                        )}
+                    </View>
                 </View>
 
+                {/* User Avatar */}
                 {isUser && (
-                    <View style={[styles.avatarContainer, { backgroundColor: '#007AFF' }]}>
-                        <Ionicons name="person" size={20} color="#FFFFFF" />
+                    <View style={styles.avatarContainer}>
+                        <View style={[styles.avatar, { backgroundColor: '#007AFF' }]}>
+                            <Ionicons name="person" size={16} color="#FFFFFF" />
+                        </View>
                     </View>
                 )}
             </View>
@@ -390,7 +397,7 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
      * Render quick actions
      */
     const renderQuickActions = () => {
-        if (!showQuickActions || messages.length > 2) return null;
+        if (!showQuickActions || messages.length > 1) return null;
 
         return (
             <View style={styles.quickActionsContainer}>
@@ -401,9 +408,14 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
                     {quickActions.map((action, index) => (
                         <TouchableOpacity
                             key={index}
-                            style={[styles.quickActionButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                            style={[
+                                styles.quickActionButton,
+                                {
+                                    backgroundColor: colors.surface,
+                                    borderColor: colors.border,
+                                },
+                            ]}
                             onPress={action.onPress}
-                            disabled={isLoading}
                         >
                             <Ionicons name={action.icon as any} size={24} color="#007AFF" />
                             <Text style={[styles.quickActionTitle, { color: colors.text }]}>
@@ -419,40 +431,34 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
         );
     };
 
-    /**
-     * Render header
-     */
-    const renderHeader = () => (
-        <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-            <View style={styles.headerContent}>
-                <View style={styles.headerLeft}>
-                    <View style={[styles.aiIcon, { backgroundColor: isConnected ? '#00FF7F20' : '#FF000020' }]}>
-                        <Ionicons name="chatbubble-ellipses" size={24} color={isConnected ? '#00FF7F' : '#FF0000'} />
-                    </View>
-                    <View>
-                        <Text style={[styles.headerTitle, { color: colors.text }]}>
-                            AI Assistant
-                        </Text>
-                        <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-                            {isConnected ? 'Connected' : 'Check Settings'}
-                        </Text>
-                    </View>
-                </View>
-
-                <TouchableOpacity
-                    style={styles.settingsButton}
-                    onPress={() => navigation.navigate('AISettings')}
-                >
-                    <Ionicons name="settings-outline" size={24} color={colors.textSecondary} />
-                </TouchableOpacity>
-            </View>
-        </View>
-    );
-
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-            {renderHeader()}
+            {/* Header */}
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
+                <View style={styles.headerContent}>
+                    <View style={styles.headerLeft}>
+                        <View style={[styles.aiIcon, { backgroundColor: '#007AFF' }]}>
+                            <Ionicons name="sparkles" size={24} color="#FFFFFF" />
+                        </View>
+                        <View>
+                            <Text style={[styles.headerTitle, { color: colors.text }]}>
+                                AI Assistant
+                            </Text>
+                            <Text style={[styles.headerSubtitle, { color: isConnected ? '#34C759' : '#FF3B30' }]}>
+                                {isConnected ? 'Connected' : 'Disconnected'}
+                            </Text>
+                        </View>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.settingsButton}
+                        onPress={() => navigation.navigate('AISettings')}
+                    >
+                        <Ionicons name="settings" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                </View>
+            </View>
 
+            {/* Chat Container */}
             <KeyboardAvoidingView
                 style={styles.chatContainer}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -463,23 +469,35 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
                     data={messages}
                     renderItem={renderMessage}
                     keyExtractor={(item) => item.id}
-                    ListFooterComponent={renderQuickActions}
                     contentContainerStyle={styles.messagesList}
                     showsVerticalScrollIndicator={false}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                    ListFooterComponent={renderQuickActions}
+                    onContentSizeChange={() => {
+                        if (messages.length > 0) {
+                            flatListRef.current?.scrollToEnd({ animated: true });
+                        }
+                    }}
                 />
 
-                {/* Input Area */}
-                <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+                {/* Input Container */}
+                <View style={[styles.inputContainer, { borderTopColor: colors.border }]}>
                     <TextInput
-                        style={[styles.textInput, { color: colors.text, borderColor: colors.border }]}
-                        value={inputText}
-                        onChangeText={setInputText}
+                        style={[
+                            styles.textInput,
+                            {
+                                backgroundColor: colors.surface,
+                                borderColor: colors.border,
+                                color: colors.text,
+                            },
+                        ]}
                         placeholder="Ask about your routines, schedule, or productivity..."
                         placeholderTextColor={colors.textSecondary}
+                        value={inputText}
+                        onChangeText={setInputText}
                         multiline
-                        maxLength={1000}
-                        editable={!isLoading && isConnected}
+                        textAlignVertical="top"
+                        onSubmitEditing={() => sendMessage()}
+                        blurOnSubmit={false}
                     />
                     <TouchableOpacity
                         style={[
@@ -554,41 +572,52 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     messagesList: {
-        padding: 16,
-        paddingBottom: 20,
+        paddingVertical: 16,
     },
-    messageContainer: {
+    // Claude-like message layout
+    messageRow: {
         flexDirection: 'row',
-        marginVertical: 4,
-        alignItems: 'flex-end',
+        marginBottom: 20,
+        paddingHorizontal: 16,
     },
-    userMessage: {
+    userMessageRow: {
         justifyContent: 'flex-end',
     },
-    assistantMessage: {
+    assistantMessageRow: {
         justifyContent: 'flex-start',
     },
     avatarContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        marginTop: 4,
+    },
+    avatar: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
         marginHorizontal: 8,
     },
-    messageBubble: {
-        maxWidth: width * 0.75,
-        padding: 12,
-        borderRadius: 16,
-        borderWidth: 1,
+    messageContent: {
+        flex: 1,
+        maxWidth: width * 0.8, // Reasonable max width like Claude
     },
-    messageText: {
-        fontSize: 16,
-        lineHeight: 22,
+    userMessageContent: {
+        alignItems: 'flex-end',
+    },
+    assistantMessageContent: {
+        alignItems: 'flex-start',
+    },
+    messageBubble: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 18,
+        borderWidth: 1,
+        // No fixed width - let content determine size within maxWidth
     },
     loadingContainer: {
         flexDirection: 'row',
         alignItems: 'center',
+        paddingVertical: 4,
     },
     loadingText: {
         marginLeft: 8,
@@ -597,7 +626,7 @@ const styles = StyleSheet.create({
     },
     quickActionsContainer: {
         marginTop: 20,
-        paddingHorizontal: 4,
+        paddingHorizontal: 20,
     },
     quickActionsTitle: {
         fontSize: 18,
@@ -610,7 +639,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     quickActionButton: {
-        width: (width - 48) / 2,
+        width: (width - 56) / 2,
         padding: 16,
         borderRadius: 12,
         borderWidth: 1,
