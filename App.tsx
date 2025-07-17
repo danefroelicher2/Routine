@@ -1,3 +1,7 @@
+// ============================================
+// UPDATED APP.TSX - REPLACE YOUR EXISTING App.tsx WITH THIS
+// ============================================
+
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, View, StyleSheet, StatusBar } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
@@ -10,7 +14,7 @@ import "react-native-url-polyfill/auto";
 // Services
 import { supabase } from "./src/services/supabase";
 
-// NEW: Theme Provider
+// Theme Provider
 import { ThemeProvider, useTheme } from "./ThemeContext";
 
 // Auth Screens
@@ -21,8 +25,12 @@ import SignupScreen from "./src/screens/Auth/SignupScreen";
 import HomeScreen from "./src/screens/Home/HomeScreen";
 import AddRoutineScreen from "./src/screens/Home/AddRoutineScreen";
 import StatsScreen from "./src/screens/Stats/StatsScreen";
-import SocialScreen from "./src/screens/Social/SocialScreen"; // NEW: Social Screen Import
-import UserProfileScreen from "./src/screens/Social/UserProfileScreen"; // NEW: User Profile Screen
+
+// AI Screens (REPLACING Social Screens)
+import AIChatScreen from "./src/screens/AI/AIChatScreen";
+import AISettingsScreen from "./src/screens/AI/AISettingsScreen";
+
+// Other Screens
 import NotesScreen from "./src/screens/Notes/NotesScreen";
 import NoteDetailScreen from "./src/screens/Notes/NoteDetailScreen";
 import ProfileScreen from "./src/screens/Profile/ProfileScreen";
@@ -50,37 +58,25 @@ function HomeStack() {
   );
 }
 
-// NEW: Stack Navigator for Social (includes user profiles)
-function SocialStack() {
-  const { colors } = useTheme();
-
+// NEW: Stack Navigator for AI (replaces SocialStack)
+function AIStack() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.surface,
-        },
-        headerTintColor: "#007AFF",
-        headerTitleStyle: {
-          color: colors.text,
-        },
-      }}
-    >
+    <Stack.Navigator>
       <Stack.Screen
-        name="SocialMain"
-        component={SocialScreen}
+        name="AIChatMain"
+        component={AIChatScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="UserProfile"
-        component={UserProfileScreen}
+        name="AISettings"
+        component={AISettingsScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
 }
 
-// Stack Navigator for Notes - HEADERS HIDDEN FOR BOTH SCREENS
+// Stack Navigator for Notes
 function NotesStack() {
   return (
     <Stack.Navigator>
@@ -98,7 +94,7 @@ function NotesStack() {
   );
 }
 
-// Stack Navigator for Profile (includes settings) - HEADERS KEPT
+// Stack Navigator for Profile (includes settings)
 function ProfileStack() {
   const { colors } = useTheme();
 
@@ -143,7 +139,7 @@ function AuthStack() {
   );
 }
 
-// Main App Tabs with Theme and NEW Social Tab
+// Main App Tabs with AI Tab (UPDATED: Social replaced with AI)
 function MainTabs() {
   const { colors } = useTheme();
 
@@ -157,11 +153,11 @@ function MainTabs() {
             iconName = focused ? "home" : "home-outline";
           } else if (route.name === "Stats") {
             iconName = focused ? "stats-chart" : "stats-chart-outline";
-          } else if (route.name === "Social") {
-            // NEW: Social tab icon - using people icons
-            iconName = focused ? "people" : "people-outline";
+          } else if (route.name === "AI") {
+            // AI tab icon
+            iconName = focused ? "chatbubbles" : "chatbubbles-outline";
 
-            // NEW: Return custom styled icon for Social tab
+            // Custom styled icon for AI tab
             return (
               <View
                 style={{
@@ -199,8 +195,14 @@ function MainTabs() {
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Stats" component={StatsScreen} />
-      {/* UPDATED: Social Tab now uses SocialStack instead of SocialScreen */}
-      <Tab.Screen name="Social" component={SocialStack} />
+      {/* UPDATED: AI Tab replaces Social Tab */}
+      <Tab.Screen
+        name="AI"
+        component={AIStack}
+        options={{
+          tabBarLabel: "AI Assistant",
+        }}
+      />
       <Tab.Screen name="Notes" component={NotesStack} />
       <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
