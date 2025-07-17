@@ -272,7 +272,7 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
             ]}>
                 {!isUser && (
                     <View style={[styles.avatarContainer, { backgroundColor: colors.surface }]}>
-                        <Ionicons name="robot" size={20} color="#007AFF" />
+                        <Ionicons name="chatbubble-ellipses" size={20} color="#007AFF" />
                     </View>
                 )}
 
@@ -350,7 +350,7 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
             <View style={styles.headerContent}>
                 <View style={styles.headerLeft}>
                     <View style={[styles.aiIcon, { backgroundColor: isConnected ? '#00FF7F20' : '#FF000020' }]}>
-                        <Ionicons name="robot" size={24} color={isConnected ? '#00FF7F' : '#FF0000'} />
+                        <Ionicons name="chatbubble-ellipses" size={24} color={isConnected ? '#00FF7F' : '#FF0000'} />
                     </View>
                     <View>
                         <Text style={[styles.headerTitle, { color: colors.text }]}>
