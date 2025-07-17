@@ -1,5 +1,6 @@
 // ============================================
-// AI CHAT SCREEN - SAVE AS src/screens/AI/AIChatScreen.tsx
+// AI CHAT SCREEN WITH MARKDOWN SUPPORT
+// Replace your entire src/screens/AI/AIChatScreen.tsx with this
 // ============================================
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -19,6 +20,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import Markdown from 'react-native-markdown-display';
 import { supabase } from '../../services/supabase';
 import { useTheme } from '../../../ThemeContext';
 import { chatService } from '../../services/chatService';
@@ -259,7 +261,7 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     ];
 
     /**
-     * Render individual message
+     * Render individual message with markdown support
      */
     const renderMessage = ({ item }: { item: ChatMessageWithLoading }) => {
         const isUser = item.role === 'user';
@@ -290,13 +292,88 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
                                 AI is thinking...
                             </Text>
                         </View>
-                    ) : (
+                    ) : isUser ? (
+                        // User messages - plain text (no markdown)
                         <Text style={[
                             styles.messageText,
-                            { color: isUser ? '#FFFFFF' : colors.text },
+                            { color: '#FFFFFF' },
                         ]}>
                             {item.content}
                         </Text>
+                    ) : (
+                        // AI messages - render with markdown
+                        <Markdown
+                            style={{
+                                body: {
+                                    color: colors.text,
+                                    fontSize: 16,
+                                    lineHeight: 22,
+                                    fontFamily: 'System',
+                                },
+                                paragraph: {
+                                    marginTop: 0,
+                                    marginBottom: 8,
+                                    color: colors.text,
+                                    fontSize: 16,
+                                    lineHeight: 22,
+                                },
+                                strong: {
+                                    fontWeight: 'bold',
+                                    color: colors.text,
+                                },
+                                em: {
+                                    fontStyle: 'italic',
+                                    color: colors.text,
+                                },
+                                code_inline: {
+                                    backgroundColor: colors.border,
+                                    paddingHorizontal: 4,
+                                    paddingVertical: 2,
+                                    borderRadius: 4,
+                                    fontFamily: 'monospace',
+                                    fontSize: 14,
+                                    color: colors.text,
+                                },
+                                bullet_list: {
+                                    marginVertical: 4,
+                                },
+                                ordered_list: {
+                                    marginVertical: 4,
+                                },
+                                list_item: {
+                                    marginVertical: 2,
+                                    color: colors.text,
+                                    fontSize: 16,
+                                },
+                                blockquote: {
+                                    backgroundColor: colors.border,
+                                    borderLeftWidth: 4,
+                                    borderLeftColor: '#007AFF',
+                                    paddingLeft: 12,
+                                    paddingVertical: 8,
+                                    marginVertical: 4,
+                                },
+                                heading1: {
+                                    fontSize: 18,
+                                    fontWeight: 'bold',
+                                    marginVertical: 8,
+                                    color: colors.text,
+                                },
+                                heading2: {
+                                    fontSize: 17,
+                                    fontWeight: '600',
+                                    marginVertical: 6,
+                                    color: colors.text,
+                                },
+                                text: {
+                                    color: colors.text,
+                                    fontSize: 16,
+                                    lineHeight: 22,
+                                },
+                            }}
+                        >
+                            {item.content}
+                        </Markdown>
                     )}
                 </View>
 
