@@ -1002,23 +1002,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         }
         scrollEnabled={scrollEnabled}
       >
-        {/* Header with greeting and calendar button */}
+        {/* Header with greeting and calendar toggle */}
         <View style={[styles.header, { backgroundColor: colors.surface }]}>
           <View style={styles.headerContent}>
             <Text style={[styles.greeting, { color: colors.text }]}>
               {personalizedGreeting}
             </Text>
-            {/* 🔥 FIXED: Simple calendar button instead of toggle */}
-            <TouchableOpacity
-              style={styles.calendarButton}
-              onPress={() => setIsCalendarView(!isCalendarView)}
-            >
-              <Ionicons
-                name={isCalendarView ? "list" : "calendar"}
-                size={24}
-                color="#007AFF"
+            {/* 🔥 FIXED: Toggle switch without label text */}
+            <View style={styles.headerRight}>
+              <Switch
+                value={isCalendarView}
+                onValueChange={setIsCalendarView}
+                trackColor={{ false: colors.border, true: "#007AFF" }}
+                thumbColor={isCalendarView ? "#fff" : "#f4f3f4"}
               />
-            </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -1830,12 +1828,6 @@ const styles = StyleSheet.create({
   addRoutineText: {
     fontSize: 14,
     fontStyle: "italic",
-  },
-  // 🔧 FIXED: Added calendar button style
-  calendarButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: "rgba(0, 122, 255, 0.1)",
   },
 });
 
