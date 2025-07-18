@@ -1002,81 +1002,72 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         }
         scrollEnabled={scrollEnabled}
       >
-        {/* Header with greeting and calendar toggle */}
+        {/* Header with greeting and calendar button */}
         <View style={[styles.header, { backgroundColor: colors.surface }]}>
           <View style={styles.headerContent}>
             <Text style={[styles.greeting, { color: colors.text }]}>
               {personalizedGreeting}
             </Text>
-            <View style={styles.headerRight}>
-              <View style={styles.toggleContainer}>
-                <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>
-                  Calendar
-                </Text>
-                <Switch
-                  value={isCalendarView}
-                  onValueChange={setIsCalendarView}
-                  trackColor={{ false: colors.border, true: "#007AFF" }}
-                  thumbColor={isCalendarView ? "#fff" : "#f4f3f4"}
-                />
-              </View>
-            </View>
+            {/* 🔥 FIXED: Simple calendar button instead of toggle */}
+            <TouchableOpacity
+              style={styles.calendarButton}
+              onPress={() => setIsCalendarView(!isCalendarView)}
+            >
+              <Ionicons
+                name={isCalendarView ? "list" : "calendar"}
+                size={24}
+                color="#007AFF"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Day selector calendar - ALWAYS visible in same position */}
+        <View style={[styles.calendarContainer, { backgroundColor: colors.surface }]}>
+          <View style={styles.calendarGrid}>
+            {daysOfWeek.map((day) => {
+              const isToday = day.value === new Date().getDay();
+              const isSelected = day.value === selectedDay;
+              const hasRoutines = (daySpecificRoutines[day.value] || []).length > 0;
+
+              return (
+                <TouchableOpacity
+                  key={day.value}
+                  style={[
+                    styles.dayBox,
+                    { borderColor: colors.border },
+                    isToday && !isSelected && styles.dayBoxToday,
+                    isSelected && styles.dayBoxSelected,
+                  ]}
+                  onPress={() => setSelectedDay(day.value)}
+                >
+                  <Text
+                    style={[
+                      styles.dayBoxName,
+                      { color: colors.text },
+                      isToday && !isSelected && styles.dayBoxNameToday,
+                      isSelected && styles.dayBoxNameSelected,
+                    ]}
+                  >
+                    {day.name}
+                  </Text>
+                  <View
+                    style={[
+                      styles.dayBoxIndicator,
+                      hasRoutines && styles.dayBoxIndicatorActive,
+                      { backgroundColor: hasRoutines ? (isSelected ? "#fff" : "#007AFF") : "transparent" }
+                    ]}
+                  />
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
         {/* Main content - conditional rendering based on calendar view */}
         {isCalendarView ? (
-          /* 🔥 FIXED: Render calendar view directly within HomeScreen */
+          /* 🔥 FIXED: Clean calendar view without titles/subtitles */
           <View style={styles.calendarViewContainer}>
-            <Text style={[styles.calendarViewTitle, { color: colors.text }]}>
-              📅 Calendar View
-            </Text>
-            <Text style={[styles.calendarViewSubtitle, { color: colors.textSecondary }]}>
-              Schedule your routines throughout the day
-            </Text>
-
-            {/* Calendar day selector */}
-            <View style={[styles.calendarContainer, { backgroundColor: colors.surface }]}>
-              <View style={styles.calendarGrid}>
-                {daysOfWeek.map((day) => {
-                  const isToday = day.value === new Date().getDay();
-                  const isSelected = day.value === selectedDay;
-                  const hasRoutines = (daySpecificRoutines[day.value] || []).length > 0;
-
-                  return (
-                    <TouchableOpacity
-                      key={day.value}
-                      style={[
-                        styles.dayBox,
-                        { borderColor: colors.border },
-                        isToday && !isSelected && styles.dayBoxToday,
-                        isSelected && styles.dayBoxSelected,
-                      ]}
-                      onPress={() => setSelectedDay(day.value)}
-                    >
-                      <Text
-                        style={[
-                          styles.dayBoxName,
-                          { color: colors.text },
-                          isToday && !isSelected && styles.dayBoxNameToday,
-                          isSelected && styles.dayBoxNameSelected,
-                        ]}
-                      >
-                        {day.name}
-                      </Text>
-                      <View
-                        style={[
-                          styles.dayBoxIndicator,
-                          hasRoutines && styles.dayBoxIndicatorActive,
-                          { backgroundColor: hasRoutines ? (isSelected ? "#fff" : "#007AFF") : "transparent" }
-                        ]}
-                      />
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
             {/* Time slots for calendar view */}
             <View style={styles.timeSlotsContainer}>
               {[6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].map((hour) => (
@@ -1107,48 +1098,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         ) : (
           /* 🔥 FIXED: Regular home screen content */
           <>
-            {/* Calendar container */}
-            <View style={[styles.calendarContainer, { backgroundColor: colors.surface }]}>
-              <View style={styles.calendarGrid}>
-                {daysOfWeek.map((day) => {
-                  const isToday = day.value === new Date().getDay();
-                  const isSelected = day.value === selectedDay;
-                  const hasRoutines = (daySpecificRoutines[day.value] || []).length > 0;
-
-                  return (
-                    <TouchableOpacity
-                      key={day.value}
-                      style={[
-                        styles.dayBox,
-                        { borderColor: colors.border },
-                        isToday && !isSelected && styles.dayBoxToday,
-                        isSelected && styles.dayBoxSelected,
-                      ]}
-                      onPress={() => setSelectedDay(day.value)}
-                    >
-                      <Text
-                        style={[
-                          styles.dayBoxName,
-                          { color: colors.text },
-                          isToday && !isSelected && styles.dayBoxNameToday,
-                          isSelected && styles.dayBoxNameSelected,
-                        ]}
-                      >
-                        {day.name}
-                      </Text>
-                      <View
-                        style={[
-                          styles.dayBoxIndicator,
-                          hasRoutines && styles.dayBoxIndicatorActive,
-                          { backgroundColor: hasRoutines ? (isSelected ? "#fff" : "#007AFF") : "transparent" }
-                        ]}
-                      />
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
             {/* Daily Routines Section */}
             <View style={[styles.section, { backgroundColor: colors.surface }]}>
               <View style={styles.sectionHeader}>
@@ -1881,6 +1830,12 @@ const styles = StyleSheet.create({
   addRoutineText: {
     fontSize: 14,
     fontStyle: "italic",
+  },
+  // 🔧 FIXED: Added calendar button style
+  calendarButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(0, 122, 255, 0.1)",
   },
 });
 
