@@ -26,6 +26,7 @@ import { supabase } from "../../services/supabase";
 import { UserRoutine } from "../../types/database";
 import { useTheme } from "../../../ThemeContext";
 import { StreakSyncService } from "../../services/StreakSyncService";
+import CalendarHomeScreen from "./CalendarHomeScreen";
 
 interface RoutineWithCompletion extends UserRoutine {
   isCompleted: boolean;
@@ -108,6 +109,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     { name: "Fri", value: 5 },
     { name: "Sat", value: 6 },
   ];
+
+  // CRITICAL FIX: If calendar view is enabled, render CalendarHomeScreen instead
+  if (isCalendarView) {
+    return <CalendarHomeScreen navigation={navigation} />;
+  }
 
   // NEW: Sync streak data in background
   const syncStreaksAfterCompletion = async (userId: string) => {
