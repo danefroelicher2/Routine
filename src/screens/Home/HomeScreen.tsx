@@ -67,7 +67,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [originalIndex, setOriginalIndex] = useState<number | null>(null);
   const [lastSwapIndex, setLastSwapIndex] = useState<number | null>(null);
-  const [draggedSection, setDraggedSection] = useState<"daily" | "weekly" | null>(null)
+  const [draggedSection, setDraggedSection] = useState<"daily" | "weekly" | null>(null);
 
   // ENHANCED: New drag state for improved UX
   const [dropZoneIndex, setDropZoneIndex] = useState<number | null>(null);
@@ -109,11 +109,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     { name: "Fri", value: 5 },
     { name: "Sat", value: 6 },
   ];
-
-  // CRITICAL FIX: If calendar view is enabled, render CalendarHomeScreen instead
-  if (isCalendarView) {
-    return <CalendarHomeScreen navigation={navigation} />;
-  }
 
   // NEW: Sync streak data in background
   const syncStreaksAfterCompletion = async (userId: string) => {
@@ -1008,6 +1003,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       </View>
     );
   };
+
+  // 🔥 CRITICAL FIX: MOVE THE CALENDAR VIEW RETURN TO AFTER ALL HOOKS
+  // This prevents the hooks violation error
+  if (isCalendarView) {
+    return <CalendarHomeScreen navigation={navigation} />;
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
