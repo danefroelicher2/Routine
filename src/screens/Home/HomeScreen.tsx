@@ -66,7 +66,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [originalIndex, setOriginalIndex] = useState<number | null>(null);
   const [lastSwapIndex, setLastSwapIndex] = useState<number | null>(null);
-  const [draggedSection, setDraggedSection] = useState<"daily" | "weekly" | null>(null);
+  const [draggedSection, setDraggedSection] = useState<"daily" | "weekly" | null>(null)
 
   // ENHANCED: New drag state for improved UX
   const [dropZoneIndex, setDropZoneIndex] = useState<number | null>(null);
