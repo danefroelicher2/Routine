@@ -989,26 +989,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     );
   };
 
-  // NEW: Calendar View Component
-  const renderCalendarView = () => {
-    return (
-      <View style={styles.calendarViewContainer}>
-        <Text style={[styles.calendarViewTitle, { color: colors.text }]}>
-          Calendar View
-        </Text>
-        <Text style={[styles.calendarViewSubtitle, { color: colors.textSecondary }]}>
-          This is where your calendar functionality will be displayed
-        </Text>
-        {/* Add your calendar components here */}
-      </View>
-    );
-  };
-
-  // 🔥 CRITICAL FIX: MOVE THE CALENDAR VIEW RETURN TO AFTER ALL HOOKS
-  // This prevents the hooks violation error
-  if (isCalendarView) {
-    return <CalendarHomeScreen navigation={navigation} />;
-  }
+  // 🔥 FIXED: Keep calendar view within the same component instead of switching components
+  // This prevents the blank screen issue
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -1042,10 +1024,88 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Conditional rendering based on view mode */}
+        {/* Main content - conditional rendering based on calendar view */}
         {isCalendarView ? (
-          renderCalendarView()
+          /* 🔥 FIXED: Render calendar view directly within HomeScreen */
+          <View style={styles.calendarViewContainer}>
+            <Text style={[styles.calendarViewTitle, { color: colors.text }]}>
+              📅 Calendar View
+            </Text>
+            <Text style={[styles.calendarViewSubtitle, { color: colors.textSecondary }]}>
+              Schedule your routines throughout the day
+            </Text>
+
+            {/* Calendar day selector */}
+            <View style={[styles.calendarContainer, { backgroundColor: colors.surface }]}>
+              <View style={styles.calendarGrid}>
+                {daysOfWeek.map((day) => {
+                  const isToday = day.value === new Date().getDay();
+                  const isSelected = day.value === selectedDay;
+                  const hasRoutines = (daySpecificRoutines[day.value] || []).length > 0;
+
+                  return (
+                    <TouchableOpacity
+                      key={day.value}
+                      style={[
+                        styles.dayBox,
+                        { borderColor: colors.border },
+                        isToday && !isSelected && styles.dayBoxToday,
+                        isSelected && styles.dayBoxSelected,
+                      ]}
+                      onPress={() => setSelectedDay(day.value)}
+                    >
+                      <Text
+                        style={[
+                          styles.dayBoxName,
+                          { color: colors.text },
+                          isToday && !isSelected && styles.dayBoxNameToday,
+                          isSelected && styles.dayBoxNameSelected,
+                        ]}
+                      >
+                        {day.name}
+                      </Text>
+                      <View
+                        style={[
+                          styles.dayBoxIndicator,
+                          hasRoutines && styles.dayBoxIndicatorActive,
+                          { backgroundColor: hasRoutines ? (isSelected ? "#fff" : "#007AFF") : "transparent" }
+                        ]}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Time slots for calendar view */}
+            <View style={styles.timeSlotsContainer}>
+              {[6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].map((hour) => (
+                <View key={hour} style={[styles.timeSlot, { borderBottomColor: colors.border }]}>
+                  <View style={styles.timeLabel}>
+                    <Text style={[styles.timeLabelText, { color: colors.textSecondary }]}>
+                      {hour === 0 ? "12 AM" : hour === 12 ? "12 PM" : hour < 12 ? `${hour} AM` : `${hour - 12} PM`}
+                    </Text>
+                  </View>
+                  <View style={[styles.timeSlotContent, { backgroundColor: colors.surface }]}>
+                    <TouchableOpacity
+                      style={styles.addRoutineToSlot}
+                      onPress={() => {
+                        loadAvailableRoutines();
+                        setShowDayRoutineModal(true);
+                      }}
+                    >
+                      <Ionicons name="add" size={16} color={colors.textTertiary} />
+                      <Text style={[styles.addRoutineText, { color: colors.textTertiary }]}>
+                        Add routine
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
         ) : (
+          /* 🔥 FIXED: Regular home screen content */
           <>
             {/* Calendar container */}
             <View style={[styles.calendarContainer, { backgroundColor: colors.surface }]}>
@@ -1424,21 +1484,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
-  calendarViewContainer: {
-    padding: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 400,
-  },
-  calendarViewTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
-  calendarViewSubtitle: {
-    fontSize: 16,
-    textAlign: "center",
-  },
   calendarContainer: {
     marginHorizontal: 16,
     marginBottom: 20,
@@ -1783,6 +1828,59 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  // 🔧 FIXED: Added all missing calendar view styles
+  calendarViewContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  calendarViewTitle: {
+    fontSize: 28,
+    fontWeight: "bold",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  calendarViewSubtitle: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  timeSlotsContainer: {
+    flex: 1,
+    paddingTop: 12,
+  },
+  timeSlot: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    minHeight: 60,
+    paddingVertical: 8,
+  },
+  timeLabel: {
+    width: 70,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  timeLabelText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  timeSlotContent: {
+    flex: 1,
+    marginLeft: 12,
+    borderRadius: 8,
+    padding: 12,
+    justifyContent: "center",
+    minHeight: 44,
+  },
+  addRoutineToSlot: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+  },
+  addRoutineText: {
+    fontSize: 14,
+    fontStyle: "italic",
   },
 });
 
