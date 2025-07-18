@@ -19,6 +19,7 @@ import {
   PanResponder,
   Dimensions,
   TextInput,
+  Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
@@ -45,6 +46,9 @@ const getLocalDateString = (date: Date): string => {
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
+
+  // NEW: Calendar toggle state
+  const [isCalendarView, setIsCalendarView] = useState(false);
 
   const [dailyRoutines, setDailyRoutines] = useState<RoutineWithCompletion[]>([]);
   const [weeklyRoutines, setWeeklyRoutines] = useState<RoutineWithCompletion[]>([]);
@@ -984,223 +988,312 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     );
   };
 
+  // NEW: Calendar View Component
+  const renderCalendarView = () => {
+    return (
+      <View style={styles.calendarViewContainer}>
+        <Text style={[styles.calendarViewTitle, { color: colors.text }]}>
+          Calendar View
+        </Text>
+        <Text style={[styles.calendarViewSubtitle, { color: colors.textSecondary }]}>
+          This is where your calendar functionality will be displayed
+        </Text>
+        {/* Add your calendar components here */}
+      </View>
+    );
+  };
+
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         scrollEnabled={scrollEnabled}
-        showsVerticalScrollIndicator={false}
       >
-        <View
-          style={[
-            styles.header,
-            {
-              backgroundColor: colors.surface,
-              borderBottomColor: colors.border,
-            },
-          ]}
-        >
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {personalizedGreeting}
-          </Text>
-          <Text style={[styles.headerDate, { color: colors.textSecondary }]}>
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}
-          </Text>
+        {/* Header with greeting and calendar toggle */}
+        <View style={[styles.header, { backgroundColor: colors.surface }]}>
+          <View style={styles.headerContent}>
+            <Text style={[styles.greeting, { color: colors.text }]}>
+              {personalizedGreeting}
+            </Text>
+            <View style={styles.headerRight}>
+              <View style={styles.toggleContainer}>
+                <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>
+                  Calendar
+                </Text>
+                <Switch
+                  value={isCalendarView}
+                  onValueChange={setIsCalendarView}
+                  trackColor={{ false: colors.border, true: "#007AFF" }}
+                  thumbColor={isCalendarView ? "#fff" : "#f4f3f4"}
+                />
+              </View>
+            </View>
+          </View>
         </View>
 
-        {/* ✅ RESTORED: Original calendar container */}
-        <View style={[styles.calendarContainer, { backgroundColor: colors.surface }]}>
-          <View style={styles.calendarGrid}>
-            {daysOfWeek.map((day) => {
-              const isToday = day.value === new Date().getDay();
-              const isSelected = day.value === selectedDay;
-              const hasRoutines = (daySpecificRoutines[day.value] || []).length > 0;
+        {/* Conditional rendering based on view mode */}
+        {isCalendarView ? (
+          renderCalendarView()
+        ) : (
+          <>
+            {/* Calendar container */}
+            <View style={[styles.calendarContainer, { backgroundColor: colors.surface }]}>
+              <View style={styles.calendarGrid}>
+                {daysOfWeek.map((day) => {
+                  const isToday = day.value === new Date().getDay();
+                  const isSelected = day.value === selectedDay;
+                  const hasRoutines = (daySpecificRoutines[day.value] || []).length > 0;
 
-              return (
+                  return (
+                    <TouchableOpacity
+                      key={day.value}
+                      style={[
+                        styles.dayBox,
+                        { borderColor: colors.border },
+                        isToday && !isSelected && styles.dayBoxToday,
+                        isSelected && styles.dayBoxSelected,
+                      ]}
+                      onPress={() => setSelectedDay(day.value)}
+                    >
+                      <Text
+                        style={[
+                          styles.dayBoxName,
+                          { color: colors.text },
+                          isToday && !isSelected && styles.dayBoxNameToday,
+                          isSelected && styles.dayBoxNameSelected,
+                        ]}
+                      >
+                        {day.name}
+                      </Text>
+                      <View
+                        style={[
+                          styles.dayBoxIndicator,
+                          hasRoutines && styles.dayBoxIndicatorActive,
+                          { backgroundColor: hasRoutines ? (isSelected ? "#fff" : "#007AFF") : "transparent" }
+                        ]}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Daily Routines Section */}
+            <View style={[styles.section, { backgroundColor: colors.surface }]}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="today" size={24} color="#007AFF" />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Daily Routines
+                </Text>
                 <TouchableOpacity
-                  key={day.value}
+                  onPress={() => toggleEditMode("daily")}
                   style={[
-                    styles.dayBox,
-                    { borderColor: colors.border },
-                    isToday && !isSelected && styles.dayBoxToday,
-                    isSelected && styles.dayBoxSelected,
+                    styles.editButton,
+                    isEditMode && editSection === "daily" && styles.editButtonActive,
                   ]}
-                  onPress={() => setSelectedDay(day.value)}
                 >
-                  <Text
-                    style={[
-                      styles.dayBoxName,
-                      { color: colors.text },
-                      isToday && !isSelected && styles.dayBoxNameToday,
-                      isSelected && styles.dayBoxNameSelected,
-                    ]}
-                  >
-                    {day.name}
-                  </Text>
-                  <View
-                    style={[
-                      styles.dayBoxIndicator,
-                      hasRoutines && styles.dayBoxIndicatorActive,
-                      { backgroundColor: hasRoutines ? (isSelected ? "#fff" : "#007AFF") : "transparent" }
-                    ]}
+                  <Ionicons
+                    name={
+                      isEditMode && editSection === "daily" ? "checkmark" : "pencil"
+                    }
+                    size={18}
+                    color={
+                      isEditMode && editSection === "daily" ? "#34c759" : "#666"
+                    }
                   />
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    loadAvailableRoutines();
+                    setShowDayRoutineModal(true);
+                  }}
+                  style={styles.addButton}
+                >
+                  <Ionicons name="add" size={20} color="#007AFF" />
+                </TouchableOpacity>
+              </View>
 
-        {/* ✅ RESTORED: Original Daily Routines Section */}
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="today" size={24} color="#007AFF" />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Daily Routines
-            </Text>
-            <TouchableOpacity
-              onPress={() => toggleEditMode("daily")}
-              style={[
-                styles.editButton,
-                isEditMode && editSection === "daily" && styles.editButtonActive,
-              ]}
-            >
-              <Ionicons
-                name={
-                  isEditMode && editSection === "daily" ? "checkmark" : "pencil"
-                }
-                size={18}
-                color={
-                  isEditMode && editSection === "daily" ? "#34c759" : "#666"
-                }
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                loadAvailableRoutines();
-                setShowDayRoutineModal(true);
-              }}
-              style={styles.addButton}
-            >
-              <Ionicons name="add" size={20} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
-
-          {dailyRoutines.length > 0 ? (
-            dailyRoutines.map((routine, index) =>
-              renderRoutineItem(routine, index, "daily")
-            )
-          ) : (
-            <View style={styles.emptyState}>
-              <Text
-                style={[styles.emptyStateText, { color: colors.textSecondary }]}
-              >
-                No routines for this day yet
-              </Text>
-              <Text
-                style={[
-                  styles.emptyStateSubtext,
-                  { color: colors.textTertiary },
-                ]}
-              >
-                Tap the + button to add routines to this day!
-              </Text>
+              {dailyRoutines.length > 0 ? (
+                dailyRoutines.map((routine, index) =>
+                  renderRoutineItem(routine, index, "daily")
+                )
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text
+                    style={[styles.emptyStateText, { color: colors.textSecondary }]}
+                  >
+                    No routines for this day yet
+                  </Text>
+                  <Text
+                    style={[
+                      styles.emptyStateSubtext,
+                      { color: colors.textTertiary },
+                    ]}
+                  >
+                    Tap the + button to add routines to this day!
+                  </Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
 
-        {/* ✅ RESTORED: Original Weekly Routines Section */}
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="calendar" size={24} color="#007AFF" />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Weekly Goals
-            </Text>
-            <View
-              style={[
-                styles.weekTimer,
-                { backgroundColor: colors.background },
-              ]}
-            >
-              <Ionicons name="time" size={16} color={colors.textSecondary} />
-              <Text
-                style={[styles.weekTimerText, { color: colors.textSecondary }]}
-              >
-                {weekTimeRemaining}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => toggleEditMode("weekly")}
-              style={[
-                styles.editButton,
-                isEditMode && editSection === "weekly" && styles.editButtonActive,
-              ]}
-            >
-              <Ionicons
-                name={
-                  isEditMode && editSection === "weekly" ? "checkmark" : "pencil"
-                }
-                size={18}
-                color={
-                  isEditMode && editSection === "weekly" ? "#34c759" : "#666"
-                }
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => navigation.navigate("AddRoutine")}
-            >
-              <Ionicons name="add" size={20} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
+            {/* Weekly Routines Section */}
+            <View style={[styles.section, { backgroundColor: colors.surface }]}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="calendar" size={24} color="#007AFF" />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Weekly Goals
+                </Text>
+                <View
+                  style={[
+                    styles.weekTimer,
+                    { backgroundColor: colors.background },
+                  ]}
+                >
+                  <Ionicons name="time" size={16} color={colors.textSecondary} />
+                  <Text
+                    style={[styles.weekTimerText, { color: colors.textSecondary }]}
+                  >
+                    {weekTimeRemaining}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => toggleEditMode("weekly")}
+                  style={[
+                    styles.editButton,
+                    isEditMode && editSection === "weekly" && styles.editButtonActive,
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      isEditMode && editSection === "weekly" ? "checkmark" : "pencil"
+                    }
+                    size={18}
+                    color={
+                      isEditMode && editSection === "weekly" ? "#34c759" : "#666"
+                    }
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={() => navigation.navigate("AddRoutine")}
+                >
+                  <Ionicons name="add" size={20} color="#007AFF" />
+                </TouchableOpacity>
+              </View>
 
-          {weeklyRoutines.length > 0 ? (
-            weeklyRoutines.map((routine, index) =>
-              renderRoutineItem(routine, index, "weekly")
-            )
-          ) : (
-            <View style={styles.emptyState}>
-              <Text
-                style={[styles.emptyStateText, { color: colors.textSecondary }]}
-              >
-                No weekly goals yet
-              </Text>
-              <Text
-                style={[
-                  styles.emptyStateSubtext,
-                  { color: colors.textTertiary },
-                ]}
-              >
-                Create weekly goals to track larger objectives!
-              </Text>
+              {weeklyRoutines.length > 0 ? (
+                weeklyRoutines.map((routine, index) =>
+                  renderRoutineItem(routine, index, "weekly")
+                )
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text
+                    style={[styles.emptyStateText, { color: colors.textSecondary }]}
+                  >
+                    No weekly goals yet
+                  </Text>
+                  <Text
+                    style={[
+                      styles.emptyStateSubtext,
+                      { color: colors.textTertiary },
+                    ]}
+                  >
+                    Create weekly goals to track larger objectives!
+                  </Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
+          </>
+        )}
       </ScrollView>
 
-      {/* ✅ RESTORED: Delete Confirmation Modal */}
+      {/* Day Routine Modal */}
+      <Modal
+        visible={showDayRoutineModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowDayRoutineModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Routines for {daysOfWeek.find(d => d.value === selectedDay)?.name}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowDayRoutineModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScrollView}>
+              {availableRoutines.map((routine) => {
+                const isAssigned = (daySpecificRoutines[selectedDay] || []).includes(routine.id);
+                return (
+                  <TouchableOpacity
+                    key={routine.id}
+                    style={[
+                      styles.modalRoutineItem,
+                      { backgroundColor: colors.background },
+                      isAssigned && styles.modalRoutineItemSelected,
+                    ]}
+                    onPress={() => {
+                      if (isAssigned) {
+                        removeRoutineFromDay(routine.id);
+                      } else {
+                        addRoutineToDay(routine.id);
+                      }
+                    }}
+                  >
+                    <View style={styles.modalRoutineInfo}>
+                      <Text style={[styles.modalRoutineName, { color: colors.text }]}>
+                        {routine.name}
+                      </Text>
+                      {routine.description && (
+                        <Text style={[styles.modalRoutineDescription, { color: colors.textSecondary }]}>
+                          {routine.description}
+                        </Text>
+                      )}
+                    </View>
+                    <View
+                      style={[
+                        styles.modalCheckbox,
+                        { borderColor: isAssigned ? "#007AFF" : colors.border },
+                        isAssigned && styles.modalCheckboxSelected,
+                      ]}
+                    >
+                      {isAssigned && (
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
       <Modal
         visible={showDeleteConfirm}
-        transparent
         animationType="fade"
+        transparent
         onRequestClose={cancelDelete}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.deleteModal, { backgroundColor: colors.surface }]}>
+          <View style={[styles.deleteModalContent, { backgroundColor: colors.surface }]}>
             <Text style={[styles.deleteModalTitle, { color: colors.text }]}>
               Delete Routine
             </Text>
             <Text style={[styles.deleteModalText, { color: colors.textSecondary }]}>
-              Are you sure you want to delete "{routineToDelete?.routine.name}"?
-              This action cannot be undone.
+              Are you sure you want to delete "{routineToDelete?.routine.name}"? This action cannot be undone.
             </Text>
             <View style={styles.deleteModalButtons}>
               <TouchableOpacity
@@ -1210,170 +1303,77 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.deleteModalButton, styles.confirmDeleteButton]}
+                style={[styles.deleteModalButton, styles.confirmButton]}
                 onPress={confirmDeleteRoutine}
               >
-                <Text style={styles.confirmDeleteButtonText}>Delete</Text>
+                <Text style={styles.confirmButtonText}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* ✅ RESTORED: Edit Routine Modal */}
+      {/* Edit Routine Modal */}
       <Modal
         visible={showEditRoutineModal}
-        transparent
         animationType="slide"
+        transparent
         onRequestClose={() => setShowEditRoutineModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.editModal, { backgroundColor: colors.surface }]}>
-            <View style={styles.editModalHeader}>
-              <TouchableOpacity onPress={() => setShowEditRoutineModal(false)}>
-                <Text style={[styles.editModalCancel, { color: "#007AFF" }]}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-              <Text style={[styles.editModalTitle, { color: colors.text }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
                 Edit Routine
               </Text>
-              <TouchableOpacity onPress={saveEditedRoutine}>
-                <Text style={[styles.editModalSave, { color: "#007AFF" }]}>
-                  Save
-                </Text>
+              <TouchableOpacity
+                onPress={() => setShowEditRoutineModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.editModalContent}>
-              <Text style={[styles.editModalLabel, { color: colors.text }]}>
-                Name
-              </Text>
-              <TextInput
-                style={[
-                  styles.editModalInput,
-                  {
-                    backgroundColor: colors.background,
-                    borderColor: colors.border,
-                    color: colors.text,
-                  },
-                ]}
-                value={editFormData.name}
-                onChangeText={(text) =>
-                  setEditFormData((prev) => ({ ...prev, name: text }))
-                }
-                placeholder="Routine name"
-                placeholderTextColor={colors.textTertiary}
-              />
+            <View style={styles.editForm}>
+              <View style={styles.inputContainer}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Name</Text>
+                <TextInput
+                  style={[styles.textInput, { backgroundColor: colors.background, color: colors.text }]}
+                  value={editFormData.name}
+                  onChangeText={(text) => setEditFormData({ ...editFormData, name: text })}
+                  placeholder="Routine name"
+                  placeholderTextColor={colors.textTertiary}
+                />
+              </View>
 
-              <Text style={[styles.editModalLabel, { color: colors.text }]}>
-                Description
-              </Text>
-              <TextInput
-                style={[
-                  styles.editModalInput,
-                  styles.editModalTextArea,
-                  {
-                    backgroundColor: colors.background,
-                    borderColor: colors.border,
-                    color: colors.text,
-                  },
-                ]}
-                value={editFormData.description}
-                onChangeText={(text) =>
-                  setEditFormData((prev) => ({ ...prev, description: text }))
-                }
-                placeholder="Description (optional)"
-                placeholderTextColor={colors.textTertiary}
-                multiline
-                numberOfLines={3}
-              />
+              <View style={styles.inputContainer}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Description</Text>
+                <TextInput
+                  style={[styles.textInput, { backgroundColor: colors.background, color: colors.text }]}
+                  value={editFormData.description}
+                  onChangeText={(text) => setEditFormData({ ...editFormData, description: text })}
+                  placeholder="Routine description"
+                  placeholderTextColor={colors.textTertiary}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={saveEditedRoutine}
+              >
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
-      </Modal>
-
-      {/* ✅ RESTORED: Day Routine Assignment Modal */}
-      <Modal
-        visible={showDayRoutineModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <SafeAreaView
-          style={[
-            styles.modalContainer,
-            { backgroundColor: colors.background },
-          ]}
-        >
-          <View
-            style={[styles.modalHeader, { borderBottomColor: colors.border }]}
-          >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Routines for{" "}
-              {daysOfWeek.find((d) => d.value === selectedDay)?.name}
-            </Text>
-            <TouchableOpacity onPress={() => setShowDayRoutineModal(false)}>
-              <Text style={[styles.modalCancelButton, { color: "#007AFF" }]}>
-                Done
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.modalContent}>
-            {availableRoutines.map((routine) => {
-              const isAssigned = (daySpecificRoutines[selectedDay] || []).includes(routine.id);
-              return (
-                <TouchableOpacity
-                  key={routine.id}
-                  style={[
-                    styles.availableRoutineItem,
-                    {
-                      backgroundColor: colors.surface,
-                      borderBottomColor: colors.border,
-                    },
-                  ]}
-                  onPress={() =>
-                    isAssigned
-                      ? removeRoutineFromDay(routine.id)
-                      : addRoutineToDay(routine.id)
-                  }
-                >
-                  <View style={styles.routineIcon}>
-                    <Ionicons
-                      name={routine.icon as any}
-                      size={20}
-                      color="#007AFF"
-                    />
-                  </View>
-                  <View style={styles.routineInfo}>
-                    <Text style={[styles.routineName, { color: colors.text }]}>
-                      {routine.name}
-                    </Text>
-                    {routine.description && (
-                      <Text
-                        style={[
-                          styles.routineDescription,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        {routine.description}
-                      </Text>
-                    )}
-                  </View>
-                  <Ionicons
-                    name={isAssigned ? "checkmark-circle" : "add-circle"}
-                    size={24}
-                    color={isAssigned ? "#34c759" : "#007AFF"}
-                  />
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
 };
 
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1381,22 +1381,67 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  header: {
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
+  scrollContent: {
+    paddingBottom: 100,
   },
-  headerTitle: {
+  header: {
+    padding: 20,
+    marginBottom: 16,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  headerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  greeting: {
+    fontSize: 24,
+    fontWeight: "700",
+    flex: 1,
+  },
+  headerRight: {
+    alignItems: "flex-end",
+  },
+  toggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  toggleLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  calendarViewContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 400,
+  },
+  calendarViewTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  headerDate: {
+  calendarViewSubtitle: {
     fontSize: 16,
+    textAlign: "center",
   },
   calendarContainer: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   calendarGrid: {
     flexDirection: "row",
@@ -1406,66 +1451,58 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     paddingVertical: 12,
+    paddingHorizontal: 4,
     marginHorizontal: 2,
     borderRadius: 8,
     borderWidth: 1,
   },
   dayBoxToday: {
-    backgroundColor: "rgba(0, 122, 255, 0.1)",
     borderColor: "#007AFF",
+    backgroundColor: "rgba(0, 122, 255, 0.1)",
   },
   dayBoxSelected: {
     backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
   },
   dayBoxName: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 4,
   },
   dayBoxNameToday: {
     color: "#007AFF",
-    fontWeight: "600",
   },
   dayBoxNameSelected: {
     color: "#fff",
-    fontWeight: "600",
   },
   dayBoxIndicator: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginTop: 4,
   },
   dayBoxIndicatorActive: {
-    opacity: 1,
+    // backgroundColor will be set inline
   },
   section: {
-    marginVertical: 8,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
     marginHorizontal: 16,
+    marginBottom: 20,
     borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    padding: 16,
+    gap: 12,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "600",
-    marginLeft: 8,
+    fontWeight: "700",
     flex: 1,
-  },
-  addButton: {
-    padding: 4,
-  },
-  editButton: {
-    padding: 6,
-    marginRight: 8,
-    borderRadius: 12,
-  },
-  editButtonActive: {
-    backgroundColor: "#34c759",
   },
   weekTimer: {
     flexDirection: "row",
@@ -1473,24 +1510,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    marginRight: 8,
+    gap: 4,
   },
   weekTimerText: {
     fontSize: 12,
-    marginLeft: 4,
     fontWeight: "500",
   },
+  editButton: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  editButtonActive: {
+    backgroundColor: "rgba(52, 199, 89, 0.1)",
+  },
+  addButton: {
+    padding: 8,
+    borderRadius: 8,
+  },
   routineItem: {
+    marginHorizontal: 16,
     marginBottom: 12,
   },
   routineContent: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    padding: 16,
     borderRadius: 12,
     borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   routineLeft: {
     flexDirection: "row",
@@ -1515,19 +1566,19 @@ const styles = StyleSheet.create({
   },
   routineName: {
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
+    marginBottom: 2,
   },
   routineNameCompleted: {
     textDecorationLine: "line-through",
-    color: "#999",
+    opacity: 0.6,
   },
   routineDescription: {
     fontSize: 14,
-    marginTop: 2,
+    marginBottom: 2,
   },
   routineTarget: {
     fontSize: 12,
-    marginTop: 2,
     fontStyle: "italic",
   },
   editModeButtons: {
@@ -1537,18 +1588,42 @@ const styles = StyleSheet.create({
   },
   editRoutineButton: {
     padding: 8,
+    borderRadius: 8,
   },
   deleteButton: {
     padding: 4,
   },
-  emptyState: {
+  dragHandle: {
+    padding: 8,
     alignItems: "center",
-    paddingVertical: 32,
+    justifyContent: "center",
+  },
+  dragHandleActive: {
+    backgroundColor: "rgba(0, 122, 255, 0.1)",
+    borderRadius: 8,
+  },
+  dragIcon: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
+  dragIconActive: {
+    // Additional active styles if needed
+  },
+  dragLine: {
+    width: 16,
+    height: 2,
+    borderRadius: 1,
+  },
+  emptyState: {
+    padding: 32,
+    alignItems: "center",
   },
   emptyStateText: {
     fontSize: 16,
     fontWeight: "500",
-    marginBottom: 8,
+    marginBottom: 4,
+    textAlign: "center",
   },
   emptyStateSubtext: {
     fontSize: 14,
@@ -1560,22 +1635,90 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  deleteModal: {
-    marginHorizontal: 40,
-    borderRadius: 16,
+  modalContent: {
+    width: "90%",
+    maxHeight: "80%",
+    borderRadius: 12,
+    padding: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0, 0, 0, 0.1)",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalScrollView: {
+    maxHeight: 400,
+  },
+  modalRoutineItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    marginHorizontal: 20,
+    marginVertical: 4,
+    borderRadius: 8,
+  },
+  modalRoutineItemSelected: {
+    backgroundColor: "rgba(0, 122, 255, 0.1)",
+  },
+  modalRoutineInfo: {
+    flex: 1,
+  },
+  modalRoutineName: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  modalRoutineDescription: {
+    fontSize: 14,
+  },
+  modalCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCheckboxSelected: {
+    backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
+  },
+  deleteModalContent: {
+    width: "85%",
+    borderRadius: 12,
     padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
   },
   deleteModalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 18,
+    fontWeight: "700",
     marginBottom: 12,
     textAlign: "center",
   },
   deleteModalText: {
     fontSize: 16,
-    lineHeight: 22,
-    marginBottom: 24,
     textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 22,
   },
   deleteModalButtons: {
     flexDirection: "row",
@@ -1584,136 +1727,55 @@ const styles = StyleSheet.create({
   deleteModalButton: {
     flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: "center",
   },
   cancelButton: {
-    backgroundColor: "rgba(102, 102, 102, 0.1)",
+    backgroundColor: "#f0f0f0",
   },
-  cancelButtonText: {
-    color: "#666",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  confirmDeleteButton: {
+  confirmButton: {
     backgroundColor: "#ff4444",
   },
-  confirmDeleteButtonText: {
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  editForm: {
+    padding: 20,
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    textAlignVertical: "top",
+  },
+  saveButton: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  saveButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
-  },
-  editModal: {
-    marginHorizontal: 20,
-    borderRadius: 16,
-    maxHeight: "80%",
-  },
-  editModalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0, 0, 0, 0.1)",
-  },
-  editModalCancel: {
-    fontSize: 16,
-  },
-  editModalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  editModalSave: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  editModalContent: {
-    padding: 20,
-  },
-  editModalLabel: {
-    fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 8,
-  },
-  editModalInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  editModalTextArea: {
-    height: 80,
-    textAlignVertical: "top",
-  },
-  modalContainer: {
-    flex: 1,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  modalCancelButton: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  modalContent: {
-    flex: 1,
-    padding: 16,
-  },
-  availableRoutineItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderBottomWidth: 1,
-  },
-  routineIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#f0f8ff",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  dragHandle: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minWidth: 44,
-    minHeight: 44,
-    borderRadius: 8,
-  },
-  dragHandleActive: {
-    backgroundColor: "rgba(0, 122, 255, 0.1)",
-  },
-  dragIcon: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dragIconActive: {
-    transform: [{ scale: 1.1 }],
-  },
-  dragLine: {
-    width: 20,
-    height: 3,
-    marginVertical: 1.5,
-    borderRadius: 1.5,
   },
 });
 
