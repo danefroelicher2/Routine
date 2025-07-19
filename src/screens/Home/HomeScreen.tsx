@@ -65,7 +65,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   // NEW: Calendar toggle state
   const [isCalendarView, setIsCalendarView] = useState(false);
-
+  console.log("🔍 isCalendarView state:", isCalendarView);
   const [dailyRoutines, setDailyRoutines] = useState<RoutineWithCompletion[]>([]);
   const [weeklyRoutines, setWeeklyRoutines] = useState<RoutineWithCompletion[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -1284,7 +1284,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <View style={styles.headerRight}>
               <Switch
                 value={isCalendarView}
-                onValueChange={setIsCalendarView}
+                onValueChange={(newValue) => {
+                  console.log("🔄 Toggle changed to:", newValue);
+                  setIsCalendarView(newValue);
+                }}
                 trackColor={{ false: colors.border, true: "#007AFF" }}
                 thumbColor={isCalendarView ? "#fff" : "#f4f3f4"}
               />
@@ -1334,16 +1337,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* ✅ NEW: CREATE BUTTON SECTION - This is where the create button goes based on your red circle */}
-        <View style={[styles.createButtonContainer, { backgroundColor: colors.surface }]}>
-          <TouchableOpacity
-            style={[styles.createButton, { backgroundColor: "#007AFF" }]}
-            onPress={() => setShowCreateModal(true)}
-          >
-            <Ionicons name="add" size={24} color="white" />
-            <Text style={styles.createButtonText}>Create Routine</Text>
-          </TouchableOpacity>
-        </View>
+        {/* ✅ CORRECTED: CREATE BUTTON SECTION - Only show when calendar view is OFF (regular list view) */}
+        {isCalendarView && (
+          <View style={[styles.createButtonContainer, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity
+              style={[styles.createButton, { backgroundColor: "#007AFF" }]}
+              onPress={() => setShowCreateModal(true)}
+            >
+              <Ionicons name="add" size={24} color="white" />
+              <Text style={styles.createButtonText}>Create Routine</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* ✅ ENHANCED: Main content - conditional rendering based on calendar view */}
         {isCalendarView ? (
