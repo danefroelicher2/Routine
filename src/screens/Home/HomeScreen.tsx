@@ -1,5 +1,5 @@
 // src/screens/Home/HomeScreen.tsx
-// ✅ COMPLETE: All existing functionality + working calendar scheduling
+// ✅ COMPLETE: All existing functionality + working calendar scheduling + CREATE BUTTON
 
 import React, {
   useState,
@@ -81,6 +81,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<number | null>(null);
 
+  // ✅ NEW: Create routine modal state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showPreloadedOptions, setShowPreloadedOptions] = useState(false);
+  const [newRoutineName, setNewRoutineName] = useState("");
+  const [newRoutineDescription, setNewRoutineDescription] = useState("");
+
   // EXISTING DRAG STATE
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -128,6 +134,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     { name: "Thu", value: 4 },
     { name: "Fri", value: 5 },
     { name: "Sat", value: 6 },
+  ];
+
+  // ✅ NEW: Preloaded routine options
+  const preloadedRoutines = [
+    { name: "Morning Workout", description: "30 min cardio and strength training", icon: "💪" },
+    { name: "Meditation", description: "10 min mindfulness practice", icon: "🧘" },
+    { name: "Read", description: "30 min reading session", icon: "📚" },
+    { name: "Hydrate", description: "Drink a glass of water", icon: "💧" },
+    { name: "Walk", description: "20 min outdoor walk", icon: "🚶" },
+    { name: "Journaling", description: "5 min gratitude journaling", icon: "📝" },
+    { name: "Stretch", description: "10 min full body stretch", icon: "🤸" },
+    { name: "Call Family", description: "Check in with loved ones", icon: "📞" },
   ];
 
   // ✅ NEW: Initialize time slots function
@@ -415,6 +433,45 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     } catch (error) {
       console.error("Error removing scheduled routine:", error);
       Alert.alert("Error", "Failed to remove routine from schedule");
+    }
+  };
+
+  // ✅ NEW: Create new routine function
+  const createNewRoutine = async (routineData: { name: string; description: string; icon?: string }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("user_routines")
+        .insert({
+          user_id: user.id,
+          name: routineData.name,
+          description: routineData.description,
+          icon: routineData.icon || "🎯",
+          is_daily: true,
+          is_active: true,
+          sort_order: 0,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Reload data to include the new routine
+      await loadData();
+      await loadAvailableRoutines();
+
+      setShowCreateModal(false);
+      setShowPreloadedOptions(false);
+      setNewRoutineName("");
+      setNewRoutineDescription("");
+
+      Alert.alert("Success", "Routine created successfully!");
+
+    } catch (error) {
+      console.error("Error creating routine:", error);
+      Alert.alert("Error", "Failed to create routine");
     }
   };
 
@@ -1277,6 +1334,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
+        {/* ✅ NEW: CREATE BUTTON SECTION - This is where the create button goes based on your red circle */}
+        <View style={[styles.createButtonContainer, { backgroundColor: colors.surface }]}>
+          <TouchableOpacity
+            style={[styles.createButton, { backgroundColor: "#007AFF" }]}
+            onPress={() => setShowCreateModal(true)}
+          >
+            <Ionicons name="add" size={24} color="white" />
+            <Text style={styles.createButtonText}>Create Routine</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* ✅ ENHANCED: Main content - conditional rendering based on calendar view */}
         {isCalendarView ? (
           /* ✅ NEW: Calendar view with working time slots */
@@ -1559,6 +1627,162 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </Modal>
 
+      {/* ✅ NEW: Create Routine Modal */}
+      <Modal
+        visible={showCreateModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCreateModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Create New Routine
+              </Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => {
+                  setShowCreateModal(false);
+                  setShowPreloadedOptions(false);
+                  setNewRoutineName("");
+                  setNewRoutineDescription("");
+                }}
+              >
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScrollView}>
+              {!showPreloadedOptions ? (
+                <View style={styles.createOptionsContainer}>
+                  {/* Quick Select from Preloaded */}
+                  <TouchableOpacity
+                    style={[styles.createOptionButton, { backgroundColor: colors.background, borderColor: "#007AFF" }]}
+                    onPress={() => setShowPreloadedOptions(true)}
+                  >
+                    <Ionicons name="apps" size={24} color="#007AFF" />
+                    <Text style={[styles.createOptionText, { color: "#007AFF" }]}>
+                      Choose from Templates
+                    </Text>
+                    <Ionicons name="chevron-forward" size={20} color="#007AFF" />
+                  </TouchableOpacity>
+
+                  {/* Custom Creation */}
+                  <View style={styles.customCreateSection}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                      Or Create Custom Routine
+                    </Text>
+
+                    <View style={styles.inputContainer}>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
+                        Routine Name
+                      </Text>
+                      <TextInput
+                        style={[styles.textInput, {
+                          backgroundColor: colors.background,
+                          borderColor: colors.border,
+                          color: colors.text
+                        }]}
+                        value={newRoutineName}
+                        onChangeText={setNewRoutineName}
+                        placeholder="Enter routine name..."
+                        placeholderTextColor={colors.textTertiary}
+                      />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
+                        Description
+                      </Text>
+                      <TextInput
+                        style={[styles.textInput, {
+                          backgroundColor: colors.background,
+                          borderColor: colors.border,
+                          color: colors.text,
+                          height: 80
+                        }]}
+                        value={newRoutineDescription}
+                        onChangeText={setNewRoutineDescription}
+                        placeholder="Enter routine description..."
+                        placeholderTextColor={colors.textTertiary}
+                        multiline
+                        textAlignVertical="top"
+                      />
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.createSubmitButton, {
+                        backgroundColor: newRoutineName.trim() ? "#007AFF" : colors.border,
+                        opacity: newRoutineName.trim() ? 1 : 0.6
+                      }]}
+                      onPress={() => {
+                        if (newRoutineName.trim()) {
+                          createNewRoutine({
+                            name: newRoutineName.trim(),
+                            description: newRoutineDescription.trim(),
+                            icon: "🎯"
+                          });
+                        }
+                      }}
+                      disabled={!newRoutineName.trim()}
+                    >
+                      <Text style={[styles.createSubmitButtonText, {
+                        color: newRoutineName.trim() ? "white" : colors.textTertiary
+                      }]}>
+                        Create Routine
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.preloadedRoutinesContainer}>
+                  <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => setShowPreloadedOptions(false)}
+                  >
+                    <Ionicons name="chevron-back" size={20} color="#007AFF" />
+                    <Text style={[styles.backButtonText, { color: "#007AFF" }]}>Back</Text>
+                  </TouchableOpacity>
+
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                    Choose a Template
+                  </Text>
+
+                  {preloadedRoutines.map((routine, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[styles.preloadedRoutineItem, {
+                        backgroundColor: colors.background,
+                        borderColor: colors.border
+                      }]}
+                      onPress={() => {
+                        createNewRoutine({
+                          name: routine.name,
+                          description: routine.description,
+                          icon: routine.icon
+                        });
+                      }}
+                    >
+                      <Text style={styles.preloadedRoutineIcon}>{routine.icon}</Text>
+                      <View style={styles.preloadedRoutineInfo}>
+                        <Text style={[styles.preloadedRoutineName, { color: colors.text }]}>
+                          {routine.name}
+                        </Text>
+                        <Text style={[styles.preloadedRoutineDescription, { color: colors.textSecondary }]}>
+                          {routine.description}
+                        </Text>
+                      </View>
+                      <Ionicons name="add-circle" size={24} color="#007AFF" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* Day Routine Modal - EXISTING */}
       <Modal
         visible={showDayRoutineModal}
@@ -1721,7 +1945,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   );
 };
 
-// ✅ COMPLETE: All existing styles + new calendar styles
+// ✅ COMPLETE: All existing styles + new calendar styles + CREATE BUTTON STYLES
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1815,6 +2039,32 @@ const styles = StyleSheet.create({
   },
   dayBoxIndicatorActive: {
     // backgroundColor will be set inline
+  },
+  // ✅ NEW: Create button styles
+  createButtonContainer: {
+    marginHorizontal: 16,
+    marginBottom: 20,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  createButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+  },
+  createButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
   section: {
     marginHorizontal: 16,
@@ -2119,6 +2369,89 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
     borderColor: "#007AFF",
   },
+  // ✅ NEW: Create modal styles
+  createOptionsContainer: {
+    padding: 20,
+  },
+  createOptionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    marginBottom: 20,
+    gap: 12,
+  },
+  createOptionText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  customCreateSection: {
+    gap: 16,
+  },
+  inputContainer: {
+    gap: 8,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    minHeight: 44,
+  },
+  createSubmitButton: {
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  createSubmitButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  preloadedRoutinesContainer: {
+    padding: 20,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 16,
+    alignSelf: "flex-start",
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  preloadedRoutineItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    gap: 12,
+  },
+  preloadedRoutineIcon: {
+    fontSize: 24,
+  },
+  preloadedRoutineInfo: {
+    flex: 1,
+  },
+  preloadedRoutineName: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  preloadedRoutineDescription: {
+    fontSize: 14,
+  },
   deleteModalContent: {
     width: "85%",
     borderRadius: 12,
@@ -2169,22 +2502,6 @@ const styles = StyleSheet.create({
   },
   editForm: {
     padding: 20,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    textAlignVertical: "top",
   },
   saveButton: {
     backgroundColor: "#007AFF",
