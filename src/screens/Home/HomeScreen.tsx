@@ -2048,7 +2048,7 @@ const styles = StyleSheet.create({
   // ✅ NEW: Create button styles
   createButtonContainer: {
     marginHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: 0.1,
     padding: 16,
     borderRadius: 12,
     shadowColor: "#000",
