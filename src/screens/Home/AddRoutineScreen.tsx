@@ -28,6 +28,7 @@ interface AddRoutineScreenProps {
     params?: {
       selectedDay?: number;
       isWeekly?: boolean;
+      isCalendarMode?: boolean;  // ✅ NEW
     };
   };
 }
