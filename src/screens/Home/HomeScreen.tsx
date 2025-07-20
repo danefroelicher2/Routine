@@ -654,7 +654,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       console.log("  - Date (LOCAL):", todayStr);
       console.log("  - Day of week:", dayOfWeek);
 
-      const [completionsResult, userRoutinesResult, dayRoutinesResult] =
+      const [completionsResult, userRoutinesResult, dayRoutinesResult, scheduledRoutinesResult] =
         await Promise.all([
           supabase
             .from("routine_completions")
@@ -670,43 +670,77 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             .select("routine_id, day_of_week")
             .eq("user_id", userId)
             .eq("day_of_week", dayOfWeek),
+          supabase
+            .from("scheduled_routines")
+            .select("routine_id")
+            .eq("user_id", userId)
+            .eq("scheduled_date", todayStr),
         ]);
 
       if (completionsResult.error) throw completionsResult.error;
       if (userRoutinesResult.error) throw userRoutinesResult.error;
       if (dayRoutinesResult.error) throw dayRoutinesResult.error;
+      if (scheduledRoutinesResult.error) throw scheduledRoutinesResult.error;
 
       const todayCompletions = completionsResult.data || [];
       const userRoutines = userRoutinesResult.data || [];
       const todayRoutineAssignments = dayRoutinesResult.data || [];
+      const todayScheduledRoutines = scheduledRoutinesResult.data || [];
 
+      const completedRoutineIds = todayCompletions.map((c) => c.routine_id);
+
+      // Check regular day routines (daily/weekly goals variation)
       const todayDailyRoutineIds = todayRoutineAssignments.map((a) => a.routine_id);
       const todayDailyRoutines = userRoutines.filter(
         (routine) => !routine.is_weekly && todayDailyRoutineIds.includes(routine.id)
       );
 
-      const completedRoutineIds = todayCompletions.map((c) => c.routine_id);
-
-      const allCompleted =
+      const regularViewCompleted =
         todayDailyRoutines.length > 0 &&
         todayDailyRoutines.every((routine) =>
           completedRoutineIds.includes(routine.id)
         );
 
+      // Check scheduled routines (calendar variation)
+      const todayScheduledRoutineIds = todayScheduledRoutines.map((s) => s.routine_id);
+      const todayScheduledRoutinesList = userRoutines.filter(
+        (routine) => todayScheduledRoutineIds.includes(routine.id)
+      );
+
+      const calendarViewCompleted =
+        todayScheduledRoutinesList.length > 0 &&
+        todayScheduledRoutinesList.every((routine) =>
+          completedRoutineIds.includes(routine.id)
+        );
+
+      // ✅ CRITICAL: Day is complete if EITHER variation is fully completed
+      const allCompleted = regularViewCompleted || calendarViewCompleted;
+
       console.log("📋 COMPLETION CHECK RESULTS (FIXED):");
-      console.log("  - Required routines today:", todayDailyRoutines.map((r) => r.name));
+      console.log("  - Regular view routines:", todayDailyRoutines.map((r) => r.name));
+      console.log("  - Calendar view routines:", todayScheduledRoutinesList.map((r) => r.name));
       console.log("  - Completed routine IDs:", completedRoutineIds);
-      console.log("  - All daily routines completed:", allCompleted);
+      console.log("  - Regular view completed:", regularViewCompleted);
+      console.log("  - Calendar view completed:", calendarViewCompleted);
+      console.log("  - Overall day completed:", allCompleted);
 
       if (allCompleted) {
-        console.log("🎉 ALL DAILY ROUTINES COMPLETED!");
+        console.log("🎉 AT LEAST ONE HOME PAGE VARIATION FULLY COMPLETED!");
         console.log("  - Stats calendar should show GREEN for today");
         console.log("  - Date (LOCAL):", todayStr);
       } else {
-        const missing = todayDailyRoutines.filter(
-          (r) => !completedRoutineIds.includes(r.id)
-        );
-        console.log("⏳ Still need to complete:", missing.map((r) => r.name));
+        if (todayDailyRoutines.length > 0) {
+          const missingRegular = todayDailyRoutines.filter(
+            (r) => !completedRoutineIds.includes(r.id)
+          );
+          console.log("⏳ Regular view missing:", missingRegular.map((r) => r.name));
+        }
+        if (todayScheduledRoutinesList.length > 0) {
+          const missingCalendar = todayScheduledRoutinesList.filter(
+            (r) => !completedRoutineIds.includes(r.id)
+          );
+          console.log("⏳ Calendar view missing:", missingCalendar.map((r) => r.name));
+        }
       }
 
       return allCompleted;
