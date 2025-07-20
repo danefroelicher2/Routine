@@ -633,9 +633,9 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                     if (pendingRoutine) {
                       handleConfirmRoutineWithTime(pendingRoutine, hour);
                     } else {
-                      handleCreateCustomWithTime(hour);
+                      // ✅ NEW: Just close modal if selecting for custom creation
+                      setShowTimePickerModal(false);
                     }
-                    setShowTimePickerModal(false);
                   }}
                 >
                   <Text style={[
@@ -759,8 +759,13 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
   // ✅ UPDATED: Handle custom creation with calendar mode support
   const handleCreateCustom = async () => {
     if (isCalendarMode) {
-      // ✅ NEW: In calendar mode, show time picker
-      setShowTimePickerModal(true);
+      // ✅ NEW: In calendar mode, check if time slot is selected first
+      if (!selectedTimeSlot) {
+        Alert.alert("Error", "Please select a time slot for your routine");
+        return;
+      }
+      // Create and schedule with selected time slot
+      await handleCreateCustomWithTime(selectedTimeSlot);
     } else {
       // ✅ EXISTING: Direct creation for daily/weekly modes  
       await createCustomDirectly();
@@ -1075,6 +1080,28 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                 {customDescription.length}/35
               </Text>
             </View>
+
+            {/* ✅ NEW: Time slot selector for calendar mode */}
+            {isCalendarMode && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Time Slot *</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.timeSlotSelector,
+                    !selectedTimeSlot && styles.timeSlotSelectorEmpty
+                  ]}
+                  onPress={() => setShowTimePickerModal(true)}
+                >
+                  <Text style={[
+                    styles.timeSlotSelectorText,
+                    !selectedTimeSlot && styles.timeSlotSelectorTextEmpty
+                  ]}>
+                    {selectedTimeSlot ? formatTime(selectedTimeSlot) : "Select time slot..."}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color="#666" />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </SafeAreaView>
       </Modal>
@@ -1330,6 +1357,29 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "right",
     marginTop: 4,
+  },
+  // ✅ NEW: Time slot selector styles
+  timeSlotSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    minHeight: 44,
+  },
+  timeSlotSelectorEmpty: {
+    borderColor: "#ddd",
+  },
+  timeSlotSelectorText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  timeSlotSelectorTextEmpty: {
+    color: "#999",
   },
 });
 
