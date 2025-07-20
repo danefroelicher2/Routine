@@ -147,7 +147,7 @@ export default function StatsScreen() {
       console.log("  - Today (LOCAL):", todayStr);
 
       // Get both completions and user routines - EXPANDED RANGE
-      const [completionsResult, userRoutinesResult, dayRoutinesResult] =
+      const [completionsResult, userRoutinesResult, dayRoutinesResult, scheduledRoutinesResult] =
         await Promise.all([
           // ✅ CRITICAL FIX: Query using local date strings
           supabase
@@ -166,6 +166,13 @@ export default function StatsScreen() {
             .from("user_day_routines")
             .select("routine_id, day_of_week")
             .eq("user_id", user.id),
+          // ✅ NEW: Get scheduled routines
+          supabase
+            .from("scheduled_routines")
+            .select("routine_id, scheduled_date")
+            .eq("user_id", user.id)
+            .gte("scheduled_date", getLocalDateString(queryStartDate))
+            .lte("scheduled_date", getLocalDateString(queryEndDate)),
         ]);
 
       if (completionsResult.error) throw completionsResult.error;
@@ -175,6 +182,8 @@ export default function StatsScreen() {
       const completions = completionsResult.data || [];
       const userRoutines = userRoutinesResult.data || [];
       const dayAssignments = dayRoutinesResult.data || [];
+      const scheduledAssignments = scheduledRoutinesResult.data || [];
+
 
       console.log("📊 STATS: Loaded data:");
       console.log("  - Completions:", completions.length);
@@ -188,6 +197,16 @@ export default function StatsScreen() {
           dayRoutineMap[assignment.day_of_week] = [];
         }
         dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
+      });
+
+      // ✅ NEW: Build scheduled routines mapping by date
+      const scheduledRoutinesByDate = new Map<string, string[]>();
+      scheduledAssignments.forEach((assignment) => {
+        const date = assignment.scheduled_date;
+        if (!scheduledRoutinesByDate.has(date)) {
+          scheduledRoutinesByDate.set(date, []);
+        }
+        scheduledRoutinesByDate.get(date)!.push(assignment.routine_id);
       });
 
       // Create completion map for ALL dates in our expanded range
@@ -222,13 +241,28 @@ export default function StatsScreen() {
         // Get completions for this date from our expanded dataset
         const completedRoutineIds = completionsByDate.get(dateStr) || [];
 
-        // Check if ALL daily routines are completed
-        const allCompleted =
+        // ✅ NEW: Also check scheduled routines for this date
+        const scheduledRoutinesForDate = scheduledRoutinesByDate.get(dateStr) || [];
+        const scheduledRoutines = userRoutines.filter(
+          (routine) => scheduledRoutinesForDate.includes(routine.id)
+        );
+
+        // Check if regular view (daily routines) is completed
+        const regularViewCompleted =
           dailyRoutines.length > 0 &&
           dailyRoutines.every((routine) =>
             completedRoutineIds.includes(routine.id)
           );
 
+        // Check if calendar view (scheduled routines) is completed
+        const calendarViewCompleted =
+          scheduledRoutines.length > 0 &&
+          scheduledRoutines.every((routine) =>
+            completedRoutineIds.includes(routine.id)
+          );
+
+        // ✅ CRITICAL: Day is complete if EITHER variation is fully completed
+        const allCompleted = regularViewCompleted || calendarViewCompleted;
         // ✅ ENHANCED LOGGING for today's data
         if (dateStr === todayStr) {
           console.log("🟢 STATS: TODAY'S CALENDAR ANALYSIS (FIXED):");
