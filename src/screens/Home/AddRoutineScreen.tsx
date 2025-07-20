@@ -48,9 +48,15 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
     new Set()
   );
 
+  // ✅ NEW: Calendar mode state
+  const [showTimePickerModal, setShowTimePickerModal] = useState(false);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<number | null>(null);
+  const [pendingRoutine, setPendingRoutine] = useState<RoutineTemplate | null>(null);
+
   // Get parameters from navigation
   const selectedDay = route?.params?.selectedDay;
   const isWeekly = route?.params?.isWeekly;
+  const isCalendarMode = route?.params?.isCalendarMode; // ✅ NEW
   const dayNames = [
     "Sunday",
     "Monday",
@@ -482,7 +488,184 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
     }
   }, [searchQuery]);
 
+  // ✅ NEW: Helper functions for calendar mode
+  const formatTime = (hour: number) => {
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+    return `${displayHour}:00 ${period}`;
+  };
+
+  const scheduleRoutineToTimeSlot = async (routineId: string, hour: number) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const scheduledTime = `${hour.toString().padStart(2, '0')}:00`;
+
+    const { error } = await supabase
+      .from("routine_schedule")
+      .insert({
+        user_id: user.id,
+        routine_id: routineId,
+        day_of_week: selectedDay,
+        scheduled_time: scheduledTime,
+        estimated_duration: 30,
+        is_active: true
+      });
+
+    if (error) throw error;
+  };
+
+  const handleConfirmRoutineWithTime = async (routine: RoutineTemplate, timeSlot: number) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      // Create the routine first
+      const { data: newRoutine, error: routineError } = await supabase
+        .from("user_routines")
+        .insert({
+          user_id: user.id,
+          name: routine.name,
+          description: routine.description,
+          icon: routine.icon,
+          is_daily: true,  // Calendar mode is daily
+          is_weekly: false,
+          is_active: true,
+          sort_order: 0,
+        })
+        .select("id")
+        .single();
+
+      if (routineError) throw routineError;
+
+      // Schedule it to the time slot
+      await scheduleRoutineToTimeSlot(newRoutine.id, timeSlot);
+
+      Alert.alert(
+        "Success",
+        `${routine.name} scheduled for ${formatTime(timeSlot)} on ${dayNames[selectedDay]}!`
+      );
+
+      setPendingRoutine(null);
+      navigation.goBack();
+    } catch (error) {
+      console.error("Error creating scheduled routine:", error);
+      Alert.alert("Error", "Failed to create routine. Please try again.");
+    }
+  };
+
+  const handleCreateCustomWithTime = async (timeSlot: number) => {
+    if (!customTitle.trim()) {
+      Alert.alert("Error", "Please enter a title for your routine");
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      // Create the routine
+      const { data: newRoutine, error: routineError } = await supabase
+        .from("user_routines")
+        .insert({
+          user_id: user.id,
+          name: customTitle.trim(),
+          description: customDescription.trim() || null,
+          icon: "checkmark-circle",
+          is_daily: true,  // Calendar mode is daily
+          is_weekly: false,
+          is_active: true,
+          sort_order: 0,
+        })
+        .select("id")
+        .single();
+
+      if (routineError) throw routineError;
+
+      // Schedule it to the time slot
+      await scheduleRoutineToTimeSlot(newRoutine.id, timeSlot);
+
+      Alert.alert(
+        "Success",
+        `${customTitle} scheduled for ${formatTime(timeSlot)} on ${dayNames[selectedDay]}!`
+      );
+
+      setShowCreateModal(false);
+      setCustomTitle("");
+      setCustomDescription("");
+      navigation.goBack();
+    } catch (error) {
+      console.error("Error creating custom scheduled routine:", error);
+      Alert.alert("Error", "Failed to create routine. Please try again.");
+    }
+  };
+
+  // ✅ NEW: Time slot picker modal component
+  const TimeSlotPickerModal = () => {
+    const timeSlots = Array.from({ length: 16 }, (_, i) => i + 6); // 6 AM to 9 PM
+
+    return (
+      <Modal
+        visible={showTimePickerModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTimePickerModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.timePickerModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Time Slot</Text>
+              <TouchableOpacity onPress={() => setShowTimePickerModal(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.timeSlotsList}>
+              {timeSlots.map((hour) => (
+                <TouchableOpacity
+                  key={hour}
+                  style={[
+                    styles.timeSlotOption,
+                    selectedTimeSlot === hour && styles.timeSlotOptionSelected
+                  ]}
+                  onPress={() => {
+                    setSelectedTimeSlot(hour);
+                    if (pendingRoutine) {
+                      handleConfirmRoutineWithTime(pendingRoutine, hour);
+                    } else {
+                      handleCreateCustomWithTime(hour);
+                    }
+                    setShowTimePickerModal(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.timeSlotText,
+                    selectedTimeSlot === hour && styles.timeSlotTextSelected
+                  ]}>
+                    {formatTime(hour)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  // ✅ UPDATED: Handle routine selection with calendar mode support
   const handleSelectRoutine = async (routine: RoutineTemplate) => {
+    if (isCalendarMode) {
+      // ✅ NEW: In calendar mode, show time picker first
+      setPendingRoutine(routine);
+      setShowTimePickerModal(true);
+    } else {
+      // ✅ EXISTING: Direct creation for daily/weekly modes
+      await createRoutineDirectly(routine);
+    }
+  };
+
+  const createRoutineDirectly = async (routine: RoutineTemplate) => {
     try {
       const {
         data: { user },
@@ -573,7 +756,18 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
     }
   };
 
+  // ✅ UPDATED: Handle custom creation with calendar mode support
   const handleCreateCustom = async () => {
+    if (isCalendarMode) {
+      // ✅ NEW: In calendar mode, show time picker
+      setShowTimePickerModal(true);
+    } else {
+      // ✅ EXISTING: Direct creation for daily/weekly modes  
+      await createCustomDirectly();
+    }
+  };
+
+  const createCustomDirectly = async () => {
     if (!customTitle.trim()) {
       Alert.alert("Error", "Please enter a title for your routine");
       return;
@@ -833,6 +1027,9 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
         )}
       </ScrollView>
 
+      {/* ✅ NEW: Time Slot Picker Modal */}
+      {isCalendarMode && <TimeSlotPickerModal />}
+
       {/* Create Custom Routine Modal */}
       <Modal
         visible={showCreateModal}
@@ -1034,6 +1231,42 @@ const styles = StyleSheet.create({
     color: "#007AFF",
     fontWeight: "500",
     marginTop: 2,
+  },
+  // ✅ NEW: Time Picker Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  timePickerModal: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "70%",
+    width: "100%",
+  },
+  timeSlotsList: {
+    maxHeight: 400,
+    paddingBottom: 20,
+  },
+  timeSlotOption: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+    backgroundColor: "#fff",
+  },
+  timeSlotOptionSelected: {
+    backgroundColor: "#007AFF",
+  },
+  timeSlotText: {
+    fontSize: 16,
+    color: "#333",
+    textAlign: "center",
+  },
+  timeSlotTextSelected: {
+    color: "#fff",
+    fontWeight: "600",
   },
   // Modal Styles
   modalContainer: {
