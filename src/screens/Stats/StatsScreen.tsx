@@ -4,6 +4,8 @@
 // 3. Updated all date comparisons to use local timezone
 // 4. Fixed "today" detection in calendar to use device timezone
 // 5. Ensured completion data uses local dates consistently
+// 6. Added checkDailyCompletionStatusForStats function to match Home page logic
+// 7. Removed scheduled_routines references to prevent errors
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -57,6 +59,44 @@ const getLocalDateString = (date: Date): string => {
 // ✅ CRITICAL FIX: Utility to create local date from date string
 const createLocalDate = (year: number, month: number, day: number): Date => {
   return new Date(year, month, day);
+};
+
+// ✅ NEW: Stats version of completion checking that matches Home page logic exactly
+const checkDailyCompletionStatusForStats = (
+  userId: string,
+  dateStr: string,
+  dayOfWeek: number,
+  userRoutines: any[],
+  completedRoutineIds: string[],
+  dayRoutineMap: Record<number, string[]>
+): boolean => {
+  // Get routines assigned to this day of week (same logic as Home page)
+  const todayDailyRoutineIds = dayRoutineMap[dayOfWeek] || [];
+  const todayDailyRoutines = userRoutines.filter(
+    (routine) => !routine.is_weekly && todayDailyRoutineIds.includes(routine.id)
+  );
+
+  // Check if all daily routines are completed (same logic as Home page)
+  const allCompleted =
+    todayDailyRoutines.length > 0 &&
+    todayDailyRoutines.every((routine) =>
+      completedRoutineIds.includes(routine.id)
+    );
+
+  // Enhanced logging for today
+  const today = getLocalDateString(new Date());
+  if (dateStr === today) {
+    console.log("🟢 STATS: TODAY'S COMPLETION CHECK (MATCHING HOME PAGE):");
+    console.log("  - Date (LOCAL):", dateStr);
+    console.log("  - Day of week:", dayOfWeek);
+    console.log("  - Required routines:", todayDailyRoutines.map((r) => r.name || r.id));
+    console.log("  - Completed routine IDs:", completedRoutineIds);
+    console.log("  - All completed?", allCompleted);
+    console.log("  - Calendar will show:", allCompleted ? "GREEN" : "TRANSPARENT");
+    console.log("  - This should MATCH the Home page completion status!");
+  }
+
+  return allCompleted;
 };
 
 export default function StatsScreen() {
@@ -147,7 +187,7 @@ export default function StatsScreen() {
       console.log("  - Today (LOCAL):", todayStr);
 
       // Get both completions and user routines - EXPANDED RANGE
-      const [completionsResult, userRoutinesResult, dayRoutinesResult, scheduledRoutinesResult] =
+      const [completionsResult, userRoutinesResult, dayRoutinesResult] =
         await Promise.all([
           // ✅ CRITICAL FIX: Query using local date strings
           supabase
@@ -166,13 +206,6 @@ export default function StatsScreen() {
             .from("user_day_routines")
             .select("routine_id, day_of_week")
             .eq("user_id", user.id),
-          // ✅ NEW: Get scheduled routines
-          supabase
-            .from("scheduled_routines")
-            .select("routine_id, scheduled_date")
-            .eq("user_id", user.id)
-            .gte("scheduled_date", getLocalDateString(queryStartDate))
-            .lte("scheduled_date", getLocalDateString(queryEndDate)),
         ]);
 
       if (completionsResult.error) throw completionsResult.error;
@@ -182,8 +215,6 @@ export default function StatsScreen() {
       const completions = completionsResult.data || [];
       const userRoutines = userRoutinesResult.data || [];
       const dayAssignments = dayRoutinesResult.data || [];
-      const scheduledAssignments = scheduledRoutinesResult.data || [];
-
 
       console.log("📊 STATS: Loaded data:");
       console.log("  - Completions:", completions.length);
@@ -197,16 +228,6 @@ export default function StatsScreen() {
           dayRoutineMap[assignment.day_of_week] = [];
         }
         dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
-      });
-
-      // ✅ NEW: Build scheduled routines mapping by date
-      const scheduledRoutinesByDate = new Map<string, string[]>();
-      scheduledAssignments.forEach((assignment) => {
-        const date = assignment.scheduled_date;
-        if (!scheduledRoutinesByDate.has(date)) {
-          scheduledRoutinesByDate.set(date, []);
-        }
-        scheduledRoutinesByDate.get(date)!.push(assignment.routine_id);
       });
 
       // Create completion map for ALL dates in our expanded range
@@ -231,53 +252,28 @@ export default function StatsScreen() {
         const dateStr = getLocalDateString(d);
         const dayOfWeek = d.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
-        // Get routines that should be active on this day (daily routines only)
-        const dailyRoutineIds = dayRoutineMap[dayOfWeek] || [];
-        const dailyRoutines = userRoutines.filter(
-          (routine) =>
-            !routine.is_weekly && dailyRoutineIds.includes(routine.id)
-        );
-
         // Get completions for this date from our expanded dataset
         const completedRoutineIds = completionsByDate.get(dateStr) || [];
 
-        // ✅ NEW: Also check scheduled routines for this date
-        const scheduledRoutinesForDate = scheduledRoutinesByDate.get(dateStr) || [];
-        const scheduledRoutines = userRoutines.filter(
-          (routine) => scheduledRoutinesForDate.includes(routine.id)
+        // ✅ FIXED: Use the same completion logic as Home page
+        const allCompleted = checkDailyCompletionStatusForStats(
+          user.id,
+          dateStr,
+          dayOfWeek,
+          userRoutines,
+          completedRoutineIds,
+          dayRoutineMap
         );
 
-        // Check if regular view (daily routines) is completed
-        const regularViewCompleted =
-          dailyRoutines.length > 0 &&
-          dailyRoutines.every((routine) =>
-            completedRoutineIds.includes(routine.id)
-          );
-
-        // Check if calendar view (scheduled routines) is completed
-        const calendarViewCompleted =
-          scheduledRoutines.length > 0 &&
-          scheduledRoutines.every((routine) =>
-            completedRoutineIds.includes(routine.id)
-          );
-
-        // ✅ CRITICAL: Day is complete if EITHER variation is fully completed
-        const allCompleted = regularViewCompleted || calendarViewCompleted;
-        // ✅ ENHANCED LOGGING for today's data
+        // ✅ ENHANCED LOGGING for today's data (matching Home page style)
         if (dateStr === todayStr) {
-          console.log("🟢 STATS: TODAY'S CALENDAR ANALYSIS (FIXED):");
+          console.log("🟢 STATS: TODAY'S CALENDAR ANALYSIS (MATCHING HOME PAGE):");
           console.log("  - Date (LOCAL):", dateStr);
           console.log("  - Day of week:", dayOfWeek);
-          console.log(
-            "  - Required routines:",
-            dailyRoutines.map((r) => `${r.name} (${r.id})`)
-          );
           console.log("  - Completed routine IDs:", completedRoutineIds);
           console.log("  - All completed?", allCompleted);
-          console.log(
-            "  - Calendar will show:",
-            allCompleted ? "GREEN" : "TRANSPARENT"
-          );
+          console.log("  - Calendar will show:", allCompleted ? "GREEN" : "TRANSPARENT");
+          console.log("  - This should MATCH the Home page completion status!");
         }
 
         successData.push({
@@ -400,28 +396,21 @@ export default function StatsScreen() {
         );
         const dayOfWeek = checkDate.getDay();
 
-        const dailyRoutineIds = dayRoutineMap[dayOfWeek] || [];
-        const dailyRoutines = userRoutines.filter(
-          (routine) =>
-            !routine.is_weekly && dailyRoutineIds.includes(routine.id)
-        );
-
         if (date === today) {
           console.log(`TODAY (${date}) analysis:`);
           console.log("- Day of week:", dayOfWeek);
-          console.log("- Required routine IDs:", dailyRoutineIds);
-          console.log(
-            "- Required routines:",
-            dailyRoutines.map((r) => r.id)
-          );
           console.log("- Completed routine IDs:", completedRoutineIds);
         }
 
-        const allCompleted =
-          dailyRoutines.length > 0 &&
-          dailyRoutines.every((routine) =>
-            completedRoutineIds.includes(routine.id)
-          );
+        // ✅ FIXED: Use the same completion logic as Home page
+        const allCompleted = checkDailyCompletionStatusForStats(
+          userId,
+          date,
+          dayOfWeek,
+          userRoutines,
+          completedRoutineIds,
+          dayRoutineMap
+        );
 
         if (date === today) {
           console.log("- All completed?", allCompleted);
@@ -578,17 +567,15 @@ export default function StatsScreen() {
         );
         const dayOfWeek = checkDate.getDay();
 
-        const dailyRoutineIds = dayRoutineMap[dayOfWeek] || [];
-        const dailyRoutines = userRoutines.filter(
-          (routine) =>
-            !routine.is_weekly && dailyRoutineIds.includes(routine.id)
+        // ✅ FIXED: Use the same completion logic as Home page
+        const allCompleted = checkDailyCompletionStatusForStats(
+          userId,
+          date,
+          dayOfWeek,
+          userRoutines,
+          completedRoutineIds,
+          dayRoutineMap
         );
-
-        const allCompleted =
-          dailyRoutines.length > 0 &&
-          dailyRoutines.every((routine) =>
-            completedRoutineIds.includes(routine.id)
-          );
 
         if (allCompleted) {
           successDays.add(date);
