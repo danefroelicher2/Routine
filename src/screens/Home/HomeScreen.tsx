@@ -1342,7 +1342,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <View style={[styles.createButtonContainer, { backgroundColor: colors.surface }]}>
             <TouchableOpacity
               style={[styles.createButton, { backgroundColor: "#007AFF" }]}
-              onPress={() => navigation.navigate("AddRoutine")}  // ✅ CORRECT
+              onPress={() => navigation.navigate("AddRoutine", {
+                selectedDay,
+                isCalendarMode: true  // ✅ NEW: Tell AddRoutine we're in calendar mode
+              })}
             >
               <Ionicons name="add" size={24} color="white" />
               <Text style={styles.createButtonText}>Create Routine</Text>
