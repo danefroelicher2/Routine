@@ -756,23 +756,40 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           weekStartDate = getLocalDateString(weekStart);
         }
 
-        const { error } = await supabase.from("routine_completions").insert({
+        console.log("🔄 About to insert completion:", {
           user_id: user.id,
           routine_id: routine.id,
-          completion_date: completionDate, // ✅ FIXED: Using local date
+          routine_name: routine.name,
+          completion_date: completionDate,
           week_start_date: weekStartDate,
         });
 
-        if (error) throw error;
+        const { error, data } = await supabase.from("routine_completions").insert({
+          user_id: user.id,
+          routine_id: routine.id,
+          completion_date: completionDate,
+          week_start_date: weekStartDate,
+        });
+
+        console.log("📥 Database insert result:", { error, data });
+
+        if (error) {
+          console.error("❌ Database insert failed:", error);
+          throw error;
+        }
+
+        console.log("✅ Database insert successful");
 
         console.log("✅ ROUTINE CHECKED (FIXED):");
         console.log("  - Routine:", routine.name);
         console.log("  - Completion date (LOCAL):", completionDate);
       }
 
+      // ✅ FIX: Add small delay to ensure database write is committed
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Check if all daily routines are now completed
       const allCompleted = await checkDailyCompletionStatus(user.id);
-
       if (allCompleted) {
         console.log("🎯 ALL DAILY ROUTINES COMPLETED FOR TODAY!");
         console.log("  - This should trigger GREEN in Stats calendar");
