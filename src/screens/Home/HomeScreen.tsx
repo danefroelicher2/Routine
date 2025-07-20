@@ -1342,7 +1342,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <View style={[styles.createButtonContainer, { backgroundColor: colors.surface }]}>
             <TouchableOpacity
               style={[styles.createButton, { backgroundColor: "#007AFF" }]}
-              onPress={() => setShowCreateModal(true)}
+              onPress={() => navigation.navigate("AddRoutine")}  // ✅ CORRECT
             >
               <Ionicons name="add" size={24} color="white" />
               <Text style={styles.createButtonText}>Create Routine</Text>
