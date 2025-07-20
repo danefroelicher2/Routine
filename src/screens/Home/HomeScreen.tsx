@@ -1344,7 +1344,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               style={[styles.createButton, { backgroundColor: "#007AFF" }]}
               onPress={() => navigation.navigate("AddRoutine", {
                 selectedDay,
-                isCalendarMode: true  // ✅ NEW: Tell AddRoutine we're in calendar mode
+                isCalendarMode: true  // ✅ ADD this parameter
               })}
             >
               <Ionicons name="add" size={24} color="white" />
