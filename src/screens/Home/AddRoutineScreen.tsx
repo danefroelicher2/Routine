@@ -631,9 +631,10 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                   onPress={() => {
                     setSelectedTimeSlot(hour);
                     if (pendingRoutine) {
+                      // For pre-loaded routines - create and schedule immediately
                       handleConfirmRoutineWithTime(pendingRoutine, hour);
                     } else {
-                      // ✅ NEW: Just close modal if selecting for custom creation
+                      // For custom creation - just close modal and update form
                       setShowTimePickerModal(false);
                     }
                   }}
@@ -1032,8 +1033,8 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
         )}
       </ScrollView>
 
-      {/* ✅ NEW: Time Slot Picker Modal */}
-      {isCalendarMode && <TimeSlotPickerModal />}
+      {/* ✅ NEW: Time Slot Picker Modal - Only for pre-loaded routines */}
+      {showTimePickerModal && pendingRoutine && <TimeSlotPickerModal />}
 
       {/* Create Custom Routine Modal */}
       <Modal
@@ -1090,7 +1091,10 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                     styles.timeSlotSelector,
                     !selectedTimeSlot && styles.timeSlotSelectorEmpty
                   ]}
-                  onPress={() => setShowTimePickerModal(true)}
+                  onPress={() => {
+                    console.log("Time slot dropdown clicked"); // Debug log
+                    setShowTimePickerModal(true);
+                  }}
                 >
                   <Text style={[
                     styles.timeSlotSelectorText,
@@ -1100,6 +1104,35 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                   </Text>
                   <Ionicons name="chevron-down" size={20} color="#666" />
                 </TouchableOpacity>
+
+                {/* ✅ NEW: Inline time slots dropdown */}
+                {showTimePickerModal && !pendingRoutine && (
+                  <View style={styles.inlineTimeSlots}>
+                    <ScrollView style={styles.inlineTimeSlotsList} showsVerticalScrollIndicator={false}>
+                      {Array.from({ length: 16 }, (_, i) => i + 6).map((hour) => (
+                        <TouchableOpacity
+                          key={hour}
+                          style={[
+                            styles.inlineTimeSlotOption,
+                            selectedTimeSlot === hour && styles.inlineTimeSlotOptionSelected
+                          ]}
+                          onPress={() => {
+                            console.log("Time selected:", hour); // Debug log
+                            setSelectedTimeSlot(hour);
+                            setShowTimePickerModal(false);
+                          }}
+                        >
+                          <Text style={[
+                            styles.inlineTimeSlotText,
+                            selectedTimeSlot === hour && styles.inlineTimeSlotTextSelected
+                          ]}>
+                            {formatTime(hour)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -1380,6 +1413,41 @@ const styles = StyleSheet.create({
   },
   timeSlotSelectorTextEmpty: {
     color: "#999",
+  },
+  // ✅ NEW: Inline time slots dropdown styles
+  inlineTimeSlots: {
+    marginTop: 8,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+    borderRadius: 8,
+    maxHeight: 200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  inlineTimeSlotsList: {
+    maxHeight: 200,
+  },
+  inlineTimeSlotOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  inlineTimeSlotOptionSelected: {
+    backgroundColor: "#007AFF",
+  },
+  inlineTimeSlotText: {
+    fontSize: 16,
+    color: "#333",
+    textAlign: "center",
+  },
+  inlineTimeSlotTextSelected: {
+    color: "#fff",
+    fontWeight: "600",
   },
 });
 
