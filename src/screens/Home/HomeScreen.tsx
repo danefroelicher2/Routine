@@ -1476,10 +1476,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => {
-                    loadAvailableRoutines();
-                    setShowDayRoutineModal(true);
-                  }}
+                  onPress={() => navigation.navigate("AddRoutine", { selectedDay })}  // ✅ CORRECT
                   style={styles.addButton}
                 >
                   <Ionicons name="add" size={20} color="#007AFF" />
