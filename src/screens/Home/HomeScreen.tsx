@@ -171,7 +171,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // NEW: Sync streak data in background
   const syncStreaksAfterCompletion = async (userId: string) => {
     try {
-      await StreakSyncService.checkAndSyncUserStreaks(userId);
+      await StreakSyncService.syncUserStreaks(userId);
     } catch (error) {
       console.error("Error syncing streaks after completion:", error);
     }
