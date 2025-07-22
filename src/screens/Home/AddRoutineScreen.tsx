@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
+import { useTheme } from "../../../ThemeContext"; // ✅ ADDED: Import useTheme hook
 
 interface RoutineTemplate {
   id: string;
@@ -37,6 +38,9 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
   navigation,
   route,
 }) => {
+  // ✅ ADDED: Use theme colors
+  const { colors } = useTheme();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredRoutines, setFilteredRoutines] = useState<RoutineTemplate[]>(
     []
@@ -612,11 +616,11 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
         onRequestClose={() => setShowTimePickerModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.timePickerModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Time Slot</Text>
+          <View style={[styles.timePickerModal, { backgroundColor: colors.surface }]}>
+            <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Time Slot</Text>
               <TouchableOpacity onPress={() => setShowTimePickerModal(false)}>
-                <Ionicons name="close" size={24} color="#666" />
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -626,7 +630,8 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                   key={hour}
                   style={[
                     styles.timeSlotOption,
-                    selectedTimeSlot === hour && styles.timeSlotOptionSelected
+                    { backgroundColor: colors.surface, borderBottomColor: colors.separator },
+                    selectedTimeSlot === hour && [styles.timeSlotOptionSelected, { backgroundColor: "#007AFF" }]
                   ]}
                   onPress={() => {
                     setSelectedTimeSlot(hour);
@@ -641,6 +646,7 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                 >
                   <Text style={[
                     styles.timeSlotText,
+                    { color: colors.text },
                     selectedTimeSlot === hour && styles.timeSlotTextSelected
                   ]}>
                     {formatTime(hour)}
@@ -892,19 +898,19 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
     const isExpanded = expandedCategories.has(category);
 
     return (
-      <View key={category} style={styles.categorySection}>
+      <View key={category} style={[styles.categorySection, { backgroundColor: colors.surface }]}>
         <TouchableOpacity
-          style={styles.categoryHeader}
+          style={[styles.categoryHeader, { backgroundColor: colors.background, borderBottomColor: colors.separator }]}
           onPress={() => toggleCategory(category)}
         >
           <View style={styles.categoryHeaderLeft}>
-            <Text style={styles.categoryTitle}>{category}</Text>
-            <Text style={styles.categoryCount}>({routines.length})</Text>
+            <Text style={[styles.categoryTitle, { color: colors.text }]}>{category}</Text>
+            <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>({routines.length})</Text>
           </View>
           <Ionicons
             name={isExpanded ? "chevron-up" : "chevron-down"}
             size={20}
-            color="#666"
+            color={colors.textSecondary}
           />
         </TouchableOpacity>
 
@@ -913,10 +919,10 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
             {routines.map((routine) => (
               <TouchableOpacity
                 key={routine.id}
-                style={styles.routineItemInCategory}
+                style={[styles.routineItemInCategory, { backgroundColor: colors.surface }]}
                 onPress={() => handleSelectRoutine(routine)}
               >
-                <View style={styles.routineIcon}>
+                <View style={[styles.routineIcon, { backgroundColor: colors.background }]}>
                   <Ionicons
                     name={routine.icon as any}
                     size={20}
@@ -924,9 +930,9 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                   />
                 </View>
                 <View style={styles.routineInfo}>
-                  <Text style={styles.routineName}>{routine.name}</Text>
+                  <Text style={[styles.routineName, { color: colors.text }]}>{routine.name}</Text>
                   {routine.description && (
-                    <Text style={styles.routineDescription}>
+                    <Text style={[styles.routineDescription, { color: colors.textSecondary }]}>
                       {routine.description}
                     </Text>
                   )}
@@ -951,27 +957,28 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{getHeaderTitle()}</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#666" />
+      <View style={[styles.searchContainer, { backgroundColor: colors.surface }]}>
+        <View style={[styles.searchBar, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Ionicons name="search" size={20} color={colors.textSecondary} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Search routines..."
+            placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
         <TouchableOpacity
-          style={styles.createButton}
+          style={[styles.createButton, { backgroundColor: colors.background, borderColor: "#007AFF" }]}
           onPress={() => setShowCreateModal(true)}
         >
           <Ionicons name="add" size={20} color="#007AFF" />
@@ -979,21 +986,21 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={[styles.content, { backgroundColor: colors.background }]}>
         {searchQuery.trim() ? (
           // Show search results
           <>
-            <Text style={styles.sectionTitle}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Search Results ({filteredRoutines.length})
             </Text>
             <FlatList
               data={filteredRoutines}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={styles.routineItem}
+                  style={[styles.routineItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
                   onPress={() => handleSelectRoutine(item)}
                 >
-                  <View style={styles.routineIcon}>
+                  <View style={[styles.routineIcon, { backgroundColor: colors.background }]}>
                     <Ionicons
                       name={item.icon as any}
                       size={24}
@@ -1001,9 +1008,9 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                     />
                   </View>
                   <View style={styles.routineInfo}>
-                    <Text style={styles.routineName}>{item.name}</Text>
+                    <Text style={[styles.routineName, { color: colors.text }]}>{item.name}</Text>
                     {item.description && (
-                      <Text style={styles.routineDescription}>
+                      <Text style={[styles.routineDescription, { color: colors.textSecondary }]}>
                         {item.description}
                       </Text>
                     )}
@@ -1020,7 +1027,7 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
         ) : (
           // Show categorized routines
           <>
-            <Text style={styles.sectionTitle}>Browse by Category</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Browse by Category</Text>
             <ScrollView
               style={styles.categoriesContainer}
               showsVerticalScrollIndicator={false}
@@ -1042,12 +1049,12 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setShowCreateModal(false)}>
-              <Text style={styles.modalCancelButton}>Cancel</Text>
+              <Text style={[styles.modalCancelButton, { color: colors.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Create Custom Routine</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Create Custom Routine</Text>
             <TouchableOpacity onPress={handleCreateCustom}>
               <Text style={styles.modalSaveButton}>Save</Text>
             </TouchableOpacity>
@@ -1055,29 +1062,31 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
 
           <View style={styles.modalContent}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Title *</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Title *</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
                 placeholder="Enter routine title..."
+                placeholderTextColor={colors.placeholder}
                 value={customTitle}
                 onChangeText={setCustomTitle}
                 maxLength={20}
               />
-              <Text style={styles.charCount}>{customTitle.length}/20</Text>
+              <Text style={[styles.charCount, { color: colors.textSecondary }]}>{customTitle.length}/20</Text>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Description (Optional)</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Description (Optional)</Text>
               <TextInput
-                style={[styles.textInput, styles.textArea]}
+                style={[styles.textInput, styles.textArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
                 placeholder="Enter description..."
+                placeholderTextColor={colors.placeholder}
                 value={customDescription}
                 onChangeText={setCustomDescription}
                 maxLength={35}
                 multiline
                 numberOfLines={3}
               />
-              <Text style={styles.charCount}>
+              <Text style={[styles.charCount, { color: colors.textSecondary }]}>
                 {customDescription.length}/35
               </Text>
             </View>
@@ -1085,10 +1094,11 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
             {/* ✅ NEW: Time slot selector for calendar mode */}
             {isCalendarMode && (
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Time Slot *</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Time Slot *</Text>
                 <TouchableOpacity
                   style={[
                     styles.timeSlotSelector,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
                     !selectedTimeSlot && styles.timeSlotSelectorEmpty
                   ]}
                   onPress={() => {
@@ -1098,23 +1108,25 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                 >
                   <Text style={[
                     styles.timeSlotSelectorText,
-                    !selectedTimeSlot && styles.timeSlotSelectorTextEmpty
+                    { color: colors.text },
+                    !selectedTimeSlot && [styles.timeSlotSelectorTextEmpty, { color: colors.placeholder }]
                   ]}>
                     {selectedTimeSlot ? formatTime(selectedTimeSlot) : "Select time slot..."}
                   </Text>
-                  <Ionicons name="chevron-down" size={20} color="#666" />
+                  <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
 
                 {/* ✅ NEW: Inline time slots dropdown */}
                 {showTimePickerModal && !pendingRoutine && (
-                  <View style={styles.inlineTimeSlots}>
+                  <View style={[styles.inlineTimeSlots, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <ScrollView style={styles.inlineTimeSlotsList} showsVerticalScrollIndicator={false}>
                       {Array.from({ length: 16 }, (_, i) => i + 6).map((hour) => (
                         <TouchableOpacity
                           key={hour}
                           style={[
                             styles.inlineTimeSlotOption,
-                            selectedTimeSlot === hour && styles.inlineTimeSlotOptionSelected
+                            { borderBottomColor: colors.separator },
+                            selectedTimeSlot === hour && [styles.inlineTimeSlotOptionSelected, { backgroundColor: "#007AFF" }]
                           ]}
                           onPress={() => {
                             console.log("Time selected:", hour); // Debug log
@@ -1124,6 +1136,7 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                         >
                           <Text style={[
                             styles.inlineTimeSlotText,
+                            { color: colors.text },
                             selectedTimeSlot === hour && styles.inlineTimeSlotTextSelected
                           ]}>
                             {formatTime(hour)}
@@ -1145,7 +1158,7 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    // ✅ REMOVED: backgroundColor: "#f5f5f5", - NOW USES THEME
   },
   header: {
     flexDirection: "row",
@@ -1153,45 +1166,49 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#fff",
+    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
+    // ✅ REMOVED: borderBottomColor: "#e9ecef", - NOW USES THEME
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
+    // ✅ REMOVED: color: "#333", - NOW USES THEME
   },
   searchContainer: {
     flexDirection: "row",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#fff",
+    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     gap: 12,
   },
   searchBar: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8f9fa",
+    // ✅ REMOVED: backgroundColor: "#f8f9fa", - NOW USES THEME
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     gap: 8,
+    borderWidth: 1,
+    // ✅ REMOVED: borderColor: "#e9ecef", - NOW USES THEME
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: "#333",
+    // ✅ REMOVED: color: "#333", - NOW USES THEME
   },
   createButton: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "#f0f8ff",
+    // ✅ REMOVED: backgroundColor: "#f0f8ff", - NOW USES THEME
     borderRadius: 8,
     gap: 4,
+    borderWidth: 1,
+    // ✅ REMOVED: borderColor: "#007AFF", - KEPT AS IS
   },
   createButtonText: {
     fontSize: 16,
@@ -1201,11 +1218,12 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 16,
+    // ✅ REMOVED: backgroundColor: "#f5f5f5", - NOW USES THEME
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#333",
+    // ✅ REMOVED: color: "#333", - NOW USES THEME
     marginVertical: 16,
   },
   categoriesContainer: {
@@ -1213,7 +1231,7 @@ const styles = StyleSheet.create({
   },
   categorySection: {
     marginBottom: 16,
-    backgroundColor: "#fff",
+    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderRadius: 12,
     overflow: "hidden",
   },
@@ -1223,7 +1241,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#f8f9fa",
+    // ✅ REMOVED: backgroundColor: "#f8f9fa", - NOW USES THEME
+    borderBottomWidth: 1,
+    // ✅ REMOVED: borderBottomColor: "#f0f0f0", - NOW USES THEME
   },
   categoryHeaderLeft: {
     flexDirection: "row",
@@ -1233,11 +1253,11 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
+    // ✅ REMOVED: color: "#333", - NOW USES THEME
   },
   categoryCount: {
     fontSize: 14,
-    color: "#666",
+    // ✅ REMOVED: color: "#666", - NOW USES THEME
   },
   categoryContent: {
     padding: 8,
@@ -1247,7 +1267,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: "#fff",
+    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderRadius: 8,
     marginBottom: 4,
     gap: 12,
@@ -1260,16 +1280,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#fff",
+    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderRadius: 12,
     marginBottom: 8,
     gap: 12,
+    borderWidth: 1,
+    // ✅ REMOVED: borderColor: "#e9ecef", - NOW USES THEME
   },
   routineIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#f0f8ff",
+    // ✅ REMOVED: backgroundColor: "#f0f8ff", - NOW USES THEME
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1279,12 +1301,12 @@ const styles = StyleSheet.create({
   routineName: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
+    // ✅ REMOVED: color: "#333", - NOW USES THEME
     marginBottom: 2,
   },
   routineDescription: {
     fontSize: 14,
-    color: "#666",
+    // ✅ REMOVED: color: "#666", - NOW USES THEME
   },
   routineCategory: {
     fontSize: 12,
@@ -1299,7 +1321,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   timePickerModal: {
-    backgroundColor: "#fff",
+    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: "70%",
@@ -1313,15 +1335,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-    backgroundColor: "#fff",
+    // ✅ REMOVED: borderBottomColor: "#f0f0f0", - NOW USES THEME
+    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
   },
   timeSlotOptionSelected: {
-    backgroundColor: "#007AFF",
+    // backgroundColor: "#007AFF", - KEPT AS IS (blue selection)
   },
   timeSlotText: {
     fontSize: 16,
-    color: "#333",
+    // ✅ REMOVED: color: "#333", - NOW USES THEME
     textAlign: "center",
   },
   timeSlotTextSelected: {
@@ -1331,7 +1353,7 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    // ✅ REMOVED: backgroundColor: "#f5f5f5", - NOW USES THEME
   },
   modalHeader: {
     flexDirection: "row",
@@ -1339,18 +1361,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#fff",
+    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
+    // ✅ REMOVED: borderBottomColor: "#e9ecef", - NOW USES THEME
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
+    // ✅ REMOVED: color: "#333", - NOW USES THEME
   },
   modalCancelButton: {
     fontSize: 16,
-    color: "#666",
+    // ✅ REMOVED: color: "#666", - NOW USES THEME
   },
   modalSaveButton: {
     fontSize: 16,
@@ -1368,18 +1390,18 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
+    // ✅ REMOVED: color: "#333", - NOW USES THEME
     marginBottom: 8,
   },
   textInput: {
-    backgroundColor: "#fff",
+    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderWidth: 1,
-    borderColor: "#e9ecef",
+    // ✅ REMOVED: borderColor: "#e9ecef", - NOW USES THEME
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
-    color: "#333",
+    // ✅ REMOVED: color: "#333", - NOW USES THEME
   },
   textArea: {
     height: 80,
@@ -1387,7 +1409,7 @@ const styles = StyleSheet.create({
   },
   charCount: {
     fontSize: 12,
-    color: "#666",
+    // ✅ REMOVED: color: "#666", - NOW USES THEME
     textAlign: "right",
     marginTop: 4,
   },
@@ -1396,30 +1418,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#fff",
+    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderWidth: 1,
-    borderColor: "#e9ecef",
+    // ✅ REMOVED: borderColor: "#e9ecef", - NOW USES THEME
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
     minHeight: 44,
   },
   timeSlotSelectorEmpty: {
-    borderColor: "#ddd",
+    // ✅ REMOVED: borderColor: "#ddd", - NOW USES THEME (inherits from timeSlotSelector)
   },
   timeSlotSelectorText: {
     fontSize: 16,
-    color: "#333",
+    // ✅ REMOVED: color: "#333", - NOW USES THEME
   },
   timeSlotSelectorTextEmpty: {
-    color: "#999",
+    // ✅ REMOVED: color: "#999", - NOW USES THEME
   },
   // ✅ NEW: Inline time slots dropdown styles
   inlineTimeSlots: {
     marginTop: 8,
-    backgroundColor: "#fff",
+    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderWidth: 1,
-    borderColor: "#e9ecef",
+    // ✅ REMOVED: borderColor: "#e9ecef", - NOW USES THEME
     borderRadius: 8,
     maxHeight: 200,
     shadowColor: "#000",
@@ -1435,14 +1457,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    // ✅ REMOVED: borderBottomColor: "#f0f0f0", - NOW USES THEME
   },
   inlineTimeSlotOptionSelected: {
-    backgroundColor: "#007AFF",
+    // backgroundColor: "#007AFF", - KEPT AS IS (blue selection)
   },
   inlineTimeSlotText: {
     fontSize: 16,
-    color: "#333",
+    // ✅ REMOVED: color: "#333", - NOW USES THEME
     textAlign: "center",
   },
   inlineTimeSlotTextSelected: {
