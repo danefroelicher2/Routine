@@ -788,21 +788,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
     },
-    timePickerDebugIndicator: {
-        position: 'absolute',
-        top: 100,
-        left: 0,
-        right: 0,
-        backgroundColor: 'red',
-        padding: 10,
-        zIndex: 9999,
-    },
-    debugText: {
-        color: 'white',
-        textAlign: 'center',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
+
     timePickerModal: {
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
