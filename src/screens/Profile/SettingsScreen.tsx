@@ -550,10 +550,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
             {/* Schedule Settings Modal */}
             <Modal
-                visible={showScheduleModal}
+                visible={showTimePickerModal}
                 animationType="slide"
-                presentationStyle="pageSheet"
-                onRequestClose={() => setShowScheduleModal(false)}
+                transparent={true}
+                presentationStyle="overFullScreen"
+                onRequestClose={() => setShowTimePickerModal(false)}
+                onShow={() => console.log('🚨 MODAL onShow FIRED - Modal is definitely visible!')}
             >
                 <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
                     <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
