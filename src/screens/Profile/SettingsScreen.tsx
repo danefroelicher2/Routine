@@ -11,6 +11,7 @@ import {
     Modal,
     FlatList,
     Platform,
+    InteractionManager
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
@@ -283,20 +284,21 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         console.log('✅ Time selection completed successfully');
     };
 
-    // ✅ COMPLETELY NEW: Simple time picker opener
-    // ✅ NEW: Open time picker with iOS delay fix
+    // ✅ NEW: Open time picker with iOS delay fix and InteractionManager
     const openTimePicker = (day: DaySchedule, type: 'start' | 'end') => {
         setSelectedDay(day);
         setTimePickerType(type);
 
-        // iOS modal visibility fix - add delay
-        if (Platform.OS === 'ios') {
-            setTimeout(() => {
+        // Use InteractionManager to ensure smooth animation
+        InteractionManager.runAfterInteractions(() => {
+            if (Platform.OS === 'ios') {
+                setTimeout(() => {
+                    setShowTimePickerModal(true);
+                }, 200);
+            } else {
                 setShowTimePickerModal(true);
-            }, 200);
-        } else {
-            setShowTimePickerModal(true);
-        }
+            }
+        });
     };
 
     const formatHour = (hour: number) => {
@@ -574,22 +576,16 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                 </SafeAreaView>
             </Modal>
 
-            {/* ✅ BRAND NEW: Super Simple Time Picker Modal */}
+            {/* ✅ UPDATED: Time Picker Modal with iOS fix */}
             <Modal
                 visible={showTimePickerModal}
+                animationType="fade"
                 transparent={true}
-                animationType="slide"
-                onRequestClose={() => {
-                    console.log("🚨 Time picker modal closing");
-                    setShowTimePickerModal(false);
-                    setSelectedDay(null);
-                }}
+                presentationStyle="overFullScreen"
+                onRequestClose={() => setShowTimePickerModal(false)}
             >
                 <View style={styles.timePickerOverlay}>
-                    {/* ✅ DEBUG: Visual confirmation that modal is rendering */}
-                    <View style={styles.timePickerDebugIndicator}>
-                        <Text style={styles.debugText}>⚡ TIME PICKER IS VISIBLE ⚡</Text>
-                    </View>
+
 
                     <View style={[styles.timePickerModal, { backgroundColor: colors.surface }]}>
                         {/* Header */}
