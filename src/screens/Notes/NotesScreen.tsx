@@ -158,22 +158,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     return stripped.length > 60 ? stripped.substring(0, 60) + "..." : stripped;
   };
 
-  // ✅ NEW: Highlight search terms in text
-  const highlightSearchTerm = (text: string, searchTerm: string) => {
-    if (!searchTerm || !text) return text;
-
-    const regex = new RegExp(`(${searchTerm})`, 'gi');
-    const parts = text.split(regex);
-
-    return parts.map((part, index) => {
-      if (part.toLowerCase() === searchTerm.toLowerCase()) {
-        return `**${part}**`; // Simple highlight indicator
-      }
-      return part;
-    }).join('');
-  };
-
-  const renderNoteCard = (note: Note, showHighlight: boolean = false) => (
+  const renderNoteCard = (note: Note) => (
     <TouchableOpacity
       key={note.id}
       style={[styles.noteCard, { backgroundColor: colors.surface }]} // USE THEME
@@ -184,10 +169,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
           style={[styles.noteCardTitle, { color: colors.text }]}
           numberOfLines={1}
         >
-          {showHighlight && searchQuery ?
-            highlightSearchTerm(note.title || "Untitled", searchQuery) :
-            note.title || "Untitled"
-          }
+          {note.title || "Untitled"}
         </Text>
         <View style={styles.noteCardActions}>
           {/* Show lock indicator if note is locked */}
@@ -218,10 +200,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
       <Text style={[styles.noteCardDate, { color: colors.textSecondary }]}>
         {formatDate(note.updated_at)}
         {getPreviewText(note.content || "") &&
-          ` ${showHighlight && searchQuery ?
-            highlightSearchTerm(getPreviewText(note.content || ""), searchQuery) :
-            getPreviewText(note.content || "")
-          }`}
+          ` ${getPreviewText(note.content || "")}`}
       </Text>
     </TouchableOpacity>
   );
@@ -271,7 +250,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
         >
           {filteredNotes.map((note, index) => (
             <View key={note.id}>
-              {renderNoteCard(note, true)}
+              {renderNoteCard(note)}
               {index < filteredNotes.length - 1 && (
                 <View
                   style={[
