@@ -1,5 +1,5 @@
 // src/screens/Home/HomeScreen.tsx
-// ✅ COMPLETE: All existing functionality + working calendar scheduling + CREATE BUTTON
+// ✅ COMPLETE: All existing functionality + working calendar scheduling + CREATE BUTTON + SCHEDULE SETTINGS INTEGRATION
 
 import React, {
   useState,
@@ -35,17 +35,24 @@ interface RoutineWithCompletion extends UserRoutine {
   completionId?: string;
 }
 
-// ✅ NEW: Interface for scheduled routines
+// ✅ EXISTING: Interface for scheduled routines
 interface ScheduledRoutine extends RoutineWithCompletion {
   scheduled_time: string;
   estimated_duration: number;
   scheduled_id?: string;
 }
 
-// ✅ NEW: Interface for time slots
+// ✅ EXISTING: Interface for time slots
 interface TimeSlot {
   hour: number;
   routines: ScheduledRoutine[];
+}
+
+// ✅ NEW: Interface for user day schedules
+interface UserDaySchedule {
+  day_id: number;
+  start_hour: number;
+  end_hour: number;
 }
 
 interface HomeScreenProps {
@@ -63,7 +70,7 @@ const getLocalDateString = (date: Date): string => {
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
 
-  // NEW: Calendar toggle state
+  // EXISTING: Calendar toggle state
   const [isCalendarView, setIsCalendarView] = useState(false);
   console.log("🔍 isCalendarView state:", isCalendarView);
   const [dailyRoutines, setDailyRoutines] = useState<RoutineWithCompletion[]>([]);
@@ -76,16 +83,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [daySpecificRoutines, setDaySpecificRoutines] = useState<Record<number, string[]>>({});
   const [userProfile, setUserProfile] = useState<any>(null);
 
-  // ✅ NEW: Calendar-specific state
+  // ✅ EXISTING: Calendar-specific state
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<number | null>(null);
 
-  // ✅ NEW: Create routine modal state
+  // ✅ EXISTING: Create routine modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPreloadedOptions, setShowPreloadedOptions] = useState(false);
   const [newRoutineName, setNewRoutineName] = useState("");
   const [newRoutineDescription, setNewRoutineDescription] = useState("");
+
+  // ✅ NEW: Schedule settings state
+  const [userDaySchedules, setUserDaySchedules] = useState<Record<number, UserDaySchedule>>({});
 
   // EXISTING DRAG STATE
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -136,7 +146,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     { name: "Sat", value: 6 },
   ];
 
-  // ✅ NEW: Preloaded routine options
+  // ✅ EXISTING: Preloaded routine options
   const preloadedRoutines = [
     { name: "Morning Workout", description: "30 min cardio and strength training", icon: "💪" },
     { name: "Meditation", description: "10 min mindfulness practice", icon: "🧘" },
@@ -148,19 +158,78 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     { name: "Call Family", description: "Check in with loved ones", icon: "📞" },
   ];
 
-  // ✅ NEW: Initialize time slots function
-  const initializeTimeSlots = useCallback(() => {
+  // ✅ NEW: Function to load user's custom day schedules
+  const loadUserDaySchedules = async (): Promise<Record<number, UserDaySchedule>> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return getDefaultTimeRange();
+
+      const { data, error } = await supabase
+        .from('user_day_schedules')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('day_id');
+
+      if (error) {
+        console.log('Could not load user day schedules:', error.message);
+        return getDefaultTimeRange();
+      }
+
+      if (!data || data.length === 0) {
+        // Fallback to default 6am-11pm
+        return getDefaultTimeRange();
+      }
+
+      // Convert to format your calendar expects
+      const scheduleMap: Record<number, UserDaySchedule> = {};
+      data.forEach(schedule => {
+        scheduleMap[schedule.day_id] = {
+          day_id: schedule.day_id,
+          start_hour: schedule.start_hour,
+          end_hour: schedule.end_hour
+        };
+      });
+
+      return scheduleMap;
+    } catch (error) {
+      console.error('Error loading user day schedules:', error);
+      return getDefaultTimeRange();
+    }
+  };
+
+  // ✅ NEW: Default time range fallback
+  const getDefaultTimeRange = (): Record<number, UserDaySchedule> => {
+    const defaultRange: Record<number, UserDaySchedule> = {};
+    for (let i = 0; i < 7; i++) {
+      defaultRange[i] = {
+        day_id: i,
+        start_hour: 6,
+        end_hour: 23
+      }; // 6am-11pm
+    }
+    return defaultRange;
+  };
+
+  // ✅ MODIFIED: Initialize time slots function using user's custom schedules
+  const initializeTimeSlots = useCallback(async () => {
+    // Load user's custom day schedules
+    const schedules = await loadUserDaySchedules();
+    setUserDaySchedules(schedules);
+
+    // Generate time slots for the selected day
+    const daySchedule = schedules[selectedDay] || { day_id: selectedDay, start_hour: 6, end_hour: 23 };
+
     const slots: TimeSlot[] = [];
-    for (let hour = 6; hour <= 23; hour++) {
+    for (let hour = daySchedule.start_hour; hour <= daySchedule.end_hour; hour++) {
       slots.push({
         hour,
         routines: []
       });
     }
     setTimeSlots(slots);
-  }, []);
+  }, [selectedDay]);
 
-  // ✅ NEW: Format time function
+  // ✅ EXISTING: Format time function
   const formatTime = (hour: number): string => {
     if (hour === 0) return "12 AM";
     if (hour === 12) return "12 PM";
@@ -272,7 +341,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return greetingArray[greetingIndex];
   }, [userProfile?.full_name]);
 
-  // ✅ NEW: Load scheduled routines function
+  // ✅ MODIFIED: Load scheduled routines function with user's custom time range
   const loadScheduledRoutines = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -356,14 +425,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           };
         });
 
-      // Distribute into time slots
-      const newTimeSlots = timeSlots.map(slot => ({
-        ...slot,
-        routines: scheduledRoutines.filter(r => {
-          const [hourStr] = r.scheduled_time.split(':');
-          return parseInt(hourStr) === slot.hour;
-        })
-      }));
+      // ✅ IMPORTANT: Use user's custom time range for this day
+      const daySchedule = userDaySchedules[selectedDay] || { day_id: selectedDay, start_hour: 6, end_hour: 23 };
+
+      // Regenerate time slots based on user's schedule
+      const newTimeSlots: TimeSlot[] = [];
+      for (let hour = daySchedule.start_hour; hour <= daySchedule.end_hour; hour++) {
+        newTimeSlots.push({
+          hour,
+          routines: scheduledRoutines.filter(r => {
+            const [hourStr] = r.scheduled_time.split(':');
+            return parseInt(hourStr) === hour;
+          })
+        });
+      }
 
       setTimeSlots(newTimeSlots);
 
@@ -372,7 +447,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ✅ NEW: Schedule routine to time slot function
+  // ✅ EXISTING: Schedule routine to time slot function
   const scheduleRoutineToTimeSlot = async (routineId: string, hour: number) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -420,7 +495,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ✅ NEW: Remove scheduled routine function
+  // ✅ EXISTING: Remove scheduled routine function
   const removeRoutineFromTimeSlot = async (scheduledId: string) => {
     try {
       const { error } = await supabase
@@ -436,7 +511,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ✅ NEW: Create new routine function
+  // ✅ EXISTING: Create new routine function
   const createNewRoutine = async (routineData: { name: string; description: string; icon?: string }) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -475,7 +550,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ✅ ENHANCED: Load data with LOCAL TIMEZONE fixes + calendar support
+  // ✅ ENHANCED: Load data with LOCAL TIMEZONE fixes + calendar support + schedule settings
   const loadData = useCallback(async () => {
     try {
       const {
@@ -613,7 +688,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       console.error("Error loading data:", error);
       Alert.alert("Error", "Failed to load routines");
     }
-  }, [selectedDay, isCalendarView]);
+  }, [selectedDay, isCalendarView, userDaySchedules]);
 
   // ✅ ENHANCED: Initialize and reload effects
   useEffect(() => {
@@ -621,10 +696,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     loadData();
   }, [selectedDay]);
 
-  // ✅ NEW: Reload scheduled routines when day or view changes
+  // ✅ MODIFIED: Reload scheduled routines when day or view changes, and refresh time slots with user's schedule
   useEffect(() => {
     if (isCalendarView) {
       loadScheduledRoutines();
+    } else {
+      // When switching back to list view, reload user schedules for next time
+      loadUserDaySchedules().then(schedules => {
+        setUserDaySchedules(schedules);
+      });
     }
   }, [selectedDay, isCalendarView]);
 
@@ -632,6 +712,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     const unsubscribe = navigation.addListener("focus", () => {
       console.log("HomeScreen focused - reloading data");
       loadData();
+      // ✅ NEW: Also reload user schedules when screen focuses (in case user changed settings)
+      loadUserDaySchedules().then(schedules => {
+        setUserDaySchedules(schedules);
+      });
     });
 
     return unsubscribe;
@@ -1354,7 +1438,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* ✅ CORRECTED: CREATE BUTTON SECTION - Only show when calendar view is OFF (regular list view) */}
+        {/* ✅ CORRECTED: CREATE BUTTON SECTION - Only show when calendar view is ON */}
         {isCalendarView && (
           <View style={[styles.createButtonContainer, { backgroundColor: colors.surface }]}>
             <TouchableOpacity
@@ -1372,7 +1456,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         {/* ✅ ENHANCED: Main content - conditional rendering based on calendar view */}
         {isCalendarView ? (
-          /* ✅ NEW: Calendar view with working time slots */
+          /* ✅ MODIFIED: Calendar view with working time slots using user's custom schedule */
           <View style={styles.calendarViewContainer}>
             <View style={styles.timeSlotsContainer}>
               {timeSlots.map((slot) => (
@@ -1389,7 +1473,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                         onPress={() => {
                           setSelectedTimeSlot(slot.hour);
                           loadAvailableRoutines();
-                          setShowScheduleModal(true); // ✅ FIXED: Use schedule modal instead of day modal
+                          setShowScheduleModal(true);
                         }}
                       >
                         <Ionicons name="add" size={16} color={colors.textTertiary} />
@@ -1467,6 +1551,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 </View>
               ))}
             </View>
+            {/* ✅ NEW: Display current day schedule info */}
+            {userDaySchedules[selectedDay] && (
+              <View style={[styles.scheduleInfo, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.scheduleInfoText, { color: colors.textSecondary }]}>
+                  Schedule: {formatTime(userDaySchedules[selectedDay].start_hour)} - {formatTime(userDaySchedules[selectedDay].end_hour)}
+                </Text>
+                <TouchableOpacity
+                  style={styles.editScheduleButton}
+                  onPress={() => navigation.navigate("Settings")}
+                >
+                  <Ionicons name="settings" size={16} color="#007AFF" />
+                  <Text style={[styles.editScheduleText, { color: "#007AFF" }]}>Edit Schedule</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         ) : (
           /* ✅ EXISTING: Regular home screen content */
@@ -1597,7 +1696,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         )}
       </ScrollView>
 
-      {/* ✅ NEW: Schedule Modal for Calendar View */}
+      {/* ✅ EXISTING: Schedule Modal for Calendar View */}
       <Modal
         visible={showScheduleModal}
         animationType="slide"
@@ -1649,7 +1748,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </Modal>
 
-      {/* ✅ NEW: Create Routine Modal */}
+      {/* ✅ EXISTING: Create Routine Modal */}
       <Modal
         visible={showCreateModal}
         transparent={true}
@@ -1967,7 +2066,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   );
 };
 
-// ✅ COMPLETE: All existing styles + new calendar styles + CREATE BUTTON STYLES
+// ✅ COMPLETE: All existing styles + new calendar styles + CREATE BUTTON STYLES + SCHEDULE INFO STYLES
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -2062,10 +2161,10 @@ const styles = StyleSheet.create({
   dayBoxIndicatorActive: {
     // backgroundColor will be set inline
   },
-  // ✅ NEW: Create button styles
+  // ✅ EXISTING: Create button styles
   createButtonContainer: {
     marginHorizontal: 16,
-    marginBottom: 0.1,
+    marginBottom: 20,
     padding: 16,
     borderRadius: 12,
     shadowColor: "#000",
@@ -2234,10 +2333,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
   },
-  // ✅ NEW: Calendar view styles
+  // ✅ EXISTING: Calendar view styles
   calendarViewContainer: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 16,
   },
   timeSlotsContainer: {
     flex: 1,
@@ -2276,7 +2375,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontStyle: "italic",
   },
-  // ✅ NEW: Calendar routine item styles
+  // ✅ EXISTING: Calendar routine item styles
   calendarRoutineItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -2320,6 +2419,29 @@ const styles = StyleSheet.create({
   },
   calendarRoutineOptions: {
     padding: 4,
+  },
+  // ✅ NEW: Schedule info styles
+  scheduleInfo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 8,
+    marginHorizontal: 4,
+  },
+  scheduleInfoText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  editScheduleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  editScheduleText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
   // Modal styles
   modalOverlay: {
@@ -2391,7 +2513,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
     borderColor: "#007AFF",
   },
-  // ✅ NEW: Create modal styles
+  // ✅ EXISTING: Create modal styles
   createOptionsContainer: {
     padding: 20,
   },
