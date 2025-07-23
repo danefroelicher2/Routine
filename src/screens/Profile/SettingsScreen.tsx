@@ -9,7 +9,6 @@ import {
     Alert,
     ScrollView,
     Modal,
-    FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
@@ -53,36 +52,21 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         { day_id: 6, day_name: 'Saturday', start_hour: 6, end_hour: 23 },
     ];
 
-    // Generate hour options
-    const generateHourOptions = () => {
-        const hours = [];
-        for (let i = 0; i < 24; i++) {
-            const period = i >= 12 ? 'PM' : 'AM';
-            const displayHour = i === 0 ? 12 : i > 12 ? i - 12 : i;
-            hours.push({
-                value: i,
-                label: `${displayHour}:00 ${period}`,
-            });
-        }
-        return hours;
-    };
-
-    const hourOptions = generateHourOptions();
+    // ✅ SIMPLE TIME OPTIONS - 24 hour format
+    const timeOptions = Array.from({ length: 24 }, (_, i) => {
+        const period = i >= 12 ? 'PM' : 'AM';
+        const displayHour = i === 0 ? 12 : i > 12 ? i - 12 : i;
+        return {
+            value: i,
+            label: `${displayHour}:00 ${period}`,
+        };
+    });
 
     useEffect(() => {
         loadSettings();
         loadUserEmail();
         loadDaySchedules();
     }, []);
-
-    // ✅ DEBUG STATE CHANGES
-    useEffect(() => {
-        console.log('📊 TIME PICKER STATE CHANGED:');
-        console.log('  - showTimePickerModal:', showTimePickerModal);
-        console.log('  - selectedDay:', selectedDay?.day_name || 'null');
-        console.log('  - timePickerType:', timePickerType);
-        console.log('  - Both conditions true?:', showTimePickerModal && selectedDay ? 'YES' : 'NO');
-    }, [showTimePickerModal, selectedDay, timePickerType]);
 
     const loadUserEmail = async () => {
         try {
@@ -264,6 +248,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         }
     };
 
+    // ✅ COMPLETELY NEW: Simple time selection handler
     const handleTimeSelection = (hour: number) => {
         console.log('🎯 TIME SELECTED:', hour);
 
@@ -289,30 +274,25 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
         updateDaySchedule(selectedDay.day_id, newStartHour, newEndHour);
 
+        // Close modal
         setShowTimePickerModal(false);
         setSelectedDay(null);
 
         console.log('✅ Time selection completed successfully');
     };
 
+    // ✅ COMPLETELY NEW: Simple time picker opener
     const openTimePicker = (day: DaySchedule, type: 'start' | 'end') => {
         console.log('🚀 OPENING TIME PICKER for', day.day_name, type);
-        console.log('🔍 Current states before update:');
-        console.log('  - showTimePickerModal:', showTimePickerModal);
-        console.log('  - selectedDay:', selectedDay);
-        console.log('  - timePickerType:', timePickerType);
 
         setSelectedDay(day);
         setTimePickerType(type);
-        setShowTimePickerModal(true);
 
+        // Add a small delay to ensure state is set
         setTimeout(() => {
-            console.log('🔍 States after update:');
-            console.log('  - showTimePickerModal should be true');
-            console.log('  - selectedDay should be:', day.day_name);
-            console.log('  - timePickerType should be:', type);
-            console.log('✅ Time picker should now be visible');
-        }, 100);
+            setShowTimePickerModal(true);
+            console.log('✅ Time picker modal should be visible now');
+        }, 50);
     };
 
     const formatHour = (hour: number) => {
@@ -435,277 +415,239 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     }
 
     return (
-        <>
-            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-                <ScrollView style={styles.scrollView}>
-                    {/* App Preferences */}
-                    <View style={[styles.section, { backgroundColor: colors.surface }]}>
-                        <Text style={[styles.sectionTitle, {
-                            backgroundColor: colors.background,
-                            color: colors.text,
-                            borderBottomColor: colors.border
-                        }]}>App Preferences</Text>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <ScrollView style={styles.scrollView}>
+                {/* App Preferences */}
+                <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                    <Text style={[styles.sectionTitle, {
+                        backgroundColor: colors.background,
+                        color: colors.text,
+                        borderBottomColor: colors.border
+                    }]}>App Preferences</Text>
 
-                        {renderSettingItem(
-                            'Dark Mode',
-                            'Switch between light and dark theme',
-                            isDarkMode,
-                            () => updateSetting('dark_mode', !isDarkMode),
-                            'switch'
-                        )}
-                    </View>
+                    {renderSettingItem(
+                        'Dark Mode',
+                        'Switch between light and dark theme',
+                        isDarkMode,
+                        () => updateSetting('dark_mode', !isDarkMode),
+                        'switch'
+                    )}
+                </View>
 
-                    {/* Notifications */}
-                    <View style={[styles.section, { backgroundColor: colors.surface }]}>
-                        <Text style={[styles.sectionTitle, {
-                            backgroundColor: colors.background,
-                            color: colors.text,
-                            borderBottomColor: colors.border
-                        }]}>Notifications</Text>
+                {/* Notifications */}
+                <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                    <Text style={[styles.sectionTitle, {
+                        backgroundColor: colors.background,
+                        color: colors.text,
+                        borderBottomColor: colors.border
+                    }]}>Notifications</Text>
 
-                        {renderSettingItem(
-                            'Enable Notifications',
-                            'Receive reminders for your routines',
-                            settings?.notifications_enabled || false,
-                            () => updateSetting('notifications_enabled', !settings?.notifications_enabled),
-                            'switch'
-                        )}
+                    {renderSettingItem(
+                        'Enable Notifications',
+                        'Receive reminders for your routines',
+                        settings?.notifications_enabled || false,
+                        () => updateSetting('notifications_enabled', !settings?.notifications_enabled),
+                        'switch'
+                    )}
 
-                        <TouchableOpacity style={[styles.settingItem, { borderBottomColor: colors.separator }]}>
-                            <View style={styles.settingContent}>
-                                <Text style={[styles.settingTitle, { color: colors.text }]}>Notification Schedule</Text>
-                                <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>Set when to receive reminders</Text>
-                            </View>
-                            <View style={styles.settingValue}>
-                                <Text style={[styles.settingValueText, { color: colors.textSecondary }]}>Coming Soon</Text>
-                                <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-                            </View>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Schedule Settings Section */}
-                    <View style={[styles.section, { backgroundColor: colors.surface }]}>
-                        <Text style={[styles.sectionTitle, {
-                            backgroundColor: colors.background,
-                            color: colors.text,
-                            borderBottomColor: colors.border
-                        }]}>Schedule Settings</Text>
-
-                        {renderSettingItem(
-                            'Daily Time Ranges',
-                            'Set your active hours for each day of the week',
-                            '',
-                            () => {
-                                console.log('📋 DAILY TIME RANGES PRESSED - Opening schedule modal');
-                                setShowScheduleModal(true);
-                            }
-                        )}
-                    </View>
-
-                    {/* Account & Security */}
-                    <View style={[styles.section, { backgroundColor: colors.surface }]}>
-                        <Text style={[styles.sectionTitle, {
-                            backgroundColor: colors.background,
-                            color: colors.text,
-                            borderBottomColor: colors.border
-                        }]}>Account & Security</Text>
-
-                        {renderSettingItem(
-                            'Change Password',
-                            'Send password reset email to your account',
-                            '',
-                            handleChangePassword
-                        )}
-
-                        <TouchableOpacity
-                            style={[styles.settingItem, { borderBottomColor: colors.separator }]}
-                            onPress={() => {
-                                Alert.alert(
-                                    'Delete Account',
-                                    'This will permanently delete your account and all data. This action cannot be undone.',
-                                    [
-                                        { text: 'Cancel', style: 'cancel' },
-                                        {
-                                            text: 'Delete Account',
-                                            style: 'destructive',
-                                            onPress: () => {
-                                                Alert.alert(
-                                                    'Are you sure?',
-                                                    'Type "DELETE" to confirm account deletion:',
-                                                    [
-                                                        { text: 'Cancel', style: 'cancel' },
-                                                        {
-                                                            text: 'I understand',
-                                                            style: 'destructive',
-                                                            onPress: () => {
-                                                                Alert.alert(
-                                                                    'Feature Coming Soon',
-                                                                    'Account deletion will be available in a future update. For now, please contact support.'
-                                                                );
-                                                            },
-                                                        },
-                                                    ]
-                                                );
-                                            },
-                                        },
-                                    ]
-                                );
-                            }}
-                        >
-                            <View style={styles.settingContent}>
-                                <Text style={[styles.settingTitle, styles.dangerText]}>Delete Account</Text>
-                                <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>Permanently delete your account and data</Text>
-                            </View>
-                            <View style={styles.settingValue}>
-                                <Ionicons name="chevron-forward" size={16} color="#ff6b6b" />
-                            </View>
-                        </TouchableOpacity>
-                    </View>
-                </ScrollView>
-
-                {/* 🚨 DEBUG: Visual State Indicator */}
-                {showTimePickerModal && (
-                    <View style={{
-                        position: 'absolute',
-                        top: 100,
-                        left: 20,
-                        right: 20,
-                        backgroundColor: 'red',
-                        padding: 20,
-                        zIndex: 9999,
-                        borderRadius: 10
-                    }}>
-                        <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>
-                            🚨 DEBUG: TIME PICKER STATE IS TRUE
-                        </Text>
-                        <Text style={{ color: 'white' }}>
-                            Selected Day: {selectedDay?.day_name || 'null'}
-                        </Text>
-                        <Text style={{ color: 'white' }}>
-                            Type: {timePickerType}
-                        </Text>
-                        <Text style={{ color: 'white' }}>
-                            Both conditions: {showTimePickerModal && selectedDay ? 'TRUE' : 'FALSE'}
-                        </Text>
-                    </View>
-                )}
-
-                {/* Schedule Settings Modal */}
-                <Modal
-                    visible={showScheduleModal}
-                    animationType="slide"
-                    presentationStyle="pageSheet"
-                    onRequestClose={() => setShowScheduleModal(false)}
-                >
-                    <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-                        <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-                            <TouchableOpacity onPress={() => setShowScheduleModal(false)}>
-                                <Text style={[styles.modalCloseButton, { color: colors.textSecondary }]}>Done</Text>
-                            </TouchableOpacity>
-                            <Text style={[styles.modalTitle, { color: colors.text }]}>Daily Time Ranges</Text>
-                            <View style={{ width: 50 }} />
+                    <TouchableOpacity style={[styles.settingItem, { borderBottomColor: colors.separator }]}>
+                        <View style={styles.settingContent}>
+                            <Text style={[styles.settingTitle, { color: colors.text }]}>Notification Schedule</Text>
+                            <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>Set when to receive reminders</Text>
                         </View>
+                        <View style={styles.settingValue}>
+                            <Text style={[styles.settingValueText, { color: colors.textSecondary }]}>Coming Soon</Text>
+                            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                        </View>
+                    </TouchableOpacity>
+                </View>
 
-                        <ScrollView style={[styles.modalContent, { backgroundColor: colors.background }]}>
-                            <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
-                                Set your active hours for each day. This determines the time range shown in your calendar view.
-                            </Text>
+                {/* Schedule Settings Section */}
+                <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                    <Text style={[styles.sectionTitle, {
+                        backgroundColor: colors.background,
+                        color: colors.text,
+                        borderBottomColor: colors.border
+                    }]}>Schedule Settings</Text>
 
-                            <View style={[styles.daySchedulesList, { backgroundColor: colors.surface }]}>
-                                {daySchedules.map(renderDayScheduleItem)}
-                            </View>
-                        </ScrollView>
-                    </SafeAreaView>
-                </Modal>
-            </SafeAreaView>
+                    {renderSettingItem(
+                        'Daily Time Ranges',
+                        'Set your active hours for each day of the week',
+                        '',
+                        () => {
+                            console.log('📋 DAILY TIME RANGES PRESSED - Opening schedule modal');
+                            setShowScheduleModal(true);
+                        }
+                    )}
+                </View>
 
-            {/* 🚨 SIMPLIFIED TEST MODAL - NO CONDITIONAL RENDERING */}
+                {/* Account & Security */}
+                <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                    <Text style={[styles.sectionTitle, {
+                        backgroundColor: colors.background,
+                        color: colors.text,
+                        borderBottomColor: colors.border
+                    }]}>Account & Security</Text>
+
+                    {renderSettingItem(
+                        'Change Password',
+                        'Send password reset email to your account',
+                        '',
+                        handleChangePassword
+                    )}
+
+                    <TouchableOpacity
+                        style={[styles.settingItem, { borderBottomColor: colors.separator }]}
+                        onPress={() => {
+                            Alert.alert(
+                                'Delete Account',
+                                'This will permanently delete your account and all data. This action cannot be undone.',
+                                [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    {
+                                        text: 'Delete Account',
+                                        style: 'destructive',
+                                        onPress: () => {
+                                            Alert.alert(
+                                                'Are you sure?',
+                                                'Type "DELETE" to confirm account deletion:',
+                                                [
+                                                    { text: 'Cancel', style: 'cancel' },
+                                                    {
+                                                        text: 'I understand',
+                                                        style: 'destructive',
+                                                        onPress: () => {
+                                                            Alert.alert(
+                                                                'Feature Coming Soon',
+                                                                'Account deletion will be available in a future update. For now, please contact support.'
+                                                            );
+                                                        },
+                                                    },
+                                                ]
+                                            );
+                                        },
+                                    },
+                                ]
+                            );
+                        }}
+                    >
+                        <View style={styles.settingContent}>
+                            <Text style={[styles.settingTitle, styles.dangerText]}>Delete Account</Text>
+                            <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>Permanently delete your account and data</Text>
+                        </View>
+                        <View style={styles.settingValue}>
+                            <Ionicons name="chevron-forward" size={16} color="#ff6b6b" />
+                        </View>
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
+
+            {/* Schedule Settings Modal */}
             <Modal
-                visible={showTimePickerModal && selectedDay ? true : false}
+                visible={showScheduleModal}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowScheduleModal(false)}
+            >
+                <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+                    <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+                        <TouchableOpacity onPress={() => setShowScheduleModal(false)}>
+                            <Text style={[styles.modalCloseButton, { color: colors.textSecondary }]}>Done</Text>
+                        </TouchableOpacity>
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>Daily Time Ranges</Text>
+                        <View style={{ width: 50 }} />
+                    </View>
+
+                    <ScrollView style={[styles.modalContent, { backgroundColor: colors.background }]}>
+                        <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
+                            Set your active hours for each day. This determines the time range shown in your calendar view.
+                        </Text>
+
+                        <View style={[styles.daySchedulesList, { backgroundColor: colors.surface }]}>
+                            {daySchedules.map(renderDayScheduleItem)}
+                        </View>
+                    </ScrollView>
+                </SafeAreaView>
+            </Modal>
+
+            {/* ✅ BRAND NEW: Super Simple Time Picker Modal */}
+            <Modal
+                visible={showTimePickerModal}
                 transparent={true}
-                animationType="none"
-                presentationStyle="overFullScreen"
+                animationType="slide"
                 onRequestClose={() => {
-                    console.log("🚨 Modal onRequestClose called");
+                    console.log("🚨 Time picker modal closing");
                     setShowTimePickerModal(false);
                     setSelectedDay(null);
                 }}
             >
-                <View style={{
-                    flex: 1,
-                    backgroundColor: 'rgba(255,0,0,0.8)',
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                }}>
-                    <View style={{
-                        backgroundColor: 'yellow',
-                        padding: 30,
-                        borderRadius: 10,
-                        width: '90%',
-                        maxHeight: '70%'
-                    }}>
-                        <Text style={{
-                            color: 'black',
-                            fontSize: 24,
-                            textAlign: 'center',
-                            marginBottom: 20,
-                            fontWeight: 'bold'
-                        }}>
-                            🚨 MODAL IS RENDERING!
-                        </Text>
+                <View style={styles.timePickerOverlay}>
+                    {/* ✅ DEBUG: Visual confirmation that modal is rendering */}
+                    <View style={styles.timePickerDebugIndicator}>
+                        <Text style={styles.debugText}>⚡ TIME PICKER IS VISIBLE ⚡</Text>
+                    </View>
 
-                        <Text style={{
-                            color: 'black',
-                            fontSize: 18,
-                            textAlign: 'center',
-                            marginBottom: 20
-                        }}>
-                            Day: {selectedDay?.day_name || 'Unknown'}
-                        </Text>
-
-                        <Text style={{
-                            color: 'black',
-                            fontSize: 18,
-                            textAlign: 'center',
-                            marginBottom: 20
-                        }}>
-                            Type: {timePickerType}
-                        </Text>
-
-                        <TouchableOpacity
-                            style={{
-                                backgroundColor: 'red',
-                                padding: 20,
-                                borderRadius: 10,
-                                marginBottom: 10
-                            }}
-                            onPress={() => {
-                                console.log("🚨 CLOSE BUTTON PRESSED");
+                    <View style={[styles.timePickerModal, { backgroundColor: colors.surface }]}>
+                        {/* Header */}
+                        <View style={[styles.timePickerHeader, { borderBottomColor: colors.border }]}>
+                            <TouchableOpacity onPress={() => {
+                                console.log("❌ Cancel pressed");
                                 setShowTimePickerModal(false);
                                 setSelectedDay(null);
-                            }}
-                        >
-                            <Text style={{
-                                color: 'white',
-                                textAlign: 'center',
-                                fontSize: 18,
-                                fontWeight: 'bold'
                             }}>
-                                CLOSE MODAL
+                                <Text style={[styles.timePickerCancel, { color: colors.textSecondary }]}>Cancel</Text>
+                            </TouchableOpacity>
+                            <Text style={[styles.timePickerTitle, { color: colors.text }]}>
+                                {selectedDay?.day_name} - {timePickerType === 'start' ? 'Start' : 'End'} Time
                             </Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity onPress={() => {
+                                console.log("✅ Done pressed");
+                                setShowTimePickerModal(false);
+                                setSelectedDay(null);
+                            }}>
+                                <Text style={[styles.timePickerDone, { color: '#007AFF' }]}>Done</Text>
+                            </TouchableOpacity>
+                        </View>
 
-                        <Text style={{
-                            color: 'black',
-                            fontSize: 14,
-                            textAlign: 'center'
-                        }}>
-                            If you see this, modals work but something is wrong with our time picker logic
-                        </Text>
+                        {/* Time Options List */}
+                        <ScrollView style={styles.timePickerScrollView}>
+                            {timeOptions.map((timeOption) => {
+                                const isCurrentSelection = selectedDay && (
+                                    (timePickerType === 'start' && timeOption.value === selectedDay.start_hour) ||
+                                    (timePickerType === 'end' && timeOption.value === selectedDay.end_hour)
+                                );
+
+                                return (
+                                    <TouchableOpacity
+                                        key={timeOption.value}
+                                        style={[
+                                            styles.timePickerItem,
+                                            { borderBottomColor: colors.border },
+                                            isCurrentSelection && { backgroundColor: '#007AFF20' }
+                                        ]}
+                                        onPress={() => {
+                                            console.log(`✅ Time selected: ${timeOption.label} (${timeOption.value})`);
+                                            handleTimeSelection(timeOption.value);
+                                        }}
+                                    >
+                                        <Text style={[
+                                            styles.timePickerItemText,
+                                            { color: colors.text },
+                                            isCurrentSelection && { color: '#007AFF', fontWeight: '600' }
+                                        ]}>
+                                            {timeOption.label}
+                                        </Text>
+                                        {isCurrentSelection && (
+                                            <Ionicons name="checkmark" size={20} color="#007AFF" />
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>
-        </>
+        </SafeAreaView>
     );
 }
 
@@ -837,5 +779,67 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
         marginHorizontal: 4,
+    },
+    // ✅ BRAND NEW: Super simple time picker styles
+    timePickerOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    timePickerDebugIndicator: {
+        position: 'absolute',
+        top: 100,
+        left: 0,
+        right: 0,
+        backgroundColor: 'red',
+        padding: 10,
+        zIndex: 9999,
+    },
+    debugText: {
+        color: 'white',
+        textAlign: 'center',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    timePickerModal: {
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        maxHeight: '60%',
+        minHeight: 400,
+    },
+    timePickerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+    },
+    timePickerTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    timePickerCancel: {
+        fontSize: 16,
+    },
+    timePickerDone: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    timePickerScrollView: {
+        flex: 1,
+    },
+    timePickerItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        minHeight: 56,
+    },
+    timePickerItemText: {
+        fontSize: 18,
+        flex: 1,
     },
 });
