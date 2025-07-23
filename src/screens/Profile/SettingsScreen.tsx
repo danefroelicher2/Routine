@@ -8,6 +8,8 @@ import {
     SafeAreaView,
     Alert,
     ScrollView,
+    Modal,
+    FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
@@ -18,17 +20,59 @@ interface SettingsScreenProps {
     navigation: any;
 }
 
+interface DaySchedule {
+    day_id: number;
+    day_name: string;
+    start_hour: number;
+    end_hour: number;
+}
+
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     const [settings, setSettings] = useState<UserSettings | null>(null);
     const [loading, setLoading] = useState(true);
     const [userEmail, setUserEmail] = useState<string>('');
-    
+
+    // ✅ NEW: Schedule settings state
+    const [daySchedules, setDaySchedules] = useState<DaySchedule[]>([]);
+    const [showScheduleModal, setShowScheduleModal] = useState(false);
+    const [showTimePickerModal, setShowTimePickerModal] = useState(false);
+    const [selectedDay, setSelectedDay] = useState<DaySchedule | null>(null);
+    const [timePickerType, setTimePickerType] = useState<'start' | 'end'>('start');
+
     // NEW: Use theme context
     const { isDarkMode, colors, setDarkMode } = useTheme();
+
+    // ✅ NEW: Default day schedules (6am-11pm for all days initially)
+    const defaultDaySchedules: DaySchedule[] = [
+        { day_id: 0, day_name: 'Sunday', start_hour: 6, end_hour: 23 },
+        { day_id: 1, day_name: 'Monday', start_hour: 6, end_hour: 23 },
+        { day_id: 2, day_name: 'Tuesday', start_hour: 6, end_hour: 23 },
+        { day_id: 3, day_name: 'Wednesday', start_hour: 6, end_hour: 23 },
+        { day_id: 4, day_name: 'Thursday', start_hour: 6, end_hour: 23 },
+        { day_id: 5, day_name: 'Friday', start_hour: 6, end_hour: 23 },
+        { day_id: 6, day_name: 'Saturday', start_hour: 6, end_hour: 23 },
+    ];
+
+    // ✅ NEW: Generate hour options (0-23)
+    const generateHourOptions = () => {
+        const hours = [];
+        for (let i = 0; i < 24; i++) {
+            const period = i >= 12 ? 'PM' : 'AM';
+            const displayHour = i === 0 ? 12 : i > 12 ? i - 12 : i;
+            hours.push({
+                value: i,
+                label: `${displayHour}:00 ${period}`,
+            });
+        }
+        return hours;
+    };
+
+    const hourOptions = generateHourOptions();
 
     useEffect(() => {
         loadSettings();
         loadUserEmail();
+        loadDaySchedules();
     }, []);
 
     const loadUserEmail = async () => {
@@ -39,6 +83,64 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             }
         } catch (error) {
             console.error('Error loading user email:', error);
+        }
+    };
+
+    // ✅ NEW: Load day schedules from database
+    const loadDaySchedules = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('user_day_schedules')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('day_id');
+
+            if (error && error.code !== 'PGRST116') {
+                throw error;
+            }
+
+            if (data && data.length > 0) {
+                // Convert database format to our DaySchedule format
+                const schedules = data.map(item => ({
+                    day_id: item.day_id,
+                    day_name: defaultDaySchedules[item.day_id].day_name,
+                    start_hour: item.start_hour,
+                    end_hour: item.end_hour,
+                }));
+                setDaySchedules(schedules);
+            } else {
+                // Create default schedules if none exist
+                await createDefaultDaySchedules(user.id);
+                setDaySchedules(defaultDaySchedules);
+            }
+        } catch (error) {
+            console.error('Error loading day schedules:', error);
+            // Fallback to defaults
+            setDaySchedules(defaultDaySchedules);
+        }
+    };
+
+    // ✅ NEW: Create default day schedules in database
+    const createDefaultDaySchedules = async (userId: string) => {
+        try {
+            const scheduleInserts = defaultDaySchedules.map(schedule => ({
+                user_id: userId,
+                day_id: schedule.day_id,
+                start_hour: schedule.start_hour,
+                end_hour: schedule.end_hour,
+            }));
+
+            const { error } = await supabase
+                .from('user_day_schedules')
+                .insert(scheduleInserts);
+
+            if (error) throw error;
+            console.log('✅ Default day schedules created');
+        } catch (error) {
+            console.error('❌ Error creating default day schedules:', error);
         }
     };
 
@@ -97,7 +199,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             if (error) throw error;
 
             setSettings({ ...settings, [key]: value });
-            
+
             // NEW: Update theme context when dark mode changes
             if (key === 'dark_mode') {
                 setDarkMode(value);
@@ -106,6 +208,71 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             console.error('Error updating setting:', error);
             Alert.alert('Error', 'Failed to update setting');
         }
+    };
+
+    // ✅ NEW: Update day schedule
+    const updateDaySchedule = async (dayId: number, startHour: number, endHour: number) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // Validation: start hour must be before end hour
+            if (startHour >= endHour) {
+                Alert.alert('Invalid Time Range', 'Start time must be before end time.');
+                return;
+            }
+
+            const { error } = await supabase
+                .from('user_day_schedules')
+                .update({
+                    start_hour: startHour,
+                    end_hour: endHour
+                })
+                .eq('user_id', user.id)
+                .eq('day_id', dayId);
+
+            if (error) throw error;
+
+            // Update local state
+            setDaySchedules(prev => prev.map(schedule =>
+                schedule.day_id === dayId
+                    ? { ...schedule, start_hour: startHour, end_hour: endHour }
+                    : schedule
+            ));
+
+            console.log(`✅ Updated ${defaultDaySchedules[dayId].day_name} schedule: ${startHour}:00 - ${endHour}:00`);
+        } catch (error) {
+            console.error('Error updating day schedule:', error);
+            Alert.alert('Error', 'Failed to update schedule');
+        }
+    };
+
+    // ✅ NEW: Handle time selection
+    const handleTimeSelection = (hour: number) => {
+        if (!selectedDay) return;
+
+        if (timePickerType === 'start') {
+            updateDaySchedule(selectedDay.day_id, hour, selectedDay.end_hour);
+        } else {
+            updateDaySchedule(selectedDay.day_id, selectedDay.start_hour, hour);
+        }
+
+        setShowTimePickerModal(false);
+        setSelectedDay(null);
+    };
+
+    // ✅ NEW: Open time picker
+    const openTimePicker = (day: DaySchedule, type: 'start' | 'end') => {
+        setSelectedDay(day);
+        setTimePickerType(type);
+        setShowTimePickerModal(true);
+    };
+
+    // ✅ NEW: Format hour for display
+    const formatHour = (hour: number) => {
+        const period = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+        return `${displayHour}:00 ${period}`;
     };
 
     // NEW: Handle password reset
@@ -139,7 +306,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                         } catch (error: any) {
                             console.error('Error sending password reset:', error);
                             Alert.alert(
-                                'Error', 
+                                'Error',
                                 error?.message || 'Failed to send password reset email. Please try again.'
                             );
                         }
@@ -183,6 +350,32 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         </TouchableOpacity>
     );
 
+    // ✅ NEW: Render day schedule item
+    const renderDayScheduleItem = (day: DaySchedule) => (
+        <View key={day.day_id} style={[styles.dayScheduleItem, { borderBottomColor: colors.separator }]}>
+            <Text style={[styles.dayName, { color: colors.text }]}>{day.day_name}</Text>
+            <View style={styles.timeSelectors}>
+                <TouchableOpacity
+                    style={[styles.timeSelector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                    onPress={() => openTimePicker(day, 'start')}
+                >
+                    <Text style={[styles.timeSelectorLabel, { color: colors.textSecondary }]}>Start</Text>
+                    <Text style={[styles.timeSelectorValue, { color: colors.text }]}>{formatHour(day.start_hour)}</Text>
+                </TouchableOpacity>
+
+                <Text style={[styles.timeSeparator, { color: colors.textSecondary }]}>to</Text>
+
+                <TouchableOpacity
+                    style={[styles.timeSelector, { backgroundColor: colors.background, borderColor: colors.border }]}
+                    onPress={() => openTimePicker(day, 'end')}
+                >
+                    <Text style={[styles.timeSelectorLabel, { color: colors.textSecondary }]}>End</Text>
+                    <Text style={[styles.timeSelectorValue, { color: colors.text }]}>{formatHour(day.end_hour)}</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+
     if (loading) {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -198,10 +391,10 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             <ScrollView style={styles.scrollView}>
                 {/* App Preferences */}
                 <View style={[styles.section, { backgroundColor: colors.surface }]}>
-                    <Text style={[styles.sectionTitle, { 
-                        backgroundColor: colors.background, 
+                    <Text style={[styles.sectionTitle, {
+                        backgroundColor: colors.background,
                         color: colors.text,
-                        borderBottomColor: colors.border 
+                        borderBottomColor: colors.border
                     }]}>App Preferences</Text>
 
                     {renderSettingItem(
@@ -215,10 +408,10 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
                 {/* Notifications */}
                 <View style={[styles.section, { backgroundColor: colors.surface }]}>
-                    <Text style={[styles.sectionTitle, { 
-                        backgroundColor: colors.background, 
+                    <Text style={[styles.sectionTitle, {
+                        backgroundColor: colors.background,
                         color: colors.text,
-                        borderBottomColor: colors.border 
+                        borderBottomColor: colors.border
                     }]}>Notifications</Text>
 
                     {renderSettingItem(
@@ -241,12 +434,28 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                     </TouchableOpacity>
                 </View>
 
+                {/* ✅ NEW: Schedule Settings Section */}
+                <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                    <Text style={[styles.sectionTitle, {
+                        backgroundColor: colors.background,
+                        color: colors.text,
+                        borderBottomColor: colors.border
+                    }]}>Schedule Settings</Text>
+
+                    {renderSettingItem(
+                        'Daily Time Ranges',
+                        'Set your active hours for each day of the week',
+                        '',
+                        () => setShowScheduleModal(true)
+                    )}
+                </View>
+
                 {/* Account & Security */}
                 <View style={[styles.section, { backgroundColor: colors.surface }]}>
-                    <Text style={[styles.sectionTitle, { 
-                        backgroundColor: colors.background, 
+                    <Text style={[styles.sectionTitle, {
+                        backgroundColor: colors.background,
                         color: colors.text,
-                        borderBottomColor: colors.border 
+                        borderBottomColor: colors.border
                     }]}>Account & Security</Text>
 
                     {renderSettingItem(
@@ -301,6 +510,72 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                     </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            {/* ✅ NEW: Schedule Settings Modal */}
+            <Modal
+                visible={showScheduleModal}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowScheduleModal(false)}
+            >
+                <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+                    <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+                        <TouchableOpacity onPress={() => setShowScheduleModal(false)}>
+                            <Text style={[styles.modalCloseButton, { color: colors.textSecondary }]}>Done</Text>
+                        </TouchableOpacity>
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>Daily Time Ranges</Text>
+                        <View style={{ width: 50 }} />
+                    </View>
+
+                    <ScrollView style={[styles.modalContent, { backgroundColor: colors.background }]}>
+                        <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
+                            Set your active hours for each day. This determines the time range shown in your calendar view.
+                        </Text>
+
+                        <View style={[styles.daySchedulesList, { backgroundColor: colors.surface }]}>
+                            {daySchedules.map(renderDayScheduleItem)}
+                        </View>
+                    </ScrollView>
+                </SafeAreaView>
+            </Modal>
+
+            {/* ✅ NEW: Time Picker Modal */}
+            <Modal
+                visible={showTimePickerModal}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setShowTimePickerModal(false)}
+            >
+                <View style={styles.timePickerOverlay}>
+                    <View style={[styles.timePickerModal, { backgroundColor: colors.surface }]}>
+                        <View style={[styles.timePickerHeader, { borderBottomColor: colors.border }]}>
+                            <TouchableOpacity onPress={() => setShowTimePickerModal(false)}>
+                                <Text style={[styles.timePickerCancel, { color: colors.textSecondary }]}>Cancel</Text>
+                            </TouchableOpacity>
+                            <Text style={[styles.timePickerTitle, { color: colors.text }]}>
+                                Select {timePickerType === 'start' ? 'Start' : 'End'} Time
+                            </Text>
+                            <View style={{ width: 60 }} />
+                        </View>
+
+                        <FlatList
+                            data={hourOptions}
+                            style={styles.timePickerList}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={[styles.timePickerItem, { borderBottomColor: colors.separator }]}
+                                    onPress={() => handleTimeSelection(item.value)}
+                                >
+                                    <Text style={[styles.timePickerItemText, { color: colors.text }]}>
+                                        {item.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                            keyExtractor={(item) => item.value.toString()}
+                        />
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -360,5 +635,118 @@ const styles = StyleSheet.create({
     },
     dangerText: {
         color: '#ff6b6b',
+    },
+    // ✅ NEW: Modal styles
+    modalContainer: {
+        flex: 1,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+    },
+    modalCloseButton: {
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    modalContent: {
+        flex: 1,
+        paddingHorizontal: 20,
+        paddingTop: 20,
+    },
+    modalDescription: {
+        fontSize: 14,
+        lineHeight: 20,
+        marginBottom: 20,
+    },
+    // ✅ NEW: Day schedule styles
+    daySchedulesList: {
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    dayScheduleItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+    },
+    dayName: {
+        fontSize: 16,
+        fontWeight: '500',
+        flex: 1,
+    },
+    timeSelectors: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    timeSelector: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        minWidth: 70,
+        alignItems: 'center',
+    },
+    timeSelectorLabel: {
+        fontSize: 11,
+        fontWeight: '500',
+        marginBottom: 2,
+    },
+    timeSelectorValue: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    timeSeparator: {
+        fontSize: 14,
+        fontWeight: '500',
+        marginHorizontal: 4,
+    },
+    // ✅ NEW: Time picker modal styles
+    timePickerOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    timePickerModal: {
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        maxHeight: '70%',
+    },
+    timePickerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+    },
+    timePickerTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    timePickerCancel: {
+        fontSize: 16,
+    },
+    timePickerList: {
+        maxHeight: 400,
+    },
+    timePickerItem: {
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+    },
+    timePickerItemText: {
+        fontSize: 16,
+        textAlign: 'center',
     },
 });
