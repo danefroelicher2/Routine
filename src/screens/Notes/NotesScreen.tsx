@@ -8,6 +8,7 @@ import {
   ScrollView,
   RefreshControl,
   Alert,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -23,6 +24,10 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [dailyQuote, setDailyQuote] = useState("");
+  // ✅ NEW: Search functionality state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   // ADD THEME SUPPORT
   const { colors } = useTheme();
@@ -47,6 +52,22 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
       setRandomQuote();
     }, [])
   );
+
+  // ✅ NEW: Search functionality - filter notes when search query changes
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredNotes([]);
+      setIsSearchActive(false);
+    } else {
+      setIsSearchActive(true);
+      const filtered = notes.filter((note) => {
+        const titleMatch = note.title?.toLowerCase().includes(searchQuery.toLowerCase());
+        const contentMatch = note.content?.toLowerCase().includes(searchQuery.toLowerCase());
+        return titleMatch || contentMatch;
+      });
+      setFilteredNotes(filtered);
+    }
+  }, [searchQuery, notes]);
 
   const setRandomQuote = () => {
     const randomIndex = Math.floor(Math.random() * quotes.length);
@@ -106,6 +127,13 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     }
   };
 
+  // ✅ NEW: Clear search function
+  const clearSearch = () => {
+    setSearchQuery("");
+    setIsSearchActive(false);
+    setFilteredNotes([]);
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -130,7 +158,22 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     return stripped.length > 60 ? stripped.substring(0, 60) + "..." : stripped;
   };
 
-  const renderNoteCard = (note: Note) => (
+  // ✅ NEW: Highlight search terms in text
+  const highlightSearchTerm = (text: string, searchTerm: string) => {
+    if (!searchTerm || !text) return text;
+
+    const regex = new RegExp(`(${searchTerm})`, 'gi');
+    const parts = text.split(regex);
+
+    return parts.map((part, index) => {
+      if (part.toLowerCase() === searchTerm.toLowerCase()) {
+        return `**${part}**`; // Simple highlight indicator
+      }
+      return part;
+    }).join('');
+  };
+
+  const renderNoteCard = (note: Note, showHighlight: boolean = false) => (
     <TouchableOpacity
       key={note.id}
       style={[styles.noteCard, { backgroundColor: colors.surface }]} // USE THEME
@@ -141,7 +184,10 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
           style={[styles.noteCardTitle, { color: colors.text }]}
           numberOfLines={1}
         >
-          {note.title || "Untitled"}
+          {showHighlight && searchQuery ?
+            highlightSearchTerm(note.title || "Untitled", searchQuery) :
+            note.title || "Untitled"
+          }
         </Text>
         <View style={styles.noteCardActions}>
           {/* Show lock indicator if note is locked */}
@@ -172,7 +218,10 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
       <Text style={[styles.noteCardDate, { color: colors.textSecondary }]}>
         {formatDate(note.updated_at)}
         {getPreviewText(note.content || "") &&
-          ` ${getPreviewText(note.content || "")}`}
+          ` ${showHighlight && searchQuery ?
+            highlightSearchTerm(getPreviewText(note.content || ""), searchQuery) :
+            getPreviewText(note.content || "")
+          }`}
       </Text>
     </TouchableOpacity>
   );
@@ -190,6 +239,51 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
       <Text style={[styles.emptyStateText, { color: colors.textTertiary }]}>
         Tap the + button to create your first note
       </Text>
+    </View>
+  );
+
+  // ✅ NEW: Render search results
+  const renderSearchResults = () => (
+    <View style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        Search Results ({filteredNotes.length})
+      </Text>
+      {filteredNotes.length === 0 ? (
+        <View style={styles.noResultsContainer}>
+          <Ionicons
+            name="search-outline"
+            size={48}
+            color={colors.textTertiary}
+          />
+          <Text style={[styles.noResultsTitle, { color: colors.textSecondary }]}>
+            No results found
+          </Text>
+          <Text style={[styles.noResultsText, { color: colors.textTertiary }]}>
+            Try searching with different keywords
+          </Text>
+        </View>
+      ) : (
+        <View
+          style={[
+            styles.sectionContent,
+            { backgroundColor: colors.surface },
+          ]}
+        >
+          {filteredNotes.map((note, index) => (
+            <View key={note.id}>
+              {renderNoteCard(note, true)}
+              {index < filteredNotes.length - 1 && (
+                <View
+                  style={[
+                    styles.noteSeparator,
+                    { backgroundColor: colors.separator },
+                  ]}
+                />
+              )}
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 
@@ -218,6 +312,34 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
         </View>
       </View>
 
+      {/* ✅ NEW: Search Section */}
+      <View
+        style={[
+          styles.searchContainer,
+          {
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Ionicons name="search" size={20} color={colors.textSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search notes..."
+            placeholderTextColor={colors.placeholder}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -226,66 +348,73 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
           notes.length === 0 ? styles.emptyContainer : styles.listContainer
         }
       >
-        {/* Pinned Section */}
-        {pinnedNotes.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Pinned
-            </Text>
-            <View
-              style={[
-                styles.sectionContent,
-                { backgroundColor: colors.surface },
-              ]}
-            >
-              {pinnedNotes.map((note, index) => (
-                <View key={note.id}>
-                  {renderNoteCard(note)}
-                  {index < pinnedNotes.length - 1 && (
-                    <View
-                      style={[
-                        styles.noteSeparator,
-                        { backgroundColor: colors.separator },
-                      ]}
-                    />
-                  )}
+        {/* ✅ NEW: Show search results if searching */}
+        {isSearchActive ? (
+          renderSearchResults()
+        ) : (
+          <>
+            {/* Pinned Section */}
+            {pinnedNotes.length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Pinned
+                </Text>
+                <View
+                  style={[
+                    styles.sectionContent,
+                    { backgroundColor: colors.surface },
+                  ]}
+                >
+                  {pinnedNotes.map((note, index) => (
+                    <View key={note.id}>
+                      {renderNoteCard(note)}
+                      {index < pinnedNotes.length - 1 && (
+                        <View
+                          style={[
+                            styles.noteSeparator,
+                            { backgroundColor: colors.separator },
+                          ]}
+                        />
+                      )}
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-          </View>
-        )}
+              </View>
+            )}
 
-        {/* Recent Section */}
-        {regularNotes.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Recent
-            </Text>
-            <View
-              style={[
-                styles.sectionContent,
-                { backgroundColor: colors.surface },
-              ]}
-            >
-              {regularNotes.map((note, index) => (
-                <View key={note.id}>
-                  {renderNoteCard(note)}
-                  {index < regularNotes.length - 1 && (
-                    <View
-                      style={[
-                        styles.noteSeparator,
-                        { backgroundColor: colors.separator },
-                      ]}
-                    />
-                  )}
+            {/* Recent Section */}
+            {regularNotes.length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Recent
+                </Text>
+                <View
+                  style={[
+                    styles.sectionContent,
+                    { backgroundColor: colors.surface },
+                  ]}
+                >
+                  {regularNotes.map((note, index) => (
+                    <View key={note.id}>
+                      {renderNoteCard(note)}
+                      {index < regularNotes.length - 1 && (
+                        <View
+                          style={[
+                            styles.noteSeparator,
+                            { backgroundColor: colors.separator },
+                          ]}
+                        />
+                      )}
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-          </View>
-        )}
+              </View>
+            )}
 
-        {/* Empty State */}
-        {notes.length === 0 && renderEmpty()}
+            {/* Empty State */}
+            {notes.length === 0 && renderEmpty()}
+          </>
+        )}
       </ScrollView>
 
       {/* Floating Add Button */}
@@ -326,6 +455,52 @@ const styles = StyleSheet.create({
     // REMOVED HARDCODED color: "#fff", - NOW USES THEME
     lineHeight: 24,
     fontStyle: "italic",
+  },
+  // ✅ NEW: Search container styles
+  searchContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    // REMOVED HARDCODED backgroundColor: "#000", - NOW USES THEME
+    borderBottomWidth: 1,
+    // REMOVED HARDCODED borderBottomColor: "#2c2c2e", - NOW USES THEME
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    // REMOVED HARDCODED backgroundColor: "#1c1c1e", - NOW USES THEME
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    // REMOVED HARDCODED borderColor: "#2c2c2e", - NOW USES THEME
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    marginLeft: 8,
+    // REMOVED HARDCODED color: "#fff", - NOW USES THEME
+  },
+  clearButton: {
+    padding: 4,
+  },
+  // ✅ NEW: No results styles
+  noResultsContainer: {
+    alignItems: "center",
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  noResultsTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    // REMOVED HARDCODED color: "#666", - NOW USES THEME
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noResultsText: {
+    fontSize: 14,
+    // REMOVED HARDCODED color: "#999", - NOW USES THEME
+    textAlign: "center",
+    lineHeight: 20,
   },
   listContainer: {
     paddingVertical: 0,
