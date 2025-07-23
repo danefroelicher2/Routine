@@ -9,6 +9,8 @@ import {
     Alert,
     ScrollView,
     Modal,
+    FlatList,
+    Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
@@ -282,17 +284,19 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     };
 
     // ✅ COMPLETELY NEW: Simple time picker opener
+    // ✅ NEW: Open time picker with iOS delay fix
     const openTimePicker = (day: DaySchedule, type: 'start' | 'end') => {
-        console.log('🚀 OPENING TIME PICKER for', day.day_name, type);
-
         setSelectedDay(day);
         setTimePickerType(type);
 
-        // Add a small delay to ensure state is set
-        setTimeout(() => {
+        // iOS modal visibility fix - add delay
+        if (Platform.OS === 'ios') {
+            setTimeout(() => {
+                setShowTimePickerModal(true);
+            }, 200);
+        } else {
             setShowTimePickerModal(true);
-            console.log('✅ Time picker modal should be visible now');
-        }, 50);
+        }
     };
 
     const formatHour = (hour: number) => {
