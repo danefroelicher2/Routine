@@ -630,11 +630,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                                     );
                                 }}
                                 keyExtractor={(item) => item.value.toString()}
-                                initialScrollIndex={(() => {
-                                    if (!selectedDay) return 0;
-                                    const currentHour = timePickerType === 'start' ? selectedDay.start_hour : selectedDay.end_hour;
-                                    return Math.max(0, currentHour - 3); // Start scroll near current time
-                                })()}
+                                initialScrollIndex={selectedDay ? Math.max(0,
+                                    (timePickerType === 'start' ? selectedDay.start_hour : selectedDay.end_hour) - 3
+                                ) : 0}
                                 getItemLayout={(data, index) => ({
                                     length: 56, // Fixed height for each item
                                     offset: 56 * index,
