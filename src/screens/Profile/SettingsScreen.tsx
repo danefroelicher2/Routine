@@ -81,6 +81,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         console.log('  - showTimePickerModal:', showTimePickerModal);
         console.log('  - selectedDay:', selectedDay?.day_name || 'null');
         console.log('  - timePickerType:', timePickerType);
+        console.log('  - Both conditions true?:', showTimePickerModal && selectedDay ? 'YES' : 'NO');
     }, [showTimePickerModal, selectedDay, timePickerType]);
 
     const loadUserEmail = async () => {
@@ -562,6 +563,33 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                     </View>
                 </ScrollView>
 
+                {/* 🚨 DEBUG: Visual State Indicator */}
+                {showTimePickerModal && (
+                    <View style={{
+                        position: 'absolute',
+                        top: 100,
+                        left: 20,
+                        right: 20,
+                        backgroundColor: 'red',
+                        padding: 20,
+                        zIndex: 9999,
+                        borderRadius: 10
+                    }}>
+                        <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>
+                            🚨 DEBUG: TIME PICKER STATE IS TRUE
+                        </Text>
+                        <Text style={{ color: 'white' }}>
+                            Selected Day: {selectedDay?.day_name || 'null'}
+                        </Text>
+                        <Text style={{ color: 'white' }}>
+                            Type: {timePickerType}
+                        </Text>
+                        <Text style={{ color: 'white' }}>
+                            Both conditions: {showTimePickerModal && selectedDay ? 'TRUE' : 'FALSE'}
+                        </Text>
+                    </View>
+                )}
+
                 {/* Schedule Settings Modal */}
                 <Modal
                     visible={showScheduleModal}
@@ -591,109 +619,92 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                 </Modal>
             </SafeAreaView>
 
-            {/* ✅ PROPER CONDITIONAL TIME PICKER MODAL */}
-            {showTimePickerModal && selectedDay && (
-                <Modal
-                    visible={true}
-                    transparent={true}
-                    animationType="slide"
-                    presentationStyle="overFullScreen"
-                    onRequestClose={() => {
-                        console.log("Modal closed");
-                        setShowTimePickerModal(false);
-                        setSelectedDay(null);
-                    }}
-                >
+            {/* 🚨 SIMPLIFIED TEST MODAL - NO CONDITIONAL RENDERING */}
+            <Modal
+                visible={showTimePickerModal && selectedDay ? true : false}
+                transparent={true}
+                animationType="none"
+                presentationStyle="overFullScreen"
+                onRequestClose={() => {
+                    console.log("🚨 Modal onRequestClose called");
+                    setShowTimePickerModal(false);
+                    setSelectedDay(null);
+                }}
+            >
+                <View style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(255,0,0,0.8)',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                }}>
                     <View style={{
-                        flex: 1,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        backgroundColor: 'rgba(0,0,0,0.6)'
+                        backgroundColor: 'yellow',
+                        padding: 30,
+                        borderRadius: 10,
+                        width: '90%',
+                        maxHeight: '70%'
                     }}>
-                        <View style={{
-                            backgroundColor: 'white',
-                            padding: 20,
-                            borderRadius: 10,
-                            width: '80%',
-                            maxHeight: '60%'
+                        <Text style={{
+                            color: 'black',
+                            fontSize: 24,
+                            textAlign: 'center',
+                            marginBottom: 20,
+                            fontWeight: 'bold'
                         }}>
+                            🚨 MODAL IS RENDERING!
+                        </Text>
+
+                        <Text style={{
+                            color: 'black',
+                            fontSize: 18,
+                            textAlign: 'center',
+                            marginBottom: 20
+                        }}>
+                            Day: {selectedDay?.day_name || 'Unknown'}
+                        </Text>
+
+                        <Text style={{
+                            color: 'black',
+                            fontSize: 18,
+                            textAlign: 'center',
+                            marginBottom: 20
+                        }}>
+                            Type: {timePickerType}
+                        </Text>
+
+                        <TouchableOpacity
+                            style={{
+                                backgroundColor: 'red',
+                                padding: 20,
+                                borderRadius: 10,
+                                marginBottom: 10
+                            }}
+                            onPress={() => {
+                                console.log("🚨 CLOSE BUTTON PRESSED");
+                                setShowTimePickerModal(false);
+                                setSelectedDay(null);
+                            }}
+                        >
                             <Text style={{
-                                color: 'black',
-                                fontSize: 20,
+                                color: 'white',
                                 textAlign: 'center',
-                                marginBottom: 10,
-                                fontWeight: '600'
+                                fontSize: 18,
+                                fontWeight: 'bold'
                             }}>
-                                Select Time
+                                CLOSE MODAL
                             </Text>
-                            <Text style={{
-                                color: 'black',
-                                fontSize: 16,
-                                textAlign: 'center',
-                                marginBottom: 20
-                            }}>
-                                {selectedDay.day_name} - {timePickerType === 'start' ? 'Start' : 'End'} Time
-                            </Text>
+                        </TouchableOpacity>
 
-                            <ScrollView style={{ maxHeight: 300 }}>
-                                {hourOptions.map((item) => {
-                                    const isSelected = selectedDay &&
-                                        ((timePickerType === 'start' && item.value === selectedDay.start_hour) ||
-                                            (timePickerType === 'end' && item.value === selectedDay.end_hour));
-
-                                    return (
-                                        <TouchableOpacity
-                                            key={`time-${item.value}`}
-                                            style={{
-                                                paddingVertical: 15,
-                                                paddingHorizontal: 20,
-                                                borderBottomWidth: 1,
-                                                borderBottomColor: '#eee',
-                                                backgroundColor: isSelected ? '#007AFF20' : 'transparent'
-                                            }}
-                                            onPress={() => {
-                                                console.log('⏰ TIME SELECTED:', item.label, 'value:', item.value);
-                                                handleTimeSelection(item.value);
-                                            }}
-                                        >
-                                            <Text style={{
-                                                fontSize: 18,
-                                                color: isSelected ? '#007AFF' : 'black',
-                                                fontWeight: isSelected ? '600' : 'normal',
-                                                textAlign: 'center'
-                                            }}>
-                                                {item.label} {isSelected && '✓'}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </ScrollView>
-
-                            <TouchableOpacity
-                                style={{
-                                    marginTop: 20,
-                                    padding: 15,
-                                    backgroundColor: '#007AFF',
-                                    borderRadius: 8
-                                }}
-                                onPress={() => {
-                                    setShowTimePickerModal(false);
-                                    setSelectedDay(null);
-                                }}
-                            >
-                                <Text style={{
-                                    color: 'white',
-                                    textAlign: 'center',
-                                    fontSize: 16,
-                                    fontWeight: '600'
-                                }}>
-                                    Close
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
+                        <Text style={{
+                            color: 'black',
+                            fontSize: 14,
+                            textAlign: 'center'
+                        }}>
+                            If you see this, modals work but something is wrong with our time picker logic
+                        </Text>
                     </View>
-                </Modal>
-            )}
+                </View>
+            </Modal>
         </>
     );
 }
