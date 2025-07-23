@@ -19,7 +19,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import { supabase } from "../../services/supabase";
-import { Profile, UserSettings, UserRoutine } from "../../types/database";
+import { Profile, UserSettings } from "../../types/database";
 import { useTheme } from "../../../ThemeContext";
 
 const { width } = Dimensions.get("window");
@@ -36,10 +36,6 @@ interface Achievement {
   unlockedDate?: string;
 }
 
-interface DayRoutines {
-  [key: number]: UserRoutine[];
-}
-
 export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -49,24 +45,12 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showImagePicker, setShowImagePicker] = useState(false);
-  const [dayRoutines, setDayRoutines] = useState<DayRoutines>({});
-  const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
   const [avatarData, setAvatarData] = useState<string | null>(null);
 
   const { colors } = useTheme();
 
   const ACHIEVEMENT_TARGETS = [
     3, 5, 7, 14, 30, 60, 100, 150, 200, 250, 300, 365,
-  ];
-
-  const DAYS_OF_WEEK = [
-    { id: 0, name: "Sunday", short: "Sun" },
-    { id: 1, name: "Monday", short: "Mon" },
-    { id: 2, name: "Tuesday", short: "Tue" },
-    { id: 3, name: "Wednesday", short: "Wed" },
-    { id: 4, name: "Thursday", short: "Thu" },
-    { id: 5, name: "Friday", short: "Fri" },
-    { id: 6, name: "Saturday", short: "Sat" },
   ];
 
   useFocusEffect(
@@ -503,51 +487,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
   };
 
-  const loadDailyRoutines = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const [routinesResult, dayAssignmentsResult] = await Promise.all([
-        supabase
-          .from("user_routines")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("is_weekly", false)
-          .eq("is_active", true)
-          .order("sort_order"),
-        supabase
-          .from("user_day_routines")
-          .select("routine_id, day_of_week")
-          .eq("user_id", user.id),
-      ]);
-
-      if (routinesResult.error) throw routinesResult.error;
-      if (dayAssignmentsResult.error) throw dayAssignmentsResult.error;
-
-      const routines = routinesResult.data || [];
-      const dayAssignments = dayAssignmentsResult.data || [];
-      const routinesByDay: DayRoutines = {};
-
-      for (let i = 0; i < 7; i++) {
-        routinesByDay[i] = [];
-      }
-
-      dayAssignments.forEach((assignment) => {
-        const routine = routines.find((r) => r.id === assignment.routine_id);
-        if (routine) {
-          routinesByDay[assignment.day_of_week].push(routine);
-        }
-      });
-
-      setDayRoutines(routinesByDay);
-    } catch (error) {
-      console.error("Error loading daily routines:", error);
-    }
-  };
-
   // FIXED: Profile data loading with avatar persistence protection
   const loadProfileData = async () => {
     try {
@@ -611,7 +550,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       }
 
       await calculateAchievements(user.id);
-      await loadDailyRoutines();
     } catch (error) {
       console.error("Error loading profile:", error);
       Alert.alert("Error", "Failed to load profile data");
@@ -899,10 +837,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       setProfile((prev) =>
         prev
           ? {
-              ...prev,
-              avatar_url: urlData.publicUrl,
-              updated_at: new Date().toISOString(),
-            }
+            ...prev,
+            avatar_url: urlData.publicUrl,
+            updated_at: new Date().toISOString(),
+          }
           : null
       );
 
@@ -1058,16 +996,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     );
   };
 
-  const toggleDay = (dayId: number) => {
-    const newExpandedDays = new Set(expandedDays);
-    if (newExpandedDays.has(dayId)) {
-      newExpandedDays.delete(dayId);
-    } else {
-      newExpandedDays.add(dayId);
-    }
-    setExpandedDays(newExpandedDays);
-  };
-
   // FIXED: Refresh function that preserves avatar state
   const onRefresh = async () => {
     setRefreshing(true);
@@ -1148,111 +1076,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     ];
 
     return badgeDesigns[tierIndex] || { tier: "Bronze", emoji: "🏅" };
-  };
-
-  const renderDailyRoutinesSection = () => {
-    return (
-      <View
-        style={[
-          styles.dailyRoutinesSection,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        <View style={styles.sectionHeader}>
-          <Ionicons name="calendar" size={20} color="#007AFF" />
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Daily Routines Schedule
-          </Text>
-        </View>
-
-        {DAYS_OF_WEEK.map((day) => {
-          const isExpanded = expandedDays.has(day.id);
-          const routinesForDay = dayRoutines[day.id] || [];
-
-          return (
-            <View key={day.id} style={styles.dayContainer}>
-              <TouchableOpacity
-                style={[styles.dayHeader, { borderColor: colors.border }]}
-                onPress={() => toggleDay(day.id)}
-              >
-                <View style={styles.dayHeaderLeft}>
-                  <Text style={[styles.dayName, { color: colors.text }]}>
-                    {day.name}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.routineCount,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    {routinesForDay.length} routine
-                    {routinesForDay.length !== 1 ? "s" : ""}
-                  </Text>
-                </View>
-                <Ionicons
-                  name={isExpanded ? "chevron-up" : "chevron-down"}
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-
-              {isExpanded && (
-                <View
-                  style={[
-                    styles.dayContent,
-                    { backgroundColor: colors.background },
-                  ]}
-                >
-                  {routinesForDay.length === 0 ? (
-                    <Text
-                      style={[
-                        styles.noRoutinesText,
-                        { color: colors.textSecondary },
-                      ]}
-                    >
-                      No routines scheduled for {day.name}
-                    </Text>
-                  ) : (
-                    routinesForDay.map((routine) => (
-                      <View
-                        key={routine.id}
-                        style={[
-                          styles.routineItem,
-                          { borderColor: colors.border },
-                        ]}
-                      >
-                        <Ionicons
-                          name={(routine.icon as any) || "checkmark-circle"}
-                          size={20}
-                          color="#007AFF"
-                        />
-                        <View style={styles.routineInfo}>
-                          <Text
-                            style={[styles.routineName, { color: colors.text }]}
-                          >
-                            {routine.name}
-                          </Text>
-                          {routine.description && (
-                            <Text
-                              style={[
-                                styles.routineDescription,
-                                { color: colors.textSecondary },
-                              ]}
-                            >
-                              {routine.description}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                    ))
-                  )}
-                </View>
-              )}
-            </View>
-          );
-        })}
-      </View>
-    );
   };
 
   const renderAchievementsSection = () => {
@@ -1437,8 +1260,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           </Text>
         </View>
 
-        {renderDailyRoutinesSection()}
-
+        {/* ✅ MOVED UP: Achievements Section - now directly after user section */}
         <View
           style={[
             styles.achievementsSection,
@@ -1698,79 +1520,6 @@ const styles = StyleSheet.create({
   joinDate: {
     fontSize: 14,
   },
-  dailyRoutinesSection: {
-    marginTop: 15,
-    borderBottomWidth: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 15,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginLeft: 8,
-    flex: 1,
-  },
-  dayContainer: {
-    marginBottom: 8,
-  },
-  dayHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  dayHeaderLeft: {
-    flex: 1,
-  },
-  dayName: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  routineCount: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  dayContent: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-  },
-  noRoutinesText: {
-    fontSize: 14,
-    fontStyle: "italic",
-    textAlign: "center",
-    paddingVertical: 12,
-  },
-  routineItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginVertical: 4,
-    borderWidth: 1,
-    borderRadius: 6,
-  },
-  routineInfo: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  routineName: {
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  routineDescription: {
-    fontSize: 13,
-    marginTop: 2,
-  },
   achievementsSection: {
     marginTop: 15,
     borderBottomWidth: 1,
@@ -1781,6 +1530,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     marginBottom: 15,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginLeft: 8,
+    flex: 1,
   },
   achievementCount: {
     marginLeft: "auto",
