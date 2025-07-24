@@ -778,9 +778,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       // Get today's daily routine IDs
       const todayDailyRoutineIds = dayRoutines.map((dr) => dr.routine_id);
 
-      // Filter to get only today's daily routines (not weekly)
+      // Filter to get only today's ACTIVE daily routines (not weekly)
       const todayDailyRoutines = userRoutines.filter(
-        (routine) => !routine.is_weekly && todayDailyRoutineIds.includes(routine.id)
+        (routine) =>
+          !routine.is_weekly &&
+          routine.is_active !== false &&
+          todayDailyRoutineIds.includes(routine.id)
       );
 
       console.log("🔧 DEBUG: Today's daily routines:", todayDailyRoutines.map(r => r.id));
@@ -1556,7 +1559,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                         >
                           <TouchableOpacity
                             style={styles.calendarRoutineLeft}
-                            onPress={() => toggleRoutineCompletion(routine, false)}
+                            onPress={() => {
+                              console.log("📅 CALENDAR: Toggling routine:", routine.name);
+                              console.log("  - Routine ID:", routine.id);
+                              console.log("  - Current completion status:", routine.isCompleted);
+                              toggleRoutineCompletion(routine, false);
+                            }}
                           >
                             <View
                               style={[
