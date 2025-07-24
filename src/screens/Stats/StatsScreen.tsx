@@ -358,7 +358,7 @@ export default function StatsScreen() {
             .order("completion_date", { ascending: false }),
           supabase
             .from("user_routines")
-            .select("id, is_weekly")
+            .select("id, is_weekly, is_active")
             .eq("user_id", userId),
           supabase
             .from("user_day_routines")
@@ -556,7 +556,7 @@ export default function StatsScreen() {
             .eq("user_id", userId),
           supabase
             .from("user_routines")
-            .select("id, is_weekly")
+            .select("id, is_weekly, is_active")
             .eq("user_id", userId),
           supabase
             .from("user_day_routines")
