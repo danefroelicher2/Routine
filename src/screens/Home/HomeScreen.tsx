@@ -725,6 +725,57 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return unsubscribe;
   }, [navigation, loadData]);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", () => {
+      console.log("HomeScreen focused - reloading data");
+      loadData();
+      // ✅ NEW: Also reload user schedules when screen focuses (in case user changed settings)
+      loadUserDaySchedules().then(schedules => {
+        setUserDaySchedules(schedules);
+      });
+    });
+
+    return unsubscribe;
+  }, [navigation, loadData]);
+
+  // ADD THIS NEW useEffect HERE:
+  useEffect(() => {
+    let lastCheckedDate = getLocalDateString(new Date());
+
+    // Check every minute if we've crossed midnight
+    const checkMidnightTransition = () => {
+      const now = new Date();
+      const currentDateStr = getLocalDateString(now);
+
+      if (currentDateStr !== lastCheckedDate) {
+        console.log("🌙 MIDNIGHT TRANSITION DETECTED!");
+        console.log("  - Previous date:", lastCheckedDate);
+        console.log("  - New date:", currentDateStr);
+
+        // Update the stored date
+        lastCheckedDate = currentDateStr;
+
+        // Reload data to reflect new day
+        loadData();
+
+        // Update selected day if viewing "today"
+        const newDayOfWeek = now.getDay();
+        if (selectedDay === new Date().getDay() - 1 ||
+          (selectedDay === 6 && newDayOfWeek === 0)) {
+          setSelectedDay(newDayOfWeek);
+        }
+      }
+    };
+
+    // Check immediately
+    checkMidnightTransition();
+
+    // Check every minute
+    const interval = setInterval(checkMidnightTransition, 60000);
+
+    return () => clearInterval(interval);
+  }, [loadData, selectedDay]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadData().finally(() => setRefreshing(false));
