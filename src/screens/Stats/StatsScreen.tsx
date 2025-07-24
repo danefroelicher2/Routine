@@ -149,10 +149,31 @@ export default function StatsScreen() {
   // Theme context
   const { colors } = useTheme();
 
-  // Achievement targets (in days) - 12 total achievements
-  const ACHIEVEMENT_TARGETS = [
-    3, 5, 7, 14, 30, 60, 100, 150, 200, 250, 300, 365,
+  // Achievement targets with levels and themed badges
+  const ACHIEVEMENT_LEVELS = [
+    // BEGINNER (Bronze theme)
+    { days: 3, name: "First Steps", icon: "🌱", level: "Beginner", color: "#CD7F32" },
+    { days: 5, name: "Getting Started", icon: "🌟", level: "Beginner", color: "#CD7F32" },
+    { days: 7, name: "One Week Wonder", icon: "✨", level: "Beginner", color: "#CD7F32" },
+
+    // BUILDER (Silver theme)
+    { days: 14, name: "Habit Builder", icon: "🔨", level: "Builder", color: "#C0C0C0" },
+    { days: 30, name: "Monthly Master", icon: "📅", level: "Builder", color: "#C0C0C0" },
+    { days: 60, name: "Committed", icon: "💪", level: "Builder", color: "#C0C0C0" },
+
+    // CHAMPION (Gold theme)
+    { days: 100, name: "Century Club", icon: "💯", level: "Champion", color: "#FFD700" },
+    { days: 150, name: "Unstoppable", icon: "🚀", level: "Champion", color: "#FFD700" },
+    { days: 200, name: "Legendary Focus", icon: "🎯", level: "Champion", color: "#FFD700" },
+    { days: 250, name: "Elite Performer", icon: "⭐", level: "Champion", color: "#FFD700" },
+
+    // LEGEND (Purple/Diamond theme)
+    { days: 300, name: "Near Mythical", icon: "👑", level: "Legend", color: "#9B59B6" },
+    { days: 365, name: "Year of Glory", icon: "💎", level: "Legend", color: "#9B59B6" },
   ];
+
+  // Keep the simple array for compatibility
+  const ACHIEVEMENT_TARGETS = ACHIEVEMENT_LEVELS.map(a => a.days);
 
   // ENHANCED: Load data when screen comes into focus (real-time updates)
   useFocusEffect(
