@@ -40,13 +40,16 @@ interface StreakInfo {
   isOngoing: boolean;
 }
 
-// Achievement interface
+// Enhanced Achievement interface
 interface Achievement {
   id: string;
   name: string;
   target: number;
   unlocked: boolean;
   unlockedDate?: string;
+  icon: string;
+  level: string;
+  color: string;
 }
 
 // ✅ CRITICAL FIX: Utility function to get local date string consistently
