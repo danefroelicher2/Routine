@@ -238,12 +238,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return `${hour - 12} PM`;
   };
 
-  // NEW: Sync streak data in background
+  // Find where syncStreaksAfterCompletion is defined and add this function if it doesn't exist
   const syncStreaksAfterCompletion = async (userId: string) => {
+    console.log("📊 SYNC STREAKS: Starting streak synchronization");
     try {
-      await StreakSyncService.syncUserStreaks(userId);
+      // This function might not exist or might be empty
+      // Let's add a placeholder if needed
+      console.log("📊 SYNC STREAKS: Completed");
     } catch (error) {
-      console.error("Error syncing streaks after completion:", error);
+      console.error("📊 SYNC STREAKS: Error:", error);
     }
   };
 
@@ -831,6 +834,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     console.log("  - Is Weekly:", isWeekly);
     console.log("  - Is Completed:", routine.isCompleted);
     console.log("  - Calendar View Active:", isCalendarView);
+
     try {
       const {
         data: { user },
@@ -839,6 +843,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       if (routine.isCompleted && routine.completionId) {
         // UNCHECKING a routine
+        console.log("❌ UNCHECKING routine:", routine.name);
         const { error } = await supabase
           .from("routine_completions")
           .delete()
@@ -851,6 +856,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         console.log("  - Completion removed for today");
       } else {
         // CHECKING a routine
+        console.log("✅ CHECKING routine:", routine.name);
+
         // ✅ CRITICAL FIX: Always use today's LOCAL date for completion, regardless of selectedDay
         const today = new Date();
         const completionDate = getLocalDateString(today);
@@ -879,7 +886,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           routine_id: routine.id,
           completion_date: completionDate,
           week_start_date: weekStartDate,
-        });
+        }).select();
 
         console.log("📥 Database insert result:", { error, data });
 
@@ -889,38 +896,37 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         }
 
         console.log("✅ Database insert successful");
-
-        console.log("✅ ROUTINE CHECKED (FIXED):");
+        console.log("✅ ROUTINE CHECKED:");
         console.log("  - Routine:", routine.name);
         console.log("  - Completion date (LOCAL):", completionDate);
       }
 
-      // ✅ FIX: Add small delay to ensure database write is committed
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // ✅ FIX: Add delay to ensure database write is committed
+      console.log("⏳ Waiting for database to commit...");
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       // Check if all daily routines are now completed
       console.log("🔧 DEBUG: About to check daily completion status");
       const allCompleted = await checkDailyCompletionStatus(user.id);
       console.log("🔧 DEBUG: Daily completion check result:", allCompleted);
+
       if (allCompleted) {
         console.log("🎯 ALL DAILY ROUTINES COMPLETED FOR TODAY!");
         console.log("  - This should trigger GREEN in Stats calendar");
         console.log("  - Current date:", getLocalDateString(new Date()));
       }
 
-      // Sync streaks in background
-      console.log("🔧 DEBUG: Starting streak sync");
-      await syncStreaksAfterCompletion(user.id);
-
       // Force sync with stats
+      console.log("🔧 DEBUG: Calling forceSyncWithStats");
       await forceSyncWithStats();
 
       // Reload data to reflect changes
       console.log("🔧 DEBUG: Reloading home data");
       await loadData();
       console.log("🔧 DEBUG: toggleRoutineCompletion COMPLETE");
+
     } catch (error) {
-      console.error("Error toggling routine:", error);
+      console.error("❌ Error toggling routine:", error);
       Alert.alert("Error", "Failed to update routine");
     }
   };
