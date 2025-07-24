@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
 
+
 interface LoginScreenProps {
     navigation: any;
 }
@@ -23,7 +24,11 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [isResettingPassword, setIsResettingPassword] = useState(false);
 
+    const handleForgotPassword = () => {
+        navigation.navigate('ResetPassword');
+    };
     const handleLogin = async () => {
         if (!email || !password) {
             Alert.alert('Error', 'Please fill in all fields');
@@ -99,6 +104,17 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                         </TouchableOpacity>
                     </View>
 
+
+                    {/* Add this after your password input field */}
+                    <TouchableOpacity
+                        onPress={handleForgotPassword}
+                        style={styles.forgotPasswordContainer}
+                    >
+                        <Text style={[styles.forgotPasswordText, { color: '#007AFF' }]}>
+                            Forgot Password?
+                        </Text>
+                    </TouchableOpacity>
+
                     <TouchableOpacity
                         style={[styles.loginButton, loading && styles.disabledButton]}
                         onPress={handleLogin}
@@ -142,6 +158,15 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#333',
         marginTop: 20,
+    },
+    forgotPasswordContainer: {
+        alignSelf: 'flex-end',
+        marginTop: 8,
+        marginBottom: 20,
+    },
+    forgotPasswordText: {
+        fontSize: 14,
+        fontWeight: '500',
     },
     subtitle: {
         fontSize: 16,
