@@ -800,11 +800,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ✅ ENHANCED toggleRoutineCompletion function with LOCAL TIMEZONE fixes + scheduled routine support
   const toggleRoutineCompletion = async (
     routine: RoutineWithCompletion,
     isWeekly: boolean
   ) => {
+    console.log("🔧 DEBUG: toggleRoutineCompletion START");
+    console.log("  - Routine:", routine.name);
+    console.log("  - Is Weekly:", isWeekly);
+    console.log("  - Is Completed:", routine.isCompleted);
+    console.log("  - Calendar View Active:", isCalendarView);
     try {
       const {
         data: { user },
