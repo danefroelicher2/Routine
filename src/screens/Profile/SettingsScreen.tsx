@@ -428,6 +428,34 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             )}
         </TouchableOpacity>
     );
+    const handleLogout = () => {
+        Alert.alert(
+            'Log Out',
+            'Are you sure you want to log out?',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel'
+                },
+                {
+                    text: 'Log Out',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const { error } = await supabase.auth.signOut();
+                            if (error) throw error;
+
+                            // The auth state listener in App.tsx will handle navigation
+                            console.log('User logged out successfully');
+                        } catch (error) {
+                            console.error('Error logging out:', error);
+                            Alert.alert('Error', 'Failed to log out. Please try again.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     const renderDayScheduleItem = (day: DaySchedule) => (
         <View key={day.day_id} style={[styles.dayScheduleItem, { borderBottomColor: colors.separator }]}>
@@ -596,6 +624,13 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                             handleChangePassword
                         )}
 
+                        {renderSettingItem(
+                            'Log Out',
+                            'Sign out of your account',
+                            '',
+                            handleLogout
+                        )}
+
                         <TouchableOpacity
                             style={[styles.settingItem, { borderBottomColor: colors.separator }]}
                             onPress={() => {
@@ -640,35 +675,33 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                             </View>
                         </TouchableOpacity>
                     </View>
-                </ScrollView>
-
-                {/* Schedule Settings Modal */}
-                <Modal
-                    visible={showScheduleModal}
-                    animationType="slide"
-                    presentationStyle="pageSheet"
-                    onRequestClose={() => setShowScheduleModal(false)}
-                >
-                    <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-                        <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-                            <TouchableOpacity onPress={() => setShowScheduleModal(false)}>
-                                <Text style={[styles.modalCloseButton, { color: colors.textSecondary }]}>Done</Text>
-                            </TouchableOpacity>
-                            <Text style={[styles.modalTitle, { color: colors.text }]}>Daily Time Ranges</Text>
-                            <View style={{ width: 50 }} />
-                        </View>
-
-                        <ScrollView style={[styles.modalContent, { backgroundColor: colors.background }]}>
-                            <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
-                                Set your active hours for each day. This determines the time range shown in your calendar view.
-                            </Text>
-
-                            <View style={[styles.daySchedulesList, { backgroundColor: colors.surface }]}>
-                                {daySchedules.map(renderDayScheduleItem)}
+                    {/* Schedule Settings Modal */}
+                    <Modal
+                        visible={showScheduleModal}
+                        animationType="slide"
+                        presentationStyle="pageSheet"
+                        onRequestClose={() => setShowScheduleModal(false)}
+                    >
+                        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+                            <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+                                <TouchableOpacity onPress={() => setShowScheduleModal(false)}>
+                                    <Text style={[styles.modalCloseButton, { color: colors.textSecondary }]}>Done</Text>
+                                </TouchableOpacity>
+                                <Text style={[styles.modalTitle, { color: colors.text }]}>Daily Time Ranges</Text>
+                                <View style={{ width: 50 }} />
                             </View>
-                        </ScrollView>
-                    </SafeAreaView>
-                </Modal>
+
+                            <ScrollView style={[styles.modalContent, { backgroundColor: colors.background }]}>
+                                <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
+                                    Set your active hours for each day. This determines the time range shown in your calendar view.
+                                </Text>
+
+                                <View style={[styles.daySchedulesList, { backgroundColor: colors.surface }]}>
+                                    {daySchedules.map(renderDayScheduleItem)}
+                                </View>
+                            </ScrollView>
+                        </SafeAreaView>
+                    </Modal>
             </SafeAreaView>
         </>
     );
