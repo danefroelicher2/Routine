@@ -752,7 +752,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             .eq("completion_date", todayStr),
           supabase
             .from("user_routines")
-            .select("id, is_weekly")
+            .select("id, is_weekly, is_active, name")  // Added is_active and name
             .eq("user_id", userId)
             .eq("is_active", true),
           supabase
@@ -1563,6 +1563,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                               console.log("📅 CALENDAR: Toggling routine:", routine.name);
                               console.log("  - Routine ID:", routine.id);
                               console.log("  - Current completion status:", routine.isCompleted);
+                              console.log("  - Is scheduled routine:", !!routine.scheduled_id);
+                              console.log("  - Scheduled ID:", routine.scheduled_id);
                               toggleRoutineCompletion(routine, false);
                             }}
                           >

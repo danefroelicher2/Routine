@@ -71,47 +71,61 @@ const checkDailyCompletionStatusForStats = (
   completedRoutineIds: string[],
   dayRoutineMap: Record<number, string[]>
 ): boolean => {
-  // Get routines assigned to this day of week
+  // Get routines assigned to this day of week (normal view)
   const todayDailyRoutineIds = dayRoutineMap[dayOfWeek] || [];
 
-  // Filter to get active daily routines only
+  // Filter to get active daily routines assigned to this day
   const todayDailyRoutines = userRoutines.filter(
     (routine) => !routine.is_weekly &&
-      routine.is_active !== false &&
+      (routine.is_active === undefined || routine.is_active === true) &&
       todayDailyRoutineIds.includes(routine.id)
   );
 
-  // Check which routines from today are completed
-  const completedTodayRoutines = todayDailyRoutines.filter(
+  // IMPORTANT: Also count ANY daily (non-weekly) routine that was completed today
+  // This captures calendar view completions that might not be in day assignments
+  const allCompletedDailyRoutines = userRoutines.filter(
+    (routine) => !routine.is_weekly &&
+      (routine.is_active === undefined || routine.is_active === true) &&
+      completedRoutineIds.includes(routine.id)
+  );
+
+  // Check which assigned routines are completed
+  const completedAssignedRoutines = todayDailyRoutines.filter(
     routine => completedRoutineIds.includes(routine.id)
   );
 
-  // FLEXIBLE COMPLETION LOGIC for multi-view support:
-  // Option 1: If user completed ALL their routines (perfect day)
-  const allCompleted = todayDailyRoutines.length > 0 &&
+  // FLEXIBLE COMPLETION LOGIC:
+  // Option 1: User completed ALL their assigned routines (perfect day for normal view)
+  const allAssignedCompleted = todayDailyRoutines.length > 0 &&
     todayDailyRoutines.every((routine) => completedRoutineIds.includes(routine.id));
 
-  // Option 2: If user completed at least 2 routines (partial completion counts)
-  const partialCompleted = completedTodayRoutines.length >= 2;
+  // Option 2: User completed at least 2 daily routines total (including calendar view)
+  const enoughRoutinesCompleted = allCompletedDailyRoutines.length >= 2;
 
-  // Use the more lenient check - EITHER all completed OR at least 2 completed
-  const isConsideredComplete = allCompleted || partialCompleted;
+  // Option 3: User has no assigned routines but completed some daily routines
+  const noAssignedButCompleted = todayDailyRoutines.length === 0 && allCompletedDailyRoutines.length >= 1;
+
+  // Use the most flexible check - ANY of these conditions
+  const isConsideredComplete = allAssignedCompleted || enoughRoutinesCompleted || noAssignedButCompleted;
 
   // Enhanced logging for today
   const today = getLocalDateString(new Date());
   if (dateStr === today) {
-    console.log("🟢 STATS: TODAY'S COMPLETION CHECK (FLEXIBLE):");
+    console.log("🟢 STATS: TODAY'S COMPLETION CHECK (MULTI-VIEW):");
     console.log("  - Date (LOCAL):", dateStr);
     console.log("  - Day of week:", dayOfWeek);
-    console.log("  - Total assigned routines:", todayDailyRoutines.length);
+    console.log("  - Assigned routine IDs:", todayDailyRoutineIds);
     console.log("  - Assigned routine names:", todayDailyRoutines.map((r) => r.name || r.id));
-    console.log("  - Completed routine IDs:", completedRoutineIds);
-    console.log("  - Completed today's routines:", completedTodayRoutines.map((r) => r.name || r.id));
-    console.log("  - Completed count:", completedTodayRoutines.length);
-    console.log("  - All completed?", allCompleted);
-    console.log("  - Partial completed (2+)?", partialCompleted);
-    console.log("  - Final decision:", isConsideredComplete);
-    console.log("  - Calendar will show:", isConsideredComplete ? "GREEN" : "TRANSPARENT");
+    console.log("  - ALL completed routine IDs:", completedRoutineIds);
+    console.log("  - Completed assigned routines:", completedAssignedRoutines.map((r) => r.name || r.id));
+    console.log("  - ALL completed daily routines:", allCompletedDailyRoutines.map((r) => r.name || r.id));
+    console.log("  - Assigned count:", todayDailyRoutines.length);
+    console.log("  - Completed assigned count:", completedAssignedRoutines.length);
+    console.log("  - Total daily completed count:", allCompletedDailyRoutines.length);
+    console.log("  - All assigned completed?", allAssignedCompleted);
+    console.log("  - Enough routines (2+)?", enoughRoutinesCompleted);
+    console.log("  - No assigned but completed some?", noAssignedButCompleted);
+    console.log("  - FINAL DECISION:", isConsideredComplete ? "✅ GREEN" : "❌ TRANSPARENT");
   }
 
   return isConsideredComplete;
