@@ -20,6 +20,7 @@ import { ThemeProvider, useTheme } from "./ThemeContext";
 // Auth Screens
 import LoginScreen from "./src/screens/Auth/LoginScreen";
 import SignupScreen from "./src/screens/Auth/SignupScreen";
+import ChangePasswordScreen from "./src/screens/Profile/ChangePasswordScreen";
 import ResetPasswordScreen from "./src/screens/Auth/ResetPasswordScreen";
 
 // Main App Screens
@@ -125,6 +126,11 @@ function ProfileStack() {
         name="RoutineManager"
         component={RoutineManagerScreen}
         options={{ title: "Manage Routines" }}
+      />
+      <Stack.Screen
+        name="ChangePassword"
+        component={ChangePasswordScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
