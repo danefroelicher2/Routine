@@ -127,30 +127,42 @@ export default function StatsScreen() {
   // ENHANCED: Load data when screen comes into focus (real-time updates)
   useFocusEffect(
     useCallback(() => {
-      console.log("📊 Stats screen focused - loading fresh data");
+      console.log("📊 STATS SCREEN: Focused - checking for updates");
 
       // Check for update flag from home screen
-      const checkUpdateFlag = async () => {
+      const checkAndLoadData = async () => {
         try {
           const updateFlag = await AsyncStorage.getItem('stats_needs_update');
+          console.log("📊 STATS SCREEN: Checking update flag:", updateFlag);
+
           if (updateFlag) {
             const flagData = JSON.parse(updateFlag);
-            console.log("📊 Update flag found:", flagData);
+            console.log("📊 STATS SCREEN: Update flag found:", flagData);
             await AsyncStorage.removeItem('stats_needs_update');
+            console.log("📊 STATS SCREEN: Update flag cleared");
           }
+
+          // Always load data with a delay
+          console.log("📊 STATS SCREEN: Loading data in 300ms...");
+          setTimeout(() => {
+            console.log("📊 STATS SCREEN: Loading data NOW");
+            loadStatsData();
+          }, 300);
+
         } catch (error) {
-          console.error("Error checking update flag:", error);
+          console.error("📊 STATS SCREEN: Error checking update flag:", error);
+          // Load data anyway
+          setTimeout(() => {
+            loadStatsData();
+          }, 300);
         }
       };
 
-      checkUpdateFlag();
+      checkAndLoadData();
 
-      // Add a small delay to ensure database writes are complete
-      const timer = setTimeout(() => {
-        loadStatsData();
-      }, 250); // Increased delay to 250ms
-
-      return () => clearTimeout(timer);
+      return () => {
+        console.log("📊 STATS SCREEN: Cleanup - focus lost");
+      };
     }, [])
   );
 
