@@ -20,6 +20,7 @@ import { ThemeProvider, useTheme } from "./ThemeContext";
 // Auth Screens
 import LoginScreen from "./src/screens/Auth/LoginScreen";
 import SignupScreen from "./src/screens/Auth/SignupScreen";
+import ResetPasswordScreen from "./src/screens/Auth/ResetPasswordScreen";
 
 // Main App Screens
 import HomeScreen from "./src/screens/Home/HomeScreen";
@@ -128,13 +129,13 @@ function ProfileStack() {
     </Stack.Navigator>
   );
 }
-
 // Auth Stack Navigator
 function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
+      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     </Stack.Navigator>
   );
 }
