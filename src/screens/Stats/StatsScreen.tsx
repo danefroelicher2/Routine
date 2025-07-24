@@ -19,6 +19,7 @@ import {
   Dimensions,
   RefreshControl,
 } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../services/supabase";
@@ -127,10 +128,27 @@ export default function StatsScreen() {
   useFocusEffect(
     useCallback(() => {
       console.log("📊 Stats screen focused - loading fresh data");
+
+      // Check for update flag from home screen
+      const checkUpdateFlag = async () => {
+        try {
+          const updateFlag = await AsyncStorage.getItem('stats_needs_update');
+          if (updateFlag) {
+            const flagData = JSON.parse(updateFlag);
+            console.log("📊 Update flag found:", flagData);
+            await AsyncStorage.removeItem('stats_needs_update');
+          }
+        } catch (error) {
+          console.error("Error checking update flag:", error);
+        }
+      };
+
+      checkUpdateFlag();
+
       // Add a small delay to ensure database writes are complete
       const timer = setTimeout(() => {
         loadStatsData();
-      }, 100);
+      }, 250); // Increased delay to 250ms
 
       return () => clearTimeout(timer);
     }, [])
