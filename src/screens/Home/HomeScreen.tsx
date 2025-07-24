@@ -877,10 +877,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Check if all daily routines are now completed
+      console.log("🔧 DEBUG: About to check daily completion status");
       const allCompleted = await checkDailyCompletionStatus(user.id);
+      console.log("🔧 DEBUG: Daily completion check result:", allCompleted);
       if (allCompleted) {
         console.log("🎯 ALL DAILY ROUTINES COMPLETED FOR TODAY!");
         console.log("  - This should trigger GREEN in Stats calendar");
+        console.log("  - Current date:", getLocalDateString(new Date()));
       }
 
       // Sync streaks in background
