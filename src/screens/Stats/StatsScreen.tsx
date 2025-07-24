@@ -1028,7 +1028,7 @@ export default function StatsScreen() {
           </View>
         </View>
 
-        {/* Achievement Section */}
+        {/* Enhanced Achievement Section */}
         <View
           style={[
             styles.achievementSection,
@@ -1039,52 +1039,93 @@ export default function StatsScreen() {
           ]}
         >
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            🏆 Achievements
+            🏆 Achievement Levels
           </Text>
-          <View style={styles.achievementGrid}>
-            {achievements.map((achievement) => (
-              <View key={achievement.id} style={styles.achievementItem}>
-                <View
-                  style={[
-                    styles.achievementBadge,
-                    {
-                      backgroundColor: achievement.unlocked
-                        ? "#007AFF"
-                        : colors.border,
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name={achievement.unlocked ? "trophy" : "trophy-outline"}
-                    size={20}
-                    color={achievement.unlocked ? "#fff" : colors.textSecondary}
-                  />
-                </View>
-                <Text
-                  style={[
-                    styles.achievementText,
-                    {
-                      color: achievement.unlocked
-                        ? colors.text
-                        : colors.textSecondary,
-                    },
-                  ]}
-                >
-                  {achievement.name}
-                </Text>
-                {achievement.unlocked && achievement.unlockedDate && (
-                  <Text
-                    style={[
-                      styles.achievementDate,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    {formatStreakDate(achievement.unlockedDate)}
+
+          {/* Group achievements by level */}
+          {["Beginner", "Builder", "Champion", "Legend"].map((levelName) => {
+            const levelAchievements = achievements.filter(a => a.level === levelName);
+            const levelColor = levelAchievements[0]?.color || "#007AFF";
+            const unlockedCount = levelAchievements.filter(a => a.unlocked).length;
+            const totalCount = levelAchievements.length;
+
+            return (
+              <View key={levelName} style={styles.levelSection}>
+                <View style={styles.levelHeader}>
+                  <Text style={[styles.levelTitle, { color: levelColor }]}>
+                    {levelName.toUpperCase()}
                   </Text>
-                )}
+                  <Text style={[styles.levelProgress, { color: colors.textSecondary }]}>
+                    {unlockedCount}/{totalCount}
+                  </Text>
+                </View>
+
+                <View style={styles.levelAchievements}>
+                  {levelAchievements.map((achievement) => (
+                    <View
+                      key={achievement.id}
+                      style={[
+                        styles.enhancedAchievementItem,
+                        achievement.unlocked && styles.achievementUnlocked
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.enhancedBadge,
+                          {
+                            backgroundColor: achievement.unlocked
+                              ? achievement.color
+                              : colors.background,
+                            borderColor: achievement.unlocked
+                              ? achievement.color
+                              : colors.border,
+                          },
+                        ]}
+                      >
+                        <Text style={styles.badgeIcon}>
+                          {achievement.unlocked ? achievement.icon : "🔒"}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.enhancedAchievementName,
+                          {
+                            color: achievement.unlocked
+                              ? colors.text
+                              : colors.textSecondary,
+                          },
+                        ]}
+                      >
+                        {achievement.name}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.achievementDays,
+                          {
+                            color: achievement.unlocked
+                              ? achievement.color
+                              : colors.textTertiary,
+                          },
+                        ]}
+                      >
+                        {achievement.target} days
+                      </Text>
+                      {achievement.unlocked && achievement.unlockedDate && (
+                        <Text
+                          style={[
+                            styles.unlockedDate,
+                            { color: colors.textSecondary },
+                          ]}
+                        >
+                          ✓ {formatStreakDate(achievement.unlockedDate)}
+                        </Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
               </View>
-            ))}
-          </View>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -1274,32 +1315,70 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 15,
   },
-  achievementGrid: {
+  // Level-based styles
+  levelSection: {
+    marginBottom: 24,
+  },
+  levelHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  levelTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 1,
+  },
+  levelProgress: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  levelAchievements: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
   },
-  achievementItem: {
-    flexDirection: "row",
+  enhancedAchievementItem: {
     alignItems: "center",
-    width: "48%",
+    width: "30%",
     marginBottom: 8,
+    opacity: 0.6,
   },
-  achievementBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  achievementUnlocked: {
+    opacity: 1,
+  },
+  enhancedBadge: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 3,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 8,
+    marginBottom: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  achievementText: {
-    flex: 1,
-    fontSize: 12,
+  badgeIcon: {
+    fontSize: 28,
+  },
+  enhancedAchievementName: {
+    fontSize: 11,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 2,
+  },
+  achievementDays: {
+    fontSize: 10,
     fontWeight: "500",
   },
-  achievementDate: {
-    fontSize: 10,
+  unlockedDate: {
+    fontSize: 9,
     marginTop: 2,
   },
 });
