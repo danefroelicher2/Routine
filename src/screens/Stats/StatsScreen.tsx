@@ -702,15 +702,18 @@ export default function StatsScreen() {
         });
       }
 
-      const newAchievements: Achievement[] = ACHIEVEMENT_TARGETS.map(
-        (target) => {
-          const unlockedStreak = streakPeriods.find((s) => s.length >= target);
+      const newAchievements: Achievement[] = ACHIEVEMENT_LEVELS.map(
+        (achievement) => {
+          const unlockedStreak = streakPeriods.find((s) => s.length >= achievement.days);
           return {
-            id: `streak_${target}`,
-            name: `${target} Day${target !== 1 ? "s" : ""} in a Row`,
-            target,
+            id: `streak_${achievement.days}`,
+            name: achievement.name,
+            target: achievement.days,
             unlocked: !!unlockedStreak,
             unlockedDate: unlockedStreak?.endDate,
+            icon: achievement.icon,
+            level: achievement.level,
+            color: achievement.color,
           };
         }
       );
