@@ -81,15 +81,21 @@ const checkDailyCompletionStatusForStats = (
       todayDailyRoutineIds.includes(routine.id)
   );
 
-  // Count how many of today's routines are completed
-  const completedCount = todayDailyRoutines.filter(
+  // Check which routines from today are completed
+  const completedTodayRoutines = todayDailyRoutines.filter(
     routine => completedRoutineIds.includes(routine.id)
-  ).length;
+  );
 
-  // FLEXIBLE COMPLETION LOGIC:
-  // Consider day complete if user has completed at least 2 routines
-  // This allows for either normal view OR calendar view completions
-  const allCompleted = completedCount >= 2;
+  // FLEXIBLE COMPLETION LOGIC for multi-view support:
+  // Option 1: If user completed ALL their routines (perfect day)
+  const allCompleted = todayDailyRoutines.length > 0 &&
+    todayDailyRoutines.every((routine) => completedRoutineIds.includes(routine.id));
+
+  // Option 2: If user completed at least 2 routines (partial completion counts)
+  const partialCompleted = completedTodayRoutines.length >= 2;
+
+  // Use the more lenient check - EITHER all completed OR at least 2 completed
+  const isConsideredComplete = allCompleted || partialCompleted;
 
   // Enhanced logging for today
   const today = getLocalDateString(new Date());
@@ -100,13 +106,15 @@ const checkDailyCompletionStatusForStats = (
     console.log("  - Total assigned routines:", todayDailyRoutines.length);
     console.log("  - Assigned routine names:", todayDailyRoutines.map((r) => r.name || r.id));
     console.log("  - Completed routine IDs:", completedRoutineIds);
-    console.log("  - Completed count:", completedCount);
-    console.log("  - Required for completion: 2 or more");
+    console.log("  - Completed today's routines:", completedTodayRoutines.map((r) => r.name || r.id));
+    console.log("  - Completed count:", completedTodayRoutines.length);
     console.log("  - All completed?", allCompleted);
-    console.log("  - Calendar will show:", allCompleted ? "GREEN" : "TRANSPARENT");
+    console.log("  - Partial completed (2+)?", partialCompleted);
+    console.log("  - Final decision:", isConsideredComplete);
+    console.log("  - Calendar will show:", isConsideredComplete ? "GREEN" : "TRANSPARENT");
   }
 
-  return allCompleted;
+  return isConsideredComplete;
 };
 export default function StatsScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());
