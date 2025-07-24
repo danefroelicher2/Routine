@@ -807,6 +807,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       return false;
     }
   };
+  // New function to set completion context
+  const setCompletionContext = async (userId: string, viewType: 'normal' | 'calendar') => {
+    try {
+      const completionContext = {
+        userId,
+        date: getLocalDateString(new Date()),
+        viewType,
+        timestamp: Date.now()
+      };
+
+      await AsyncStorage.setItem('completion_context', JSON.stringify(completionContext));
+      console.log(`✅ Set completion context for ${viewType} view`);
+    } catch (error) {
+      console.error("Error setting completion context:", error);
+    }
+  };
 
   // Force sync with stats screen
   const forceSyncWithStats = async () => {
@@ -914,6 +930,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         console.log("🎯 ALL DAILY ROUTINES COMPLETED FOR TODAY!");
         console.log("  - This should trigger GREEN in Stats calendar");
         console.log("  - Current date:", getLocalDateString(new Date()));
+        console.log("  - View type:", isCalendarView ? "calendar" : "normal");
+
+        // Set which view completed the routines
+        await setCompletionContext(user.id, isCalendarView ? 'calendar' : 'normal');
       }
 
       // Force sync with stats
