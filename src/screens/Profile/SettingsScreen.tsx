@@ -298,38 +298,57 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         console.log('✅ Time selection completed successfully');
     };
 
-    // ✅ NEW: Open time picker with iOS delay fix and InteractionManager
+    // ✅ NEW: Open time picker with Alert showing all hours
     const openTimePicker = (day: DaySchedule, type: 'start' | 'end') => {
+        // Store day in a local variable to avoid closure issues
+        const currentDay = day;
+        const currentType = type;
+
         setSelectedDay(day);
         setTimePickerType(type);
 
-        // TEST WITH ALERT FIRST
+        // Create options for all 24 hours
+        const timeOptions = [];
+        for (let hour = 0; hour < 24; hour++) {
+            const period = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+            const label = `${displayHour}:00 ${period}`;
+
+            timeOptions.push({
+                text: label,
+                onPress: () => {
+                    console.log(`Selected ${label} for ${currentDay.day_name} ${currentType}`);
+                    // Use the captured day directly
+                    let newStartHour = currentDay.start_hour;
+                    let newEndHour = currentDay.end_hour;
+
+                    if (currentType === 'start') {
+                        newStartHour = hour;
+                        if (hour >= currentDay.end_hour) {
+                            newEndHour = Math.min(hour + 1, 23);
+                        }
+                    } else {
+                        newEndHour = hour;
+                        if (hour <= currentDay.start_hour) {
+                            newStartHour = Math.max(hour - 1, 0);
+                        }
+                    }
+
+                    updateDaySchedule(currentDay.day_id, newStartHour, newEndHour);
+                }
+            });
+        }
+
+        // Add cancel button
+        timeOptions.push({ text: 'Cancel', style: 'cancel' });
+
+        // Show alert with all options
         Alert.alert(
             `Select ${type} time for ${day.day_name}`,
-            'Choose a time:',
-            [
-                { text: '6:00 AM', onPress: () => handleTimeSelection(6) },
-                { text: '9:00 AM', onPress: () => handleTimeSelection(9) },
-                { text: '12:00 PM', onPress: () => handleTimeSelection(12) },
-                { text: '3:00 PM', onPress: () => handleTimeSelection(15) },
-                { text: '6:00 PM', onPress: () => handleTimeSelection(18) },
-                { text: '9:00 PM', onPress: () => handleTimeSelection(21) },
-                { text: 'Cancel', style: 'cancel' }
-            ]
+            'Scroll to see all times:',
+            timeOptions,
+            { cancelable: true }
         );
-
-        // Comment out the modal for now
-        /*
-        InteractionManager.runAfterInteractions(() => {
-            if (Platform.OS === 'ios') {
-                setTimeout(() => {
-                    setShowTimePickerModal(true);
-                }, 200);
-            } else {
-                setShowTimePickerModal(true);
-            }
-        });
-        */
     };
 
     const formatHour = (hour: number) => {
