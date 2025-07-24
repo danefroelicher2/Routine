@@ -1697,7 +1697,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <View style={styles.sectionHeader}>
                 <Ionicons name="today" size={24} color="#007AFF" />
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                  Daily Routines
+                  Daily Routine
                 </Text>
                 <TouchableOpacity
                   onPress={() => toggleEditMode("daily")}
@@ -1750,23 +1750,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             {/* Weekly Routines Section */}
             <View style={[styles.section, { backgroundColor: colors.surface }]}>
               <View style={styles.sectionHeader}>
-                <Ionicons name="calendar" size={24} color="#007AFF" />
+                <Ionicons name="checkbox-outline" size={24} color="#007AFF" />
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                  Weekly Goals
+                  To Do List
                 </Text>
-                <View
-                  style={[
-                    styles.weekTimer,
-                    { backgroundColor: colors.background },
-                  ]}
-                >
-                  <Ionicons name="time" size={16} color={colors.textSecondary} />
-                  <Text
-                    style={[styles.weekTimerText, { color: colors.textSecondary }]}
-                  >
-                    {weekTimeRemaining}
-                  </Text>
-                </View>
                 <TouchableOpacity
                   onPress={() => toggleEditMode("weekly")}
                   style={[
@@ -1801,7 +1788,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   <Text
                     style={[styles.emptyStateText, { color: colors.textSecondary }]}
                   >
-                    No weekly goals yet
+                    No items in your to do list
                   </Text>
                   <Text
                     style={[
@@ -1809,7 +1796,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                       { color: colors.textTertiary },
                     ]}
                   >
-                    Create weekly goals to track larger objectives!
+                    Add items to track tasks and goals!
                   </Text>
                 </View>
               )}
