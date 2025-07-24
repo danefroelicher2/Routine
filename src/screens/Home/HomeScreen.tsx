@@ -24,6 +24,7 @@ import {
   TextInput,
   Switch,
 } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
 import { UserRoutine } from "../../types/database";
@@ -737,6 +738,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       console.log("🔍 CHECKING DAILY COMPLETION STATUS (FIXED):");
       console.log("  - Date (LOCAL):", todayStr);
       console.log("  - Day of week:", dayOfWeek);
+      console.log("  - Is Calendar View:", isCalendarView);
 
       const [completionsResult, userRoutinesResult, dayRoutinesResult] =
         await Promise.all([
@@ -747,8 +749,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             .eq("completion_date", todayStr),
           supabase
             .from("user_routines")
-            .select("id, name, is_weekly")
-            .eq("user_id", userId),
+            .select("id, is_weekly")
+            .eq("user_id", userId)
+            .eq("is_active", true),
           supabase
             .from("user_day_routines")
             .select("routine_id, day_of_week")
@@ -760,43 +763,72 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (userRoutinesResult.error) throw userRoutinesResult.error;
       if (dayRoutinesResult.error) throw dayRoutinesResult.error;
 
-      const todayCompletions = completionsResult.data || [];
+      const completions = completionsResult.data || [];
       const userRoutines = userRoutinesResult.data || [];
-      const todayRoutineAssignments = dayRoutinesResult.data || [];
+      const dayRoutines = dayRoutinesResult.data || [];
 
-      const todayDailyRoutineIds = todayRoutineAssignments.map((a) => a.routine_id);
+      console.log("🔧 DEBUG: Query results:");
+      console.log("  - Completions found:", completions.length);
+      console.log("  - User routines:", userRoutines.length);
+      console.log("  - Today's assigned routines:", dayRoutines.length);
+
+      // Get today's daily routine IDs
+      const todayDailyRoutineIds = dayRoutines.map((dr) => dr.routine_id);
+
+      // Filter to get only today's daily routines (not weekly)
       const todayDailyRoutines = userRoutines.filter(
         (routine) => !routine.is_weekly && todayDailyRoutineIds.includes(routine.id)
       );
 
-      const completedRoutineIds = todayCompletions.map((c) => c.routine_id);
+      console.log("🔧 DEBUG: Today's daily routines:", todayDailyRoutines.map(r => r.id));
 
+      // Get completed routine IDs for today
+      const completedRoutineIds = completions.map((c) => c.routine_id);
+      console.log("🔧 DEBUG: Completed routine IDs:", completedRoutineIds);
+
+      // Check if all daily routines are completed
       const allCompleted =
         todayDailyRoutines.length > 0 &&
         todayDailyRoutines.every((routine) =>
           completedRoutineIds.includes(routine.id)
         );
 
-      console.log("📋 COMPLETION CHECK RESULTS (FIXED):");
-      console.log("  - Required routines today:", todayDailyRoutines.map((r) => r.name));
-      console.log("  - Completed routine IDs:", completedRoutineIds);
-      console.log("  - All daily routines completed:", allCompleted);
-
-      if (allCompleted) {
-        console.log("🎉 ALL DAILY ROUTINES COMPLETED!");
-        console.log("  - Stats calendar should show GREEN for today");
-        console.log("  - Date (LOCAL):", todayStr);
-      } else {
-        const missing = todayDailyRoutines.filter(
-          (r) => !completedRoutineIds.includes(r.id)
-        );
-        console.log("⏳ Still need to complete:", missing.map((r) => r.name));
-      }
+      console.log("🔧 DEBUG: All completed?", allCompleted);
+      console.log("  - Required count:", todayDailyRoutines.length);
+      console.log("  - Completed count:", completedRoutineIds.filter(id =>
+        todayDailyRoutineIds.includes(id)).length);
 
       return allCompleted;
     } catch (error) {
-      console.error("Error checking completion status:", error);
+      console.error("❌ Error checking completion status:", error);
       return false;
+    }
+  };
+
+  // Force sync with stats screen
+  const forceSyncWithStats = async () => {
+    console.log("🔄 FORCE SYNC: Triggering stats update");
+
+    // Emit a custom event that stats screen can listen to
+    const event = new CustomEvent('routineCompletionUpdate', {
+      detail: {
+        timestamp: Date.now(),
+        source: 'home'
+      }
+    });
+
+    if (typeof window !== 'undefined' && window.dispatchEvent) {
+      window.dispatchEvent(event);
+    }
+
+    // Alternative: Use AsyncStorage to set a flag
+    try {
+      await AsyncStorage.setItem('stats_needs_update', JSON.stringify({
+        timestamp: Date.now(),
+        date: getLocalDateString(new Date())
+      }));
+    } catch (error) {
+      console.error("Error setting stats update flag:", error);
     }
   };
 
@@ -887,10 +919,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       }
 
       // Sync streaks in background
+      console.log("🔧 DEBUG: Starting streak sync");
       await syncStreaksAfterCompletion(user.id);
 
+      // Force sync with stats
+      await forceSyncWithStats();
+
       // Reload data to reflect changes
+      console.log("🔧 DEBUG: Reloading home data");
       await loadData();
+      console.log("🔧 DEBUG: toggleRoutineCompletion COMPLETE");
     } catch (error) {
       console.error("Error toggling routine:", error);
       Alert.alert("Error", "Failed to update routine");
