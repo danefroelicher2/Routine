@@ -702,6 +702,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                             </ScrollView>
                         </SafeAreaView>
                     </Modal>
+                </ScrollView>
             </SafeAreaView>
         </>
     );
