@@ -809,24 +809,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const forceSyncWithStats = async () => {
     console.log("🔄 FORCE SYNC: Triggering stats update");
 
-    // Emit a custom event that stats screen can listen to
-    const event = new CustomEvent('routineCompletionUpdate', {
-      detail: {
-        timestamp: Date.now(),
-        source: 'home'
-      }
-    });
-
-    if (typeof window !== 'undefined' && window.dispatchEvent) {
-      window.dispatchEvent(event);
-    }
-
-    // Alternative: Use AsyncStorage to set a flag
+    // Use AsyncStorage to set a flag for stats screen
     try {
       await AsyncStorage.setItem('stats_needs_update', JSON.stringify({
         timestamp: Date.now(),
-        date: getLocalDateString(new Date())
+        date: getLocalDateString(new Date()),
+        source: 'home'
       }));
+      console.log("✅ Stats update flag set successfully");
     } catch (error) {
       console.error("Error setting stats update flag:", error);
     }
