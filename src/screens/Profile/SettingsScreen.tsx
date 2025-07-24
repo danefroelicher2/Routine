@@ -356,44 +356,8 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
         return `${displayHour}:00 ${period}`;
     };
-
-    const handleChangePassword = async () => {
-        if (!userEmail) {
-            Alert.alert('Error', 'Unable to get your email address');
-            return;
-        }
-
-        Alert.alert(
-            'Change Password',
-            `We'll send a password reset link to ${userEmail}. You can use this link to set a new password.`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Send Reset Email',
-                    onPress: async () => {
-                        try {
-                            const { error } = await supabase.auth.resetPasswordForEmail(userEmail);
-
-                            if (error) {
-                                throw error;
-                            }
-
-                            Alert.alert(
-                                'Email Sent',
-                                `A password reset link has been sent to ${userEmail}. Please check your email and follow the instructions.\n\nThe link will open a secure page where you can set your new password.`,
-                                [{ text: 'OK' }]
-                            );
-                        } catch (error: any) {
-                            console.error('Error sending password reset:', error);
-                            Alert.alert(
-                                'Error',
-                                error?.message || 'Failed to send password reset email. Please try again.'
-                            );
-                        }
-                    }
-                }
-            ]
-        );
+    const handleChangePassword = () => {
+        navigation.navigate('ChangePassword');
     };
 
     const renderSettingItem = (
@@ -428,6 +392,8 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             )}
         </TouchableOpacity>
     );
+
+
     const handleLogout = () => {
         Alert.alert(
             'Log Out',
