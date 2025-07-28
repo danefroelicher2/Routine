@@ -1,5 +1,6 @@
 // ============================================
-// UPDATED APP.TSX - REPLACE YOUR EXISTING App.tsx WITH THIS
+// UPDATED App.tsx - COMPLETE PREMIUM INTEGRATION
+// Replace your existing App.tsx with this version
 // ============================================
 
 import React, { useEffect, useState } from "react";
@@ -16,6 +17,9 @@ import { supabase } from "./src/services/supabase";
 
 // Theme Provider
 import { ThemeProvider, useTheme } from "./ThemeContext";
+
+// ✅ PREMIUM PROVIDER - ADD THIS IMPORT
+import { PremiumProvider } from "./src/contexts/PremiumContext";
 
 // Auth Screens
 import LoginScreen from "./src/screens/Auth/LoginScreen";
@@ -39,6 +43,9 @@ import ProfileScreen from "./src/screens/Profile/ProfileScreen";
 import SettingsScreen from "./src/screens/Profile/SettingsScreen";
 import RoutineManagerScreen from "./src/screens/Profile/RoutineManagerScreen";
 
+// ✅ PREMIUM SCREEN - ADD THIS IMPORT
+import PremiumScreen from "./src/screens/Premium/PremiumScreen";
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
@@ -60,7 +67,7 @@ function HomeStack() {
   );
 }
 
-// NEW: Stack Navigator for AI (replaces SocialStack)
+// Stack Navigator for AI (replaces SocialStack)
 function AIStack() {
   return (
     <Stack.Navigator>
@@ -96,7 +103,7 @@ function NotesStack() {
   );
 }
 
-// Stack Navigator for Profile (includes settings)
+// ✅ UPDATED: Stack Navigator for Profile with Premium Screen
 function ProfileStack() {
   const { colors } = useTheme();
 
@@ -132,9 +139,26 @@ function ProfileStack() {
         component={ChangePasswordScreen}
         options={{ headerShown: false }}
       />
+      {/* ✅ ADD PREMIUM SCREEN TO PROFILE STACK */}
+      <Stack.Screen
+        name="Premium"
+        component={PremiumScreen}
+        options={{
+          title: "Premium",
+          headerStyle: {
+            backgroundColor: colors.surface,
+          },
+          headerTintColor: "#FFD700", // Gold color for premium
+          headerTitleStyle: {
+            color: colors.text,
+            fontWeight: "700",
+          },
+        }}
+      />
     </Stack.Navigator>
   );
 }
+
 // Auth Stack Navigator
 function AuthStack() {
   return (
@@ -146,7 +170,7 @@ function AuthStack() {
   );
 }
 
-// Main App Tabs with AI Tab (UPDATED: Social replaced with AI)
+// Main App Tabs with AI Tab
 function MainTabs() {
   const { colors } = useTheme();
 
@@ -186,7 +210,7 @@ function MainTabs() {
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
           } else {
-            iconName = "help-outline";
+            iconName = "ellipse";
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -194,33 +218,34 @@ function MainTabs() {
         tabBarActiveTintColor: "#007AFF",
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
-          backgroundColor: colors.surface,
+          backgroundColor: colors.background,
           borderTopColor: colors.border,
+          borderTopWidth: 1,
+          paddingBottom: 5,
+          paddingTop: 5,
+          height: 85,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "600",
+          marginTop: -5,
         },
         headerShown: false,
       })}
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Stats" component={StatsScreen} />
-      {/* UPDATED: AI Tab replaces Social Tab */}
-      <Tab.Screen
-        name="AI"
-        component={AIStack}
-        options={{
-          tabBarLabel: "AI Assistant",
-        }}
-      />
+      <Tab.Screen name="AI" component={AIStack} />
       <Tab.Screen name="Notes" component={NotesStack} />
       <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
   );
 }
 
-// App Content (needs to be wrapped in ThemeProvider)
+// Root App Component with Premium Integration
 function AppContent() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const { colors } = useTheme();
 
   useEffect(() => {
     // Get initial session
@@ -234,7 +259,6 @@ function AppContent() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -242,35 +266,28 @@ function AppContent() {
 
   if (loading) {
     return (
-      <View
-        style={[
-          styles.loadingContainer,
-          { backgroundColor: colors.background },
-        ]}
-      >
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }
 
   return (
-    <>
-      <StatusBar
-        barStyle={colors.statusBar}
-        backgroundColor={colors.background}
-      />
-      <NavigationContainer>
-        {session ? <MainTabs /> : <AuthStack />}
-      </NavigationContainer>
-    </>
+    <NavigationContainer>
+      {session ? <MainTabs /> : <AuthStack />}
+    </NavigationContainer>
   );
 }
 
-// Main App Component with ThemeProvider
+// ✅ MAIN APP WITH PREMIUM PROVIDER WRAPPER
 export default function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      {/* ✅ WRAP THE ENTIRE APP WITH PREMIUM PROVIDER */}
+      <PremiumProvider>
+        <StatusBar barStyle="light-content" backgroundColor="#000" />
+        <AppContent />
+      </PremiumProvider>
     </ThemeProvider>
   );
 }
@@ -280,5 +297,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#000",
   },
 });

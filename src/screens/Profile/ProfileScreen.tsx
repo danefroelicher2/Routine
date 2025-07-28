@@ -23,7 +23,6 @@ import { Profile, UserSettings } from "../../types/database";
 import { useTheme } from "../../../ThemeContext";
 import { usePremium } from "../../contexts/PremiumContext";
 
-
 const { width } = Dimensions.get("window");
 
 interface ProfileScreenProps {
@@ -51,7 +50,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
   const { colors } = useTheme();
   const { isPremium } = usePremium();
-
 
   const ACHIEVEMENT_TARGETS = [
     3, 5, 7, 14, 30, 60, 100, 150, 200, 250, 300, 365,
@@ -1166,26 +1164,31 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     );
   };
 
+  // ✅ UPDATED: Menu items with Premium integration
   const menuItems = [
     {
       title: "Settings",
       subtitle: "Notifications, preferences, and more",
-      icon: "settings",
+      icon: "settings-outline",
+      iconColor: colors.textSecondary,
       onPress: () => navigation.navigate("Settings"),
     },
     {
-      title: "Premium",
-      subtitle: isPremium ? "Manage your subscription" : "Unlock AI Assistant & more features",
-      icon: isPremium ? "diamond" : "diamond-outline",
+      title: isPremium ? "Premium Features" : "Upgrade to Premium",
+      subtitle: isPremium
+        ? "Manage your subscription"
+        : "Unlock unlimited routines & AI features",
+      icon: "diamond",
       iconColor: "#FFD700", // Gold color for premium
       onPress: () => navigation.navigate("Premium", { source: "profile_menu" }),
-      // Add a badge for non-premium users
-      badge: !isPremium ? "Upgrade" : null,
+      isPremium: true, // Flag to style differently
+      badge: !isPremium ? "$2.94/mo" : "ACTIVE",
     },
     {
       title: "Help & Support",
       subtitle: "Get help or contact us",
-      icon: "help-circle",
+      icon: "help-circle-outline",
+      iconColor: colors.textSecondary,
       onPress: showHelpSupport,
     },
   ];
@@ -1273,7 +1276,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           </Text>
         </View>
 
-        {/* ✅ MOVED UP: Achievements Section - now directly after user section */}
+        {/* Achievements Section */}
         <View
           style={[
             styles.achievementsSection,
@@ -1303,6 +1306,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           {renderAchievementsSection()}
         </View>
 
+        {/* ✅ UPDATED: Menu Section with Premium styling */}
         <View style={styles.menuSection}>
           {menuItems.map((item, index) => (
             <TouchableOpacity
@@ -1314,13 +1318,24 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 <View
                   style={[
                     styles.menuIconContainer,
-                    { backgroundColor: "#007AFF20" },
+                    { backgroundColor: item.isPremium ? "#FFD70020" : "#007AFF20" },
+                    item.isPremium && { borderColor: "#FFD70040", borderWidth: 1 },
                   ]}
                 >
-                  <Ionicons name={item.icon as any} size={18} color="#007AFF" />
+                  <Ionicons
+                    name={item.icon as any}
+                    size={18}
+                    color={item.iconColor || "#007AFF"}
+                  />
                 </View>
                 <View style={styles.menuItemContent}>
-                  <Text style={[styles.menuItemTitle, { color: colors.text }]}>
+                  <Text
+                    style={[
+                      styles.menuItemTitle,
+                      { color: colors.text },
+                      item.isPremium && { fontWeight: "600" }
+                    ]}
+                  >
                     {item.title}
                   </Text>
                   <Text
@@ -1333,11 +1348,40 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                   </Text>
                 </View>
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={colors.textTertiary}
-              />
+
+              {/* ✅ Premium Badge or Chevron */}
+              <View style={styles.menuItemRight}>
+                {item.badge && (
+                  <View
+                    style={[
+                      styles.menuBadge,
+                      {
+                        backgroundColor: isPremium ? "#34C759" : "#FFD70020",
+                        borderColor: isPremium ? "#34C759" : "#FFD700",
+                        borderWidth: isPremium ? 0 : 1,
+                      }
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.menuBadgeText,
+                        {
+                          color: isPremium ? "#fff" : "#FFD700",
+                          fontSize: isPremium ? 10 : 11,
+                          fontWeight: "700",
+                        }
+                      ]}
+                    >
+                      {item.badge}
+                    </Text>
+                  </View>
+                )}
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={item.isPremium ? "#FFD700" : colors.textTertiary}
+                />
+              </View>
             </TouchableOpacity>
           ))}
         </View>
@@ -1669,6 +1713,22 @@ const styles = StyleSheet.create({
   },
   menuItemSubtitle: {
     fontSize: 14,
+  },
+  // ✅ NEW: Premium menu styling
+  menuItemRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  menuBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  menuBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
   imagePickerOverlay: {
     flex: 1,
