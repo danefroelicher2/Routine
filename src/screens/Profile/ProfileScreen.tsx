@@ -21,6 +21,8 @@ import * as FileSystem from "expo-file-system";
 import { supabase } from "../../services/supabase";
 import { Profile, UserSettings } from "../../types/database";
 import { useTheme } from "../../../ThemeContext";
+import { usePremium } from "../../contexts/PremiumContext";
+
 
 const { width } = Dimensions.get("window");
 
@@ -48,6 +50,8 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [avatarData, setAvatarData] = useState<string | null>(null);
 
   const { colors } = useTheme();
+  const { isPremium } = usePremium();
+
 
   const ACHIEVEMENT_TARGETS = [
     3, 5, 7, 14, 30, 60, 100, 150, 200, 250, 300, 365,
@@ -1168,6 +1172,15 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       subtitle: "Notifications, preferences, and more",
       icon: "settings",
       onPress: () => navigation.navigate("Settings"),
+    },
+    {
+      title: "Premium",
+      subtitle: isPremium ? "Manage your subscription" : "Unlock AI Assistant & more features",
+      icon: isPremium ? "diamond" : "diamond-outline",
+      iconColor: "#FFD700", // Gold color for premium
+      onPress: () => navigation.navigate("Premium", { source: "profile_menu" }),
+      // Add a badge for non-premium users
+      badge: !isPremium ? "Upgrade" : null,
     },
     {
       title: "Help & Support",
