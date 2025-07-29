@@ -1,10 +1,5 @@
-// ============================================
-// UPDATED App.tsx - COMPLETE PREMIUM INTEGRATION
-// Replace your existing App.tsx with this version
-// ============================================
-
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, View, StyleSheet, StatusBar } from "react-native";
+import { ActivityIndicator, View, StyleSheet, StatusBar, Linking, Alert } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -18,7 +13,7 @@ import { supabase } from "./src/services/supabase";
 // Theme Provider
 import { ThemeProvider, useTheme } from "./ThemeContext";
 
-// ✅ PREMIUM PROVIDER - ADD THIS IMPORT
+// ✅ PREMIUM PROVIDER
 import { PremiumProvider } from "./src/contexts/PremiumContext";
 
 // Auth Screens
@@ -32,7 +27,7 @@ import HomeScreen from "./src/screens/Home/HomeScreen";
 import AddRoutineScreen from "./src/screens/Home/AddRoutineScreen";
 import StatsScreen from "./src/screens/Stats/StatsScreen";
 
-// AI Screens (REPLACING Social Screens)
+// AI Screens
 import AIChatScreen from "./src/screens/AI/AIChatScreen";
 import AISettingsScreen from "./src/screens/AI/AISettingsScreen";
 
@@ -43,13 +38,13 @@ import ProfileScreen from "./src/screens/Profile/ProfileScreen";
 import SettingsScreen from "./src/screens/Profile/SettingsScreen";
 import RoutineManagerScreen from "./src/screens/Profile/RoutineManagerScreen";
 
-// ✅ PREMIUM SCREEN - ADD THIS IMPORT
+// ✅ PREMIUM SCREEN
 import PremiumScreen from "./src/screens/Premium/PremiumScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// Stack Navigator for Home (includes add routine)
+// Stack Navigator for Home
 function HomeStack() {
   return (
     <Stack.Navigator>
@@ -67,7 +62,7 @@ function HomeStack() {
   );
 }
 
-// Stack Navigator for AI (replaces SocialStack)
+// Stack Navigator for AI
 function AIStack() {
   return (
     <Stack.Navigator>
@@ -103,7 +98,7 @@ function NotesStack() {
   );
 }
 
-// ✅ UPDATED: Stack Navigator for Profile with Premium Screen
+// ✅ Stack Navigator for Profile with Premium Screen
 function ProfileStack() {
   const { colors } = useTheme();
 
@@ -139,7 +134,7 @@ function ProfileStack() {
         component={ChangePasswordScreen}
         options={{ headerShown: false }}
       />
-      {/* ✅ ADD PREMIUM SCREEN TO PROFILE STACK */}
+      {/* ✅ PREMIUM SCREEN */}
       <Stack.Screen
         name="Premium"
         component={PremiumScreen}
@@ -148,7 +143,7 @@ function ProfileStack() {
           headerStyle: {
             backgroundColor: colors.surface,
           },
-          headerTintColor: "#FFD700", // Gold color for premium
+          headerTintColor: "#FFD700",
           headerTitleStyle: {
             color: colors.text,
             fontWeight: "700",
@@ -170,7 +165,7 @@ function AuthStack() {
   );
 }
 
-// Main App Tabs with AI Tab
+// Main App Tabs
 function MainTabs() {
   const { colors } = useTheme();
 
@@ -185,10 +180,8 @@ function MainTabs() {
           } else if (route.name === "Stats") {
             iconName = focused ? "stats-chart" : "stats-chart-outline";
           } else if (route.name === "AI") {
-            // AI tab icon
             iconName = focused ? "chatbubbles" : "chatbubbles-outline";
 
-            // Custom styled icon for AI tab
             return (
               <View
                 style={{
@@ -242,7 +235,7 @@ function MainTabs() {
   );
 }
 
-// Root App Component with Premium Integration
+// App Content with Deep Link Handling
 function AppContent() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -264,6 +257,70 @@ function AppContent() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // ✅ DEEP LINK HANDLING FOR STRIPE
+  useEffect(() => {
+    const handleDeepLink = async (url: string) => {
+      console.log('🔗 Deep link received:', url);
+
+      if (url.includes('premium-success')) {
+        console.log('🎉 Premium purchase successful!');
+
+        setTimeout(async () => {
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              // 🔑 REPLACE YOUR_VERCEL_URL with your actual Vercel URL
+              const response = await fetch(
+                `https://YOUR_VERCEL_URL.vercel.app/api/subscription-status?userId=${user.id}`
+              );
+
+              if (response.ok) {
+                const { isPremium } = await response.json();
+
+                if (isPremium) {
+                  Alert.alert(
+                    '🎉 Welcome to Premium!',
+                    'Your premium features are now active! Enjoy unlimited routines, AI assistant, and more.',
+                    [{ text: 'Get Started' }]
+                  );
+                }
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error processing premium success:', error);
+            Alert.alert(
+              'Success!',
+              'Welcome to Premium! Your features are being activated.',
+              [{ text: 'OK' }]
+            );
+          }
+        }, 1000);
+
+      } else if (url.includes('premium-cancel')) {
+        console.log('❌ Premium purchase cancelled');
+        setTimeout(() => {
+          Alert.alert(
+            'Purchase Cancelled',
+            'No worries! You can upgrade to Premium anytime.',
+            [{ text: 'OK' }]
+          );
+        }, 500);
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleDeepLink(url);
+    });
+
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink(url);
+      }
+    });
+
+    return () => subscription?.remove();
+  }, []);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -279,11 +336,10 @@ function AppContent() {
   );
 }
 
-// ✅ MAIN APP WITH PREMIUM PROVIDER WRAPPER
+// ✅ MAIN APP WITH PREMIUM PROVIDER
 export default function App() {
   return (
     <ThemeProvider>
-      {/* ✅ WRAP THE ENTIRE APP WITH PREMIUM PROVIDER */}
       <PremiumProvider>
         <StatusBar barStyle="light-content" backgroundColor="#000" />
         <AppContent />

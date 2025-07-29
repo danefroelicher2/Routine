@@ -1,7 +1,8 @@
 {
     "expo": {
-        "name": "Routine",
+        "name": "Routine App",
         "slug": "routine-app",
+        "scheme": "routineapp",
         "version": "1.0.0",
         "orientation": "portrait",
         "icon": "./assets/icon.png",
@@ -16,17 +17,45 @@
         ],
         "ios": {
             "supportsTablet": true,
-            "bundleIdentifier": "com.yourcompany.routine"
+            "bundleIdentifier": "com.yourname.routineapp",
+            "infoPlist": {
+                "CFBundleURLTypes": [
+                    {
+                        "CFBundleURLName": "routineapp",
+                        "CFBundleURLSchemes": [
+                            "routineapp"
+                        ]
+                    }
+                ]
+            }
         },
         "android": {
             "adaptiveIcon": {
                 "foregroundImage": "./assets/adaptive-icon.png",
                 "backgroundColor": "#ffffff"
             },
-            "package": "com.yourcompany.routine"
+            "package": "com.yourname.routineapp",
+            "intentFilters": [
+                {
+                    "action": "VIEW",
+                    "autoVerify": true,
+                    "data": [
+                        {
+                            "scheme": "routineapp"
+                        }
+                    ],
+                    "category": [
+                        "BROWSABLE",
+                        "DEFAULT"
+                    ]
+                }
+            ]
         },
         "web": {
             "favicon": "./assets/favicon.png"
-        }
+        },
+        "plugins": [
+            "@react-native-async-storage/async-storage"
+        ]
     }
 }

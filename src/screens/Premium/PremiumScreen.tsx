@@ -17,6 +17,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../../ThemeContext";
+import { Linking } from 'react-native';
+import { supabase } from "../../services/supabase";
+
 
 const { width } = Dimensions.get("window");
 
@@ -133,30 +136,60 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
     ];
 
     const handlePurchase = async (planId: string) => {
-        console.log(`Purchase triggered for plan: ${planId} from source: ${source}`);
-        setIsProcessing(true);
-
         try {
-            // Here's where you'll integrate Stripe later
-            // For now, just show a console log and alert
+            setIsProcessing(true);
 
-            Alert.alert(
-                "Purchase Initiated",
-                `You selected the ${pricingPlans.find(p => p.id === planId)?.name} plan. This will be connected to Stripe payment processing.`,
-                [
-                    {
-                        text: "OK",
-                        onPress: () => {
-                            console.log("Premium purchase flow started");
-                            // Navigate back or to success screen
-                            navigation.goBack();
-                        },
-                    },
-                ]
-            );
+            // Get current user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                Alert.alert('Error', 'Please log in to upgrade to Premium');
+                return;
+            }
+
+            console.log(`🚀 Starting Stripe checkout for plan: ${planId}`);
+            console.log(`📊 Source: ${source}`);
+
+            // 🔑 REPLACE YOUR_VERCEL_URL with your actual Vercel URL
+            const response = await fetch('https://YOUR_VERCEL_URL.vercel.app/api/create-checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: user.id,
+                    userEmail: user.email,
+                    planId: planId
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to create checkout session');
+            }
+
+            const { url, sessionId } = await response.json();
+            console.log(`✅ Checkout URL created: ${url}`);
+            console.log(`🎫 Session ID: ${sessionId}`);
+
+            // Open Stripe checkout in browser
+            const canOpen = await Linking.canOpenURL(url);
+            if (canOpen) {
+                await Linking.openURL(url);
+                console.log(`🌐 Opened Stripe checkout in browser`);
+
+                // Track analytics
+                console.log(`Premium checkout opened from: ${source}`);
+            } else {
+                throw new Error('Cannot open checkout URL');
+            }
+
         } catch (error) {
-            console.error("Purchase error:", error);
-            Alert.alert("Error", "Something went wrong. Please try again.");
+            console.error('❌ Purchase failed:', error);
+            Alert.alert(
+                'Purchase Failed',
+                `Unable to start checkout: ${error.message}\n\nPlease try again.`,
+                [{ text: 'OK' }]
+            );
         } finally {
             setIsProcessing(false);
         }

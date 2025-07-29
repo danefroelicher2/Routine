@@ -1,10 +1,10 @@
 // ============================================
-// FIXED src/contexts/PremiumContext.tsx
-// Replace your entire PremiumContext.tsx with this corrected version
+// COMPLETE PremiumContext.tsx - REPLACE YOUR ENTIRE FILE
 // ============================================
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { supabase } from "../services/supabase";
 
 interface PremiumFeature {
     id: string;
@@ -43,7 +43,7 @@ interface PremiumContextType {
     hidePremiumPopup: () => void;
     checkPremiumFeature: (featureId: string) => boolean;
 
-    // Usage Tracking - FIXED: Made synchronous
+    // Usage Tracking
     trackFeatureUsage: (featureId: string) => void;
     getUsageCount: (featureId: string) => number;
 
@@ -53,9 +53,12 @@ interface PremiumContextType {
     // Current Usage
     currentUsage: CurrentUsage;
 
-    // Check if limit reached - FIXED: Using proper type
+    // Limit Checking
     isLimitReached: (feature: keyof CurrentUsage) => boolean;
     updateUsage: (feature: keyof CurrentUsage, count: number) => void;
+
+    // ✅ NEW: Stripe Integration
+    refreshSubscriptionStatus: () => Promise<boolean>;
 }
 
 const PremiumContext = createContext<PremiumContextType | undefined>(undefined);
@@ -73,30 +76,27 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
     const [showPremiumModal, setShowPremiumModal] = useState<boolean>(false);
     const [modalSource, setModalSource] = useState<string>("");
 
-    // Usage Tracking
+    // Usage State
+    const [usageCountCache, setUsageCountCache] = useState<Record<string, number>>({});
     const [currentUsage, setCurrentUsage] = useState<CurrentUsage>({
         routines: 0,
         notes: 0,
         aiQueries: 0,
     });
 
-    // Usage count cache for synchronous access
-    const [usageCountCache, setUsageCountCache] = useState<Record<string, number>>({});
-
-    // Free tier limits - FIXED: Proper typing
-    const freeLimits: FreeLimits = {
-        maxRoutines: 5,
-        maxNotes: 10,
-        maxAIQueries: 3, // per day
-    };
-
-    // Premium features configuration
+    // Premium Features
     const premiumFeatures: PremiumFeature[] = [
         {
             id: "unlimited_routines",
             name: "Unlimited Routines",
             description: "Create as many routines as you want",
             icon: "infinite",
+        },
+        {
+            id: "ai_assistant",
+            name: "AI Assistant",
+            description: "Get personalized routine suggestions",
+            icon: "chatbubbles",
         },
         {
             id: "advanced_analytics",
@@ -111,26 +111,46 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
             icon: "cloud",
         },
         {
-            id: "ai_coaching",
-            name: "AI Coaching",
-            description: "Unlimited AI-powered recommendations",
-            icon: "sparkles",
-        },
-        {
-            id: "custom_themes",
-            name: "Custom Themes",
-            description: "Personalize your app appearance",
-            icon: "color-palette",
-        },
-        {
-            id: "premium_support",
-            name: "Premium Support",
-            description: "Priority customer support",
+            id: "priority_support",
+            name: "Priority Support",
+            description: "Get help when you need it most",
             icon: "headset",
         },
     ];
 
-    // Load premium status and usage data on app start
+    // Free Limits
+    const freeLimits: FreeLimits = {
+        maxRoutines: 3,
+        maxNotes: 10,
+        maxAIQueries: 5,
+    };
+
+    // ✅ NEW: Check Stripe subscription status
+    const checkStripeSubscriptionStatus = async (userId: string): Promise<boolean> => {
+        try {
+            console.log(`🔍 Checking Stripe subscription for user: ${userId}`);
+
+            // 🔑 REPLACE YOUR_VERCEL_URL with your actual Vercel URL
+            const response = await fetch(
+                `https://YOUR_VERCEL_URL.vercel.app/api/subscription-status?userId=${userId}`
+            );
+
+            if (!response.ok) {
+                console.error('❌ Failed to check subscription status');
+                return false;
+            }
+
+            const data = await response.json();
+            console.log(`📊 Subscription status response:`, data);
+
+            return data.isPremium || false;
+        } catch (error) {
+            console.error('❌ Error checking subscription status:', error);
+            return false;
+        }
+    };
+
+    // Load premium data on app start
     useEffect(() => {
         loadPremiumData();
     }, []);
@@ -139,10 +159,23 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         try {
             setIsLoading(true);
 
-            // Load premium status
-            const premiumStatus = await AsyncStorage.getItem("@premium_status");
-            if (premiumStatus !== null) {
-                setIsPremium(JSON.parse(premiumStatus));
+            // Load cached premium status
+            const cachedPremiumStatus = await AsyncStorage.getItem("@premium_status");
+            if (cachedPremiumStatus !== null) {
+                setIsPremium(JSON.parse(cachedPremiumStatus));
+            }
+
+            // ✅ Check with Stripe for real-time status
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const stripeStatus = await checkStripeSubscriptionStatus(user.id);
+
+                // Update if status changed
+                if (stripeStatus !== JSON.parse(cachedPremiumStatus || 'false')) {
+                    setIsPremium(stripeStatus);
+                    await AsyncStorage.setItem("@premium_status", JSON.stringify(stripeStatus));
+                    console.log(`✅ Premium status updated from Stripe: ${stripeStatus}`);
+                }
             }
 
             // Load usage data
@@ -157,9 +190,9 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
                 setUsageCountCache(JSON.parse(cacheData));
             }
 
-            console.log("Premium data loaded successfully");
+            console.log("✅ Premium data loaded successfully");
         } catch (error) {
-            console.error("Error loading premium data:", error);
+            console.error("❌ Error loading premium data:", error);
         } finally {
             setIsLoading(false);
         }
@@ -195,7 +228,7 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         return freeTierFeatures.includes(featureId);
     };
 
-    // FIXED: Made synchronous and updates cache
+    // Track feature usage
     const trackFeatureUsage = (featureId: string) => {
         try {
             const currentCount = usageCountCache[featureId] || 0;
@@ -215,12 +248,12 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         }
     };
 
-    // FIXED: Made synchronous using cache
+    // Get usage count
     const getUsageCount = (featureId: string): number => {
         return usageCountCache[featureId] || 0;
     };
 
-    // FIXED: Proper typing for feature parameter
+    // Check if limit reached
     const isLimitReached = (feature: keyof CurrentUsage): boolean => {
         if (isPremium) return false;
 
@@ -244,6 +277,24 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
             console.log(`Usage updated for ${feature}: ${count}`);
         } catch (error) {
             console.error("Error updating usage:", error);
+        }
+    };
+
+    // ✅ NEW: Refresh subscription status from Stripe
+    const refreshSubscriptionStatus = async (): Promise<boolean> => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return false;
+
+            const stripeStatus = await checkStripeSubscriptionStatus(user.id);
+            setIsPremium(stripeStatus);
+            await AsyncStorage.setItem("@premium_status", JSON.stringify(stripeStatus));
+
+            console.log(`🔄 Subscription status refreshed: ${stripeStatus}`);
+            return stripeStatus;
+        } catch (error) {
+            console.error('❌ Error refreshing subscription status:', error);
+            return false;
         }
     };
 
@@ -278,6 +329,9 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         // Limit Checking
         isLimitReached,
         updateUsage,
+
+        // ✅ NEW: Stripe Integration
+        refreshSubscriptionStatus,
     };
 
     return (
