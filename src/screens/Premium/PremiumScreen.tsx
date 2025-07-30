@@ -134,7 +134,6 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             ],
         },
     ];
-
     const handlePurchase = async (planId: string) => {
         try {
             setIsProcessing(true);
@@ -149,8 +148,8 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             console.log(`🚀 Starting Stripe checkout for plan: ${planId}`);
             console.log(`📊 Source: ${source}`);
 
-            // 🔑 REPLACE YOUR_VERCEL_URL with your actual Vercel URL
-            const response = await fetch('https://YOUR_VERCEL_URL.vercel.app/api/create-checkout', {
+            // ✅ YOUR ACTUAL VERCEL URL
+            const response = await fetch('https://routine-payments-ixoy2co18-dane-froelichers-projects.vercel.app/api/create-checkout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
