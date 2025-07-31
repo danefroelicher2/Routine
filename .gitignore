@@ -9,3 +9,4 @@
 src/stripe-backend/.env.local
 src/stripe-backend/.env
 node_modules
+.vercel

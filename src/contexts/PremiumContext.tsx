@@ -125,27 +125,44 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         maxAIQueries: 5,
     };
 
-    // ✅ NEW: Check Stripe subscription status
+    // STEP 1: Add detailed logging to PremiumContext.tsx
+    // Replace the checkStripeSubscriptionStatus function with this:
+
     const checkStripeSubscriptionStatus = async (userId: string): Promise<boolean> => {
         try {
             console.log(`🔍 Checking Stripe subscription for user: ${userId}`);
 
-            // ✅ YOUR ACTUAL VERCEL URL
-            const response = await fetch(
-                `https://routine-payments-ixoy2co18-dane-froelichers-projects.vercel.app/api/subscription-status?userId=${userId}`
-            );
+            const url = `https://routine-payments-v3-5wi091vr6-dane-froelichers-projects.vercel.app/api/subscription-status?userId=${userId}`;
+            console.log(`📡 Making request to: ${url}`);
+
+            const response = await fetch(url);
+
+            console.log(`📊 Response status: ${response.status}`);
+            console.log(`📊 Response ok: ${response.ok}`);
+            console.log(`📊 Response headers:`, response.headers);
 
             if (!response.ok) {
+                const errorText = await response.text();
                 console.error('❌ Failed to check subscription status');
+                console.error('❌ Error response body:', errorText);
                 return false;
             }
 
-            const data = await response.json();
-            console.log(`📊 Subscription status response:`, data);
+            const responseText = await response.text();
+            console.log(`📊 Raw response text:`, responseText);
 
-            return data.isPremium || false;
+            try {
+                const data = JSON.parse(responseText);
+                console.log(`📊 Parsed JSON response:`, data);
+                return data.isPremium || false;
+            } catch (parseError) {
+                console.error('❌ JSON Parse Error:', parseError);
+                console.error('❌ Response was:', responseText);
+                return false;
+            }
+
         } catch (error) {
-            console.error('❌ Error checking subscription status:', error);
+            console.error('❌ Network Error:', error);
             return false;
         }
     };

@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "description": "Payment backend for Routine App",
     "main": "index.js",
+    "type": "module",
     "scripts": {
         "dev": "vercel dev",
         "deploy": "vercel --prod"
@@ -11,6 +12,6 @@
         "stripe": "^14.10.0"
     },
     "engines": {
-        "node": "18.x"
+        "node": "22.x"
     }
 }

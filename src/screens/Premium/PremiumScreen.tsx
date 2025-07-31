@@ -149,7 +149,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             console.log(`📊 Source: ${source}`);
 
             // ✅ YOUR ACTUAL VERCEL URL
-            const response = await fetch('https://routine-payments-ixoy2co18-dane-froelichers-projects.vercel.app/api/create-checkout', {
+            const response = await fetch('https://routine-payments-v3-5wi091vr6-dane-froelichers-projects.vercel.app/api/create-checkout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -161,34 +161,48 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                 }),
             });
 
+            // Replace your error handling section with this:
+
+            console.log(`📊 Create-checkout response status: ${response.status}`);
+            console.log(`📊 Create-checkout response ok: ${response.ok}`);
+
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to create checkout session');
+                // Get the raw response text first
+                const errorText = await response.text();
+                console.error('❌ Create-checkout error response:', errorText);
+
+                // Try to parse as JSON, but handle if it's HTML
+                try {
+                    const errorData = JSON.parse(errorText);
+                    throw new Error(errorData.error || 'Failed to create checkout session');
+                } catch (parseError) {
+                    throw new Error(`API Error: ${response.status} - Server returned HTML instead of JSON`);
+                }
             }
 
-            const { url, sessionId } = await response.json();
-            console.log(`✅ Checkout URL created: ${url}`);
-            console.log(`🎫 Session ID: ${sessionId}`);
+            // Get response text first, then parse
+            const responseText = await response.text();
+            console.log(`📊 Create-checkout raw response:`, responseText);
 
-            // Open Stripe checkout in browser
-            const canOpen = await Linking.canOpenURL(url);
-            if (canOpen) {
-                await Linking.openURL(url);
-                console.log(`🌐 Opened Stripe checkout in browser`);
+            try {
+                const { url, sessionId } = JSON.parse(responseText);
+                console.log(`✅ Checkout URL created: ${url}`);
+                console.log(`🎫 Session ID: ${sessionId}`);
 
-                // Track analytics
-                console.log(`Premium checkout opened from: ${source}`);
-            } else {
-                throw new Error('Cannot open checkout URL');
+                // Open Stripe checkout in browser
+                const canOpen = await Linking.canOpenURL(url);
+                if (canOpen) {
+                    await Linking.openURL(url);
+                    console.log(`🌐 Opened Stripe checkout in browser`);
+                    console.log(`Premium checkout opened from: ${source}`);
+                } else {
+                    throw new Error('Cannot open checkout URL');
+                }
+            } catch (parseError) {
+                console.error('❌ Create-checkout JSON Parse Error:', parseError);
+                console.error('❌ Response was:', responseText);
+                throw new Error('Server returned invalid JSON response');
             }
-
-        } catch (error) {
-            console.error('❌ Purchase failed:', error);
-            Alert.alert(
-                'Purchase Failed',
-                `Unable to start checkout: ${error.message}\n\nPlease try again.`,
-                [{ text: 'OK' }]
-            );
         } finally {
             setIsProcessing(false);
         }

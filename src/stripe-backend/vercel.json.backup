@@ -1,0 +1,18 @@
+{
+    "functions": {
+        "api/webhook.js": {
+            "maxDuration": 30
+        },
+        "api/create-checkout.js": {
+            "maxDuration": 30,
+            "memory": 1024
+        },
+        "api/subscription-status.js": {
+            "maxDuration": 30,
+            "memory": 1024
+        }
+    },
+    "env": {
+        "NODE_ENV": "production"
+    }
+}
