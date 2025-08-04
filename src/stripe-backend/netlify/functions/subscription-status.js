@@ -1,28 +1,43 @@
-import Stripe from 'stripe';
+// netlify/functions/subscription-status.js
+const Stripe = require('stripe');
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+exports.handler = async (event, context) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+        'Access-Control-Allow-Credentials': 'false',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Content-Type': 'application/json'
+    };
 
-export default async function handler(req, res) {
-    // Enhanced CORS headers for React Native
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PUT, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.setHeader('Access-Control-Allow-Credentials', 'false');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+    // Handle preflight requests
+    if (event.httpMethod === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers,
+            body: ''
+        };
     }
 
-    if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method not allowed' });
+    if (event.httpMethod !== 'GET') {
+        return {
+            statusCode: 405,
+            headers,
+            body: JSON.stringify({ error: 'Method not allowed' })
+        };
     }
 
     try {
-        const { userId } = req.query;
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+        const { userId } = event.queryStringParameters || {};
 
         if (!userId) {
-            return res.status(400).json({ error: 'userId is required' });
+            return {
+                statusCode: 400,
+                headers,
+                body: JSON.stringify({ error: 'userId is required' })
+            };
         }
 
         console.log(`🔍 Checking subscription status for user: ${userId}`);
@@ -42,28 +57,190 @@ export default async function handler(req, res) {
         if (userSubscription) {
             console.log(`✅ Active subscription found for user: ${userId}`);
 
-            res.json({
-                isPremium: true,
-                subscriptionId: userSubscription.id,
-                status: userSubscription.status,
-                currentPeriodEnd: userSubscription.current_period_end,
-                cancelAtPeriodEnd: userSubscription.cancel_at_period_end
-            });
+            return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify({
+                    isPremium: true,
+                    subscriptionId: userSubscription.id,
+                    status: userSubscription.status,
+                    currentPeriodEnd: userSubscription.current_period_end,
+                    cancelAtPeriodEnd: userSubscription.cancel_at_period_end
+                })
+            };
         } else {
             console.log(`📭 No active subscription found for user: ${userId}`);
 
-            res.json({
-                isPremium: false,
-                subscriptionId: null,
-                status: 'inactive'
-            });
+            return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify({
+                    isPremium: false,
+                    subscriptionId: null,
+                    status: 'inactive'
+                })
+            };
         }
 
     } catch (error) {
         console.error('❌ Subscription status error:', error);
-        res.status(500).json({
-            error: 'Failed to check subscription status',
-            details: error.message
-        });
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({
+                error: 'Failed to check subscription status',
+                details: error.message
+            })
+        };
     }
-}
+};
+
+// netlify/functions/create-checkout.js
+const Stripe = require('stripe');
+
+exports.handler = async (event, context) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+        'Access-Control-Allow-Credentials': 'false',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Content-Type': 'application/json'
+    };
+
+    // Handle preflight requests
+    if (event.httpMethod === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers,
+            body: ''
+        };
+    }
+
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            headers,
+            body: JSON.stringify({ error: 'Method not allowed' })
+        };
+    }
+
+    try {
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+        const { userId, userEmail } = JSON.parse(event.body || '{}');
+
+        if (!userId) {
+            return {
+                statusCode: 400,
+                headers,
+                body: JSON.stringify({ error: 'userId is required' })
+            };
+        }
+
+        console.log(`🚀 Creating checkout session for user: ${userId}`);
+
+        // Create Stripe checkout session
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [{
+                price: process.env.STRIPE_PRICE_ID,
+                quantity: 1,
+            }],
+            mode: 'subscription',
+            customer_email: userEmail,
+            success_url: `routineapp://premium-success?session_id={CHECKOUT_SESSION_ID}&user_id=${userId}`,
+            cancel_url: `routineapp://premium-cancel?user_id=${userId}`,
+            client_reference_id: userId,
+            metadata: {
+                userId: userId,
+                source: 'routine_app'
+            },
+            subscription_data: {
+                metadata: {
+                    userId: userId
+                }
+            },
+            allow_promotion_codes: true,
+        });
+
+        console.log(`✅ Checkout session created: ${session.id}`);
+
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+                url: session.url,
+                sessionId: session.id
+            })
+        };
+
+    } catch (error) {
+        console.error('❌ Checkout creation error:', error);
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({
+                error: 'Failed to create checkout session',
+                details: error.message
+            })
+        };
+    }
+};
+
+// netlify/functions/webhook.js
+const Stripe = require('stripe');
+
+exports.handler = async (event, context) => {
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            body: 'Method Not Allowed'
+        };
+    }
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const sig = event.headers['stripe-signature'];
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    let stripeEvent;
+
+    try {
+        stripeEvent = stripe.webhooks.constructEvent(event.body, sig, endpointSecret);
+    } catch (err) {
+        console.error('❌ Webhook signature verification failed:', err.message);
+        return {
+            statusCode: 400,
+            body: `Webhook Error: ${err.message}`
+        };
+    }
+
+    console.log(`🎣 Webhook received: ${stripeEvent.type}`);
+
+    // Handle the event
+    switch (stripeEvent.type) {
+        case 'checkout.session.completed':
+            const session = stripeEvent.data.object;
+            console.log(`✅ Payment successful for user: ${session.client_reference_id}`);
+            break;
+
+        case 'customer.subscription.deleted':
+            const subscription = stripeEvent.data.object;
+            console.log(`❌ Subscription cancelled for user: ${subscription.metadata?.userId}`);
+            break;
+
+        case 'invoice.payment_failed':
+            const invoice = stripeEvent.data.object;
+            console.log(`💳 Payment failed for subscription: ${invoice.subscription}`);
+            break;
+
+        default:
+            console.log(`🔔 Unhandled event type: ${stripeEvent.type}`);
+    }
+
+    return {
+        statusCode: 200,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ received: true })
+    };
+};
