@@ -149,7 +149,8 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             console.log(`📊 Source: ${source}`);
 
             // ✅ YOUR ACTUAL VERCEL URL
-            const response = await fetch('http://localhost:8888/.netlify/functions/create-checkout', {
+            // ✅ NEW LOCAL SERVER URL
+            const response = await fetch('http://localhost:3001/create-payment', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

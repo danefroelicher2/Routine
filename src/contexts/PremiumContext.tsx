@@ -130,11 +130,8 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
             console.log(`🔍 Checking Stripe subscription for user: ${userId}`);
 
             // ✅ CHANGE FROM:
-            // const url = `https://routine-payments-v4-aw3jz78pi-dane-froelichers-projects.vercel.app/api/subscription-status?userId=${userId}`;
 
-            // ✅ CHANGE TO:
-            const url = `http://localhost:8888/.netlify/functions/subscription-status?userId=${userId}`;
-            console.log(`📡 Making request to: ${url}`);
+            const url = `http://localhost:3001/premium-status?userId=${userId}`; console.log(`📡 Making request to: ${url}`);
 
             const response = await fetch(url, {
                 method: 'GET',
