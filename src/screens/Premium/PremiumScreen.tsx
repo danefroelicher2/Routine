@@ -101,17 +101,17 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
         {
             id: "monthly",
             name: "Monthly",
-            price: "$9.99",
+            price: "$2.94",
             period: "per month",
             features: ["All Premium Features", "Cancel Anytime", "24/7 Support"],
         },
         {
             id: "yearly",
             name: "Yearly",
-            price: "$79.99",
-            originalPrice: "$119.88",
+            price: "$27.99",
+            originalPrice: "$34.99",
             period: "per year",
-            savings: "Save 33%",
+            savings: "Save 20%",
             popular: true,
             features: [
                 "All Premium Features",
@@ -120,19 +120,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                 "Early Access to New Features",
             ],
         },
-        {
-            id: "lifetime",
-            name: "Lifetime",
-            price: "$199.99",
-            period: "one-time payment",
-            savings: "Best Value",
-            features: [
-                "All Premium Features Forever",
-                "No Recurring Payments",
-                "Exclusive Beta Access",
-                "Premium Support",
-            ],
-        },
+
     ];
     const handlePurchase = async (planId: string) => {
         try {
