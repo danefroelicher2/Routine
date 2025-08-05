@@ -149,7 +149,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             console.log(`📊 Source: ${source}`);
 
             // ✅ YOUR ACTUAL VERCEL URL
-            const response = await fetch('https://routine-payments-v4-aw3jz78pi-dane-froelichers-projects.vercel.app/api/create-checkout', {
+            const response = await fetch('http://localhost:8888/.netlify/functions/create-checkout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

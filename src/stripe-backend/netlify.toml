@@ -1,9 +1,13 @@
 [build]
   functions = "netlify/functions"
 
+[dev]
+  functions = "netlify/functions"
+  functionsPort = 8888
+
 [[headers]]
   for = "/.netlify/functions/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Headers = "Content-Type"
+    Access-Control-Allow-Headers = "Content-Type, stripe-signature"
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"

@@ -125,40 +125,50 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         maxAIQueries: 5,
     };
 
-    // STEP 1: Add detailed logging to PremiumContext.tsx
-    // Replace the checkStripeSubscriptionStatus function with this:
-
     const checkStripeSubscriptionStatus = async (userId: string): Promise<boolean> => {
         try {
             console.log(`🔍 Checking Stripe subscription for user: ${userId}`);
 
-            const url = `https://routine-payments-v4-aw3jz78pi-dane-froelichers-projects.vercel.app/api/subscription-status?userId=${userId}`;
+            // ✅ CHANGE FROM:
+            // const url = `https://routine-payments-v4-aw3jz78pi-dane-froelichers-projects.vercel.app/api/subscription-status?userId=${userId}`;
+
+            // ✅ CHANGE TO:
+            const url = `http://localhost:8888/.netlify/functions/subscription-status?userId=${userId}`;
             console.log(`📡 Making request to: ${url}`);
 
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
 
-            console.log(`📊 Response status: ${response.status}`);
-            console.log(`📊 Response ok: ${response.ok}`);
-            console.log(`📊 Response headers:`, response.headers);
+            console.log(`📊 Subscription status response status: ${response.status}`);
+            console.log(`📊 Subscription status response ok: ${response.ok}`);
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('❌ Failed to check subscription status');
-                console.error('❌ Error response body:', errorText);
-                return false;
+                console.error('❌ Subscription status error response:', errorText);
+
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    throw new Error(errorJson.error || 'Failed to check subscription status');
+                } catch (parseError) {
+                    throw new Error(`API Error: ${response.status} - Server returned HTML instead of JSON`);
+                }
             }
 
             const responseText = await response.text();
-            console.log(`📊 Raw response text:`, responseText);
+            console.log("📊 Subscription status raw response:", responseText);
 
             try {
                 const data = JSON.parse(responseText);
-                console.log(`📊 Parsed JSON response:`, data);
+                console.log("✅ Subscription status data:", data);
                 return data.isPremium || false;
             } catch (parseError) {
-                console.error('❌ JSON Parse Error:', parseError);
+                console.error('❌ Subscription status JSON Parse Error:', parseError);
                 console.error('❌ Response was:', responseText);
-                return false;
+                throw new Error('Server returned invalid JSON response');
             }
 
         } catch (error) {
