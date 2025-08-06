@@ -13,7 +13,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   SafeAreaView,
   Alert,
   Dimensions,
@@ -25,6 +24,10 @@ import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../services/supabase";
 import { RoutineCompletion } from "../../types/database";
 import { useTheme } from "../../../ThemeContext";
+import { TouchableOpacity } from 'react-native'; // If not already imported
+import { usePremium } from '../../contexts/PremiumContext';
+import { useNavigation } from '@react-navigation/native';
+
 
 const { width } = Dimensions.get("window");
 
@@ -151,6 +154,8 @@ export default function StatsScreen() {
 
   // Theme context
   const { colors } = useTheme();
+  const { isPremium } = usePremium();
+  const navigation = useNavigation<any>();
 
   // Achievement targets with levels and themed badges
   const ACHIEVEMENT_LEVELS = [
@@ -923,8 +928,8 @@ export default function StatsScreen() {
             </View>
           </View>
 
-          {/* Longest Streak Widget */}
-          <View
+          {/* Longest Streak Widget - PREMIUM PROTECTED */}
+          <TouchableOpacity
             style={[
               styles.widget,
               styles.longestStreakWidget,
@@ -933,200 +938,218 @@ export default function StatsScreen() {
                 shadowColor: colors.text,
               },
             ]}
+            onPress={() => {
+              if (!isPremium) {
+                console.log("🚫 Non-premium user trying to view best streak - redirecting to premium");
+                (navigation as any).navigate('Premium', { source: 'best_streak' });
+              }
+            }}
+            activeOpacity={isPremium ? 1 : 0.7}
           >
             <View style={styles.widgetContent}>
-              <Text style={[styles.longestStreakNumber, { color: "#ffd700" }]}>
-                {longestStreak.length}
-              </Text>
-              <Text style={[styles.longestStreakLabel, { color: colors.text }]}>
-                best streak
-              </Text>
-              <Text
-                style={[
-                  styles.longestStreakDates,
-                  { color: colors.textSecondary },
-                ]}
-              >
-                {getStreakDateRange()}
-              </Text>
+              {isPremium ? (
+                // Show normal content for premium users
+                <>
+                  <Text style={[styles.longestStreakNumber, { color: "#ffd700" }]}>
+                    {longestStreak.length}
+                  </Text>
+                  <Text style={[styles.longestStreakLabel, { color: colors.text }]}>
+                    best streak
+                  </Text>
+                  <Text style={[styles.longestStreakDates, { color: colors.textSecondary }]}>
+                    {getStreakDateRange()}
+                  </Text>
+                </>
+              ) : (
+                // Show lock overlay for free users
+                <View style={styles.lockOverlay}>
+                  <Ionicons name="lock-closed" size={20} color="#007AFF" />
+                  <Text style={[styles.premiumText, { color: colors.text }]}>
+                    best streak
+                  </Text>
+                  <Text style={[styles.premiumSubtext, { color: colors.textSecondary }]}>
+                    Tap to unlock
+                  </Text>
+                </View>
+              )}
             </View>
+
             <View style={styles.widgetIcon}>
               <Ionicons
-                name={longestStreak.length > 0 ? "trophy" : "trophy-outline"}
+                name={isPremium && longestStreak.length > 0 ? "trophy" : "lock-closed"}
                 size={32}
-                color={
-                  longestStreak.length > 0 ? "#ffd700" : colors.textSecondary
-                }
+                color={isPremium && longestStreak.length > 0 ? "#ffd700" : "#007AFF"}
               />
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
 
-        {/* Heatmap Calendar Section */}
-        <View
-          style={[
-            styles.heatmapSection,
-            {
-              backgroundColor: colors.surface,
-              shadowColor: colors.text,
-            },
-          ]}
-        >
-          <View style={styles.heatmapHeader}>
-            <TouchableOpacity
-              style={styles.navButton}
-              onPress={() => navigateMonth("prev")}
-            >
-              <Ionicons name="chevron-back" size={24} color="#007AFF" />
-            </TouchableOpacity>
+          {/* Heatmap Calendar Section */}
+          <View
+            style={[
+              styles.heatmapSection,
+              {
+                backgroundColor: colors.surface,
+                shadowColor: colors.text,
+              },
+            ]}
+          >
+            <View style={styles.heatmapHeader}>
+              <TouchableOpacity
+                style={styles.navButton}
+                onPress={() => navigateMonth("prev")}
+              >
+                <Ionicons name="chevron-back" size={24} color="#007AFF" />
+              </TouchableOpacity>
 
-            <Text style={[styles.monthTitle, { color: colors.text }]}>
-              {getMonthName(currentDate)}
-            </Text>
+              <Text style={[styles.monthTitle, { color: colors.text }]}>
+                {getMonthName(currentDate)}
+              </Text>
 
-            <TouchableOpacity
-              style={styles.navButton}
-              onPress={() => navigateMonth("next")}
-            >
-              <Ionicons name="chevron-forward" size={24} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.heatmapGrid}>
-            {/* Day labels */}
-            <View style={styles.dayLabels}>
-              {["S", "M", "T", "W", "T", "F", "S"].map((dayLabel, index) => (
-                <Text
-                  key={index}
-                  style={[styles.dayLabel, { color: colors.textSecondary }]}
-                >
-                  {dayLabel}
-                </Text>
-              ))}
+              <TouchableOpacity
+                style={styles.navButton}
+                onPress={() => navigateMonth("next")}
+              >
+                <Ionicons name="chevron-forward" size={24} color="#007AFF" />
+              </TouchableOpacity>
             </View>
 
-            {/* Calendar grid */}
-            <View style={styles.calendarGrid}>{renderHeatmapCalendar()}</View>
-          </View>
-
-          {/* Success tracker legend */}
-          <View style={styles.legend}>
-            <Text style={[styles.legendLabel, { color: colors.textSecondary }]}>
-              Less
-            </Text>
-            <View style={styles.legendColors}>
-              <View
-                style={[styles.legendColor, { backgroundColor: "#ebedf0" }]}
-              />
-              <View
-                style={[styles.legendColor, { backgroundColor: "#c6e48b" }]}
-              />
-            </View>
-            <Text style={[styles.legendLabel, { color: colors.textSecondary }]}>
-              More
-            </Text>
-          </View>
-        </View>
-
-        {/* Enhanced Achievement Section */}
-        <View
-          style={[
-            styles.achievementSection,
-            {
-              backgroundColor: colors.surface,
-              shadowColor: colors.text,
-            },
-          ]}
-        >
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            🏆 Achievement Levels
-          </Text>
-
-          {/* Group achievements by level */}
-          {["Beginner", "Builder", "Champion", "Legend"].map((levelName) => {
-            const levelAchievements = achievements.filter(a => a.level === levelName);
-            const levelColor = levelAchievements[0]?.color || "#007AFF";
-            const unlockedCount = levelAchievements.filter(a => a.unlocked).length;
-            const totalCount = levelAchievements.length;
-
-            return (
-              <View key={levelName} style={styles.levelSection}>
-                <View style={styles.levelHeader}>
-                  <Text style={[styles.levelTitle, { color: levelColor }]}>
-                    {levelName.toUpperCase()}
+            <View style={styles.heatmapGrid}>
+              {/* Day labels */}
+              <View style={styles.dayLabels}>
+                {["S", "M", "T", "W", "T", "F", "S"].map((dayLabel, index) => (
+                  <Text
+                    key={index}
+                    style={[styles.dayLabel, { color: colors.textSecondary }]}
+                  >
+                    {dayLabel}
                   </Text>
-                  <Text style={[styles.levelProgress, { color: colors.textSecondary }]}>
-                    {unlockedCount}/{totalCount}
-                  </Text>
-                </View>
+                ))}
+              </View>
 
-                <View style={styles.levelAchievements}>
-                  {levelAchievements.map((achievement) => (
-                    <View
-                      key={achievement.id}
-                      style={[
-                        styles.enhancedAchievementItem,
-                        achievement.unlocked && styles.achievementUnlocked
-                      ]}
-                    >
+              {/* Calendar grid */}
+              <View style={styles.calendarGrid}>{renderHeatmapCalendar()}</View>
+            </View>
+
+            {/* Success tracker legend */}
+            <View style={styles.legend}>
+              <Text style={[styles.legendLabel, { color: colors.textSecondary }]}>
+                Less
+              </Text>
+              <View style={styles.legendColors}>
+                <View
+                  style={[styles.legendColor, { backgroundColor: "#ebedf0" }]}
+                />
+                <View
+                  style={[styles.legendColor, { backgroundColor: "#c6e48b" }]}
+                />
+              </View>
+              <Text style={[styles.legendLabel, { color: colors.textSecondary }]}>
+                More
+              </Text>
+            </View>
+          </View>
+
+          {/* Enhanced Achievement Section */}
+          <View
+            style={[
+              styles.achievementSection,
+              {
+                backgroundColor: colors.surface,
+                shadowColor: colors.text,
+              },
+            ]}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              🏆 Achievement Levels
+            </Text>
+
+            {/* Group achievements by level */}
+            {["Beginner", "Builder", "Champion", "Legend"].map((levelName) => {
+              const levelAchievements = achievements.filter(a => a.level === levelName);
+              const levelColor = levelAchievements[0]?.color || "#007AFF";
+              const unlockedCount = levelAchievements.filter(a => a.unlocked).length;
+              const totalCount = levelAchievements.length;
+
+              return (
+                <View key={levelName} style={styles.levelSection}>
+                  <View style={styles.levelHeader}>
+                    <Text style={[styles.levelTitle, { color: levelColor }]}>
+                      {levelName.toUpperCase()}
+                    </Text>
+                    <Text style={[styles.levelProgress, { color: colors.textSecondary }]}>
+                      {unlockedCount}/{totalCount}
+                    </Text>
+                  </View>
+
+                  <View style={styles.levelAchievements}>
+                    {levelAchievements.map((achievement) => (
                       <View
+                        key={achievement.id}
                         style={[
-                          styles.enhancedBadge,
-                          {
-                            backgroundColor: achievement.unlocked
-                              ? achievement.color
-                              : colors.background,
-                            borderColor: achievement.unlocked
-                              ? achievement.color
-                              : colors.border,
-                          },
+                          styles.enhancedAchievementItem,
+                          achievement.unlocked && styles.achievementUnlocked
                         ]}
                       >
-                        <Text style={styles.badgeIcon}>
-                          {achievement.unlocked ? achievement.icon : "🔒"}
-                        </Text>
-                      </View>
-                      <Text
-                        style={[
-                          styles.enhancedAchievementName,
-                          {
-                            color: achievement.unlocked
-                              ? colors.text
-                              : colors.textSecondary,
-                          },
-                        ]}
-                      >
-                        {achievement.name}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.achievementDays,
-                          {
-                            color: achievement.unlocked
-                              ? achievement.color
-                              : colors.textTertiary,
-                          },
-                        ]}
-                      >
-                        {achievement.target} days
-                      </Text>
-                      {achievement.unlocked && achievement.unlockedDate && (
-                        <Text
+                        <View
                           style={[
-                            styles.unlockedDate,
-                            { color: colors.textSecondary },
+                            styles.enhancedBadge,
+                            {
+                              backgroundColor: achievement.unlocked
+                                ? achievement.color
+                                : colors.background,
+                              borderColor: achievement.unlocked
+                                ? achievement.color
+                                : colors.border,
+                            },
                           ]}
                         >
-                          ✓ {formatStreakDate(achievement.unlockedDate)}
+                          <Text style={styles.badgeIcon}>
+                            {achievement.unlocked ? achievement.icon : "🔒"}
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.enhancedAchievementName,
+                            {
+                              color: achievement.unlocked
+                                ? colors.text
+                                : colors.textSecondary,
+                            },
+                          ]}
+                        >
+                          {achievement.name}
                         </Text>
-                      )}
-                    </View>
-                  ))}
+                        <Text
+                          style={[
+                            styles.achievementDays,
+                            {
+                              color: achievement.unlocked
+                                ? achievement.color
+                                : colors.textTertiary,
+                            },
+                          ]}
+                        >
+                          {achievement.target} days
+                        </Text>
+                        {achievement.unlocked && achievement.unlockedDate && (
+                          <Text
+                            style={[
+                              styles.unlockedDate,
+                              { color: colors.textSecondary },
+                            ]}
+                          >
+                            ✓ {formatStreakDate(achievement.unlockedDate)}
+                          </Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
                 </View>
-              </View>
-            );
-          })}
+              );
+            })}
+          </View>
         </View>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -1210,6 +1233,37 @@ const styles = StyleSheet.create({
   longestStreakDates: {
     fontSize: 12,
     marginTop: 4,
+  },
+  lockOverlay: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 12,
+  },
+  lockIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  premiumText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  premiumSubtext: {
+    fontSize: 12,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   // Heatmap styles
   heatmapSection: {
