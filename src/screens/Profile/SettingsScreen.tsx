@@ -45,10 +45,8 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
     // Use theme context
     const { isDarkMode, colors, setDarkMode } = useTheme();
-    const { isPremium } = usePremium(); // Add this line
-    const navigation = useNavigation<any>();
-
-
+    const { isPremium } = usePremium();
+    const navigationHook = useNavigation<any>();
 
     // Default day schedules
     const defaultDaySchedules: DaySchedule[] = [
@@ -362,6 +360,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
         return `${displayHour}:00 ${period}`;
     };
+
     const handleChangePassword = () => {
         navigation.navigate('ChangePassword');
     };
@@ -398,7 +397,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             )}
         </TouchableOpacity>
     );
-
 
     const handleLogout = () => {
         Alert.alert(
@@ -562,21 +560,57 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Schedule Settings Section */}
+                    {/* Schedule Settings Section - PREMIUM PROTECTED */}
                     <View style={[styles.section, { backgroundColor: colors.surface }]}>
                         <Text style={[styles.sectionTitle, { backgroundColor: colors.background, color: colors.text, borderBottomColor: colors.border }]}>
                             Schedule Settings
                         </Text>
 
-                        {renderSettingItem(
-                            'Daily Time Ranges',
-                            'Set your active hours for each day of the week',
-                            '',
-                            () => {
-                                console.log('📋 DAILY TIME RANGES PRESSED - Opening schedule modal');
-                                setShowScheduleModal(true);
-                            }
-                        )}
+                        {/* ✅ PREMIUM PROTECTED Daily Time Ranges */}
+                        <TouchableOpacity
+                            style={[
+                                styles.settingItem,
+                                {
+                                    borderBottomColor: colors.separator,
+                                    opacity: isPremium ? 1 : 0.6
+                                }
+                            ]}
+                            onPress={() => {
+                                if (!isPremium) {
+                                    console.log("🚫 Non-premium user trying to access schedule settings - redirecting to premium");
+                                    navigationHook.navigate('Premium', { source: 'schedule_settings' });
+                                } else {
+                                    console.log('📅 DAILY TIME RANGES PRESSED - Opening schedule modal');
+                                    setShowScheduleModal(true);
+                                }
+                            }}
+                        >
+                            <View style={styles.settingContent}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Text style={[styles.settingTitle, { color: isPremium ? colors.text : colors.textSecondary }]}>
+                                        Daily Time Ranges
+                                    </Text>
+                                    {!isPremium && (
+                                        <View style={[styles.premiumBadge, { backgroundColor: '#007AFF', marginLeft: 8 }]}>
+                                            <Ionicons name="lock-closed" size={12} color="#FFFFFF" />
+                                        </View>
+                                    )}
+                                </View>
+                                <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>
+                                    {isPremium
+                                        ? "Set your active hours for each day of the week"
+                                        : "Unlock to customize your daily schedule"
+                                    }
+                                </Text>
+                            </View>
+                            <View style={styles.settingValue}>
+                                <Ionicons
+                                    name={isPremium ? "chevron-forward" : "lock-closed"}
+                                    size={16}
+                                    color={isPremium ? colors.textTertiary : "#007AFF"}
+                                />
+                            </View>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Account & Security */}
@@ -645,9 +679,10 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                             </View>
                         </TouchableOpacity>
                     </View>
-                    {/* Schedule Settings Modal */}
+
+                    {/* Schedule Settings Modal - Only show if premium */}
                     <Modal
-                        visible={showScheduleModal}
+                        visible={showScheduleModal && isPremium}
                         animationType="slide"
                         presentationStyle="pageSheet"
                         onRequestClose={() => setShowScheduleModal(false)}
@@ -734,6 +769,14 @@ const styles = StyleSheet.create({
     dangerText: {
         color: '#ff6b6b',
     },
+    // ✅ NEW: Premium badge style
+    premiumBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     modalContainer: {
         flex: 1,
     },
@@ -813,7 +856,6 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
     },
-
     timePickerModal: {
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
