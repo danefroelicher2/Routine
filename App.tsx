@@ -27,6 +27,7 @@ import SignupScreen from "./src/screens/Auth/SignupScreen";
 import ChangePasswordScreen from "./src/screens/Profile/ChangePasswordScreen";
 import ResetPasswordScreen from "./src/screens/Auth/ResetPasswordScreen";
 
+
 // Main App Screens
 import HomeScreen from "./src/screens/Home/HomeScreen";
 import AddRoutineScreen from "./src/screens/Home/AddRoutineScreen";
@@ -36,6 +37,7 @@ import StatsScreen from "./src/screens/Stats/StatsScreen";
 import AIChatScreen from "./src/screens/AI/AIChatScreen";
 import AISettingsScreen from "./src/screens/AI/AISettingsScreen";
 import AIPremiumPaywall from "./src/screens/AI/AIPremiumPaywall";
+
 
 
 // Other Screens
@@ -172,15 +174,13 @@ function MainTabs() {
           if (route.name === "Home") {
             iconName = focused ? "home" : "home-outline";
           } else if (route.name === "Stats") {
-            iconName = focused ? "analytics" : "analytics-outline";
+            iconName = focused ? "stats-chart" : "stats-chart-outline";
           } else if (route.name === "AI") {
             iconName = focused ? "chatbubbles" : "chatbubbles-outline";
           } else if (route.name === "Notes") {
             iconName = focused ? "document-text" : "document-text-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
-          } else {
-            iconName = "help-outline";
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -190,6 +190,15 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
+          borderTopWidth: 1,
+          paddingBottom: 8,
+          paddingTop: 8,
+          height: 88,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "500",
+          marginTop: 4,
         },
         headerShown: false,
       })}
@@ -199,6 +208,15 @@ function MainTabs() {
       <Tab.Screen name="AI" component={AIStack} />
       <Tab.Screen name="Notes" component={NotesStack} />
       <Tab.Screen name="Profile" component={ProfileStack} />
+
+      {/* Add Premium as a modal screen */}
+      <Tab.Screen
+        name="Premium"
+        component={PremiumScreen}
+        options={{
+          tabBarButton: () => null, // Hide from tab bar
+        }}
+      />
     </Tab.Navigator>
   );
 }
