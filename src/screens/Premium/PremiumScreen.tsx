@@ -136,8 +136,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             console.log(`🚀 Starting Stripe checkout for plan: ${planId}`);
             console.log(`📊 Source: ${source}`);
 
-            // ✅ YOUR ACTUAL VERCEL URL
-            // ✅ NEW LOCAL SERVER URL
+            // Call our local server
             const response = await fetch('http://localhost:3001/create-payment', {
                 method: 'POST',
                 headers: {
@@ -150,8 +149,6 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                 }),
             });
 
-            // Replace your error handling section with this:
-
             console.log(`📊 Create-checkout response status: ${response.status}`);
             console.log(`📊 Create-checkout response ok: ${response.ok}`);
 
@@ -160,7 +157,6 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                 const errorText = await response.text();
                 console.error('❌ Create-checkout error response:', errorText);
 
-                // Try to parse as JSON, but handle if it's HTML
                 try {
                     const errorData = JSON.parse(errorText);
                     throw new Error(errorData.error || 'Failed to create checkout session');
@@ -174,29 +170,51 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             console.log(`📊 Create-checkout raw response:`, responseText);
 
             try {
-                const { url, sessionId } = JSON.parse(responseText);
-                console.log(`✅ Checkout URL created: ${url}`);
-                console.log(`🎫 Session ID: ${sessionId}`);
+                const data = JSON.parse(responseText);
+                console.log(`✅ Payment response received:`, data);
 
-                // Open Stripe checkout in browser
-                const canOpen = await Linking.canOpenURL(url);
-                if (canOpen) {
-                    await Linking.openURL(url);
-                    console.log(`🌐 Opened Stripe checkout in browser`);
-                    console.log(`Premium checkout opened from: ${source}`);
-                } else {
-                    throw new Error('Cannot open checkout URL');
+                // Check if we're in test mode
+                if (data.testMode) {
+                    Alert.alert(
+                        'Test Success! ✅',
+                        'Payment API is working perfectly! Ready for Stripe integration.',
+                        [{ text: 'OK' }]
+                    );
+                    return;
                 }
+
+                // If we have a real Stripe URL, open it
+                if (data.url && data.sessionId) {
+                    console.log(`✅ Checkout URL created: ${data.url}`);
+                    console.log(`🎫 Session ID: ${data.sessionId}`);
+
+                    // Open Stripe checkout in browser
+                    const canOpen = await Linking.canOpenURL(data.url);
+                    if (canOpen) {
+                        await Linking.openURL(data.url);
+                        console.log(`🌐 Opened Stripe checkout in browser`);
+                        console.log(`Premium checkout opened from: ${source}`);
+                    } else {
+                        throw new Error('Cannot open checkout URL');
+                    }
+                } else {
+                    // Handle other success responses
+                    Alert.alert('Success!', data.message || 'Payment processed successfully!');
+                }
+
             } catch (parseError) {
                 console.error('❌ Create-checkout JSON Parse Error:', parseError);
                 console.error('❌ Response was:', responseText);
                 throw new Error('Server returned invalid JSON response');
             }
+
+        } catch (error) {
+            console.error('❌ Purchase failed:', error);
+            Alert.alert('Purchase Failed', error.message || 'Something went wrong. Please try again.');
         } finally {
             setIsProcessing(false);
         }
     };
-
     const renderFeature = (feature: PremiumFeature, index: number) => (
         <View key={index} style={[styles.featureItem, { backgroundColor: colors.surface }]}>
             <View style={[styles.featureIcon, { backgroundColor: feature.color + "20" }]}>
