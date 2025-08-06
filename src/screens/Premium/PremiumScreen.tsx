@@ -230,7 +230,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             </View>
         </View>
     );
-
+    //test
     const renderPricingPlan = (plan: PricingPlan) => (
         <TouchableOpacity
             key={plan.id}
