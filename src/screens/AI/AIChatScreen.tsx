@@ -1,5 +1,5 @@
 // ============================================
-// AI CHAT SCREEN WITH CLAUDE-LIKE UI
+// AI CHAT SCREEN WITH CLAUDE-LIKE UI + PREMIUM CHECK
 // Replace your entire src/screens/AI/AIChatScreen.tsx with this
 // ============================================
 
@@ -28,7 +28,6 @@ import { aiService } from '../../services/aiService';
 import { ChatSession, ChatMessage, ScheduleContext } from '../../types/database';
 import { usePremium } from '../../contexts/PremiumContext';
 
-
 const { width } = Dimensions.get('window');
 
 interface AIChatScreenProps {
@@ -41,6 +40,7 @@ interface ChatMessageWithLoading extends ChatMessage {
 
 const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     const { colors } = useTheme();
+    const { isPremium } = usePremium();
 
     // State management
     const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
@@ -54,12 +54,23 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     // Refs
     const flatListRef = useRef<FlatList>(null);
 
+    // 🔒 PREMIUM CHECK - Redirect non-premium users immediately
+    useEffect(() => {
+        if (!isPremium) {
+            console.log('🚫 Non-premium user accessing AI - redirecting to paywall');
+            navigation.replace('AIPremiumPaywall');
+            return;
+        }
+    }, [isPremium, navigation]);
+
     // Load data when screen focuses
     useFocusEffect(
         useCallback(() => {
-            initializeChat();
-            checkAIConnection();
-        }, [])
+            if (isPremium) { // Only initialize if premium
+                initializeChat();
+                checkAIConnection();
+            }
+        }, [isPremium])
     );
 
     /**
@@ -433,6 +444,20 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
         );
     };
 
+    // 🔒 Show loading screen while redirecting non-premium users
+    if (!isPremium) {
+        return (
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
+                <View style={styles.premiumLoadingContainer}>
+                    <ActivityIndicator size="large" color="#007AFF" />
+                    <Text style={[styles.premiumLoadingText, { color: colors.text }]}>
+                        Loading AI...
+                    </Text>
+                </View>
+            </View>
+        );
+    }
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
             {/* Header */}
@@ -682,6 +707,17 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    // 🔒 Premium loading styles
+    premiumLoadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    premiumLoadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        fontWeight: '500',
     },
 });
 
