@@ -58,7 +58,7 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     useEffect(() => {
         if (!isPremium) {
             console.log('🚫 Non-premium user accessing AI - redirecting to paywall');
-            navigation.replace('AIPremiumPaywall');
+            navigation.navigate('Premium', { source: 'ai_tab' });
             return;
         }
     }, [isPremium, navigation]);
