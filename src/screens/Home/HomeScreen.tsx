@@ -72,6 +72,7 @@ const getLocalDateString = (date: Date): string => {
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
+  const { isPremium } = usePremium();
 
   // EXISTING: Calendar toggle state
   const [isCalendarView, setIsCalendarView] = useState(false);
@@ -1504,6 +1505,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 value={isCalendarView}
                 onValueChange={(newValue) => {
                   console.log("🔄 Toggle changed to:", newValue);
+
+                  // 🔒 PREMIUM CHECK - Block calendar view for non-premium users
+                  if (newValue && !isPremium) {
+                    console.log("🚫 Non-premium user trying to access calendar view - redirecting to premium");
+                    navigation.navigate('Premium', { source: 'calendar_toggle' });
+                    return; // Don't change the toggle state
+                  }
+
+                  // If premium user or turning off calendar view, allow the change
                   setIsCalendarView(newValue);
                 }}
                 trackColor={{ false: colors.border, true: "#007AFF" }}
@@ -1512,6 +1522,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </View>
           </View>
         </View>
+
+
 
         {/* Day selector calendar - ALWAYS visible in same position */}
         <View style={[styles.calendarContainer, { backgroundColor: colors.surface }]}>
