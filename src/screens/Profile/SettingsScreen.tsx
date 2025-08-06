@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
 import { UserSettings } from '../../types/database';
 import { useTheme } from '../../../ThemeContext';
+import { usePremium } from '../../contexts/PremiumContext';
+import { useNavigation } from '@react-navigation/native';
 
 interface SettingsScreenProps {
     navigation: any;
@@ -43,6 +45,10 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
     // Use theme context
     const { isDarkMode, colors, setDarkMode } = useTheme();
+    const { isPremium } = usePremium(); // Add this line
+    const navigation = useNavigation<any>();
+
+
 
     // Default day schedules
     const defaultDaySchedules: DaySchedule[] = [
@@ -558,11 +564,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
                     {/* Schedule Settings Section */}
                     <View style={[styles.section, { backgroundColor: colors.surface }]}>
-                        <Text style={[styles.sectionTitle, {
-                            backgroundColor: colors.background,
-                            color: colors.text,
-                            borderBottomColor: colors.border
-                        }]}>Schedule Settings</Text>
+                        <Text style={[styles.sectionTitle, { backgroundColor: colors.background, color: colors.text, borderBottomColor: colors.border }]}>
+                            Schedule Settings
+                        </Text>
 
                         {renderSettingItem(
                             'Daily Time Ranges',
