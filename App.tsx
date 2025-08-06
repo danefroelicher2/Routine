@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Session } from "./src/services/supabase";
 import "react-native-url-polyfill/auto";
 
+
 // Services
 import { supabase } from "./src/services/supabase";
 
@@ -34,6 +35,8 @@ import StatsScreen from "./src/screens/Stats/StatsScreen";
 // AI Screens
 import AIChatScreen from "./src/screens/AI/AIChatScreen";
 import AISettingsScreen from "./src/screens/AI/AISettingsScreen";
+import AIPremiumPaywall from "./src/screens/AI/AIPremiumPaywall";
+
 
 // Other Screens
 import NotesScreen from "./src/screens/Notes/NotesScreen";
@@ -78,6 +81,11 @@ function AIStack() {
       <Stack.Screen
         name="AISettings"
         component={AISettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AIPremiumPaywall"
+        component={AIPremiumPaywall}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

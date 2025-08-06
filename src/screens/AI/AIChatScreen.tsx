@@ -26,6 +26,8 @@ import { useTheme } from '../../../ThemeContext';
 import { chatService } from '../../services/chatService';
 import { aiService } from '../../services/aiService';
 import { ChatSession, ChatMessage, ScheduleContext } from '../../types/database';
+import { usePremium } from '../../contexts/PremiumContext';
+
 
 const { width } = Dimensions.get('window');
 
