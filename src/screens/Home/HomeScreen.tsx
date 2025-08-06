@@ -30,6 +30,8 @@ import { supabase } from "../../services/supabase";
 import { UserRoutine } from "../../types/database";
 import { useTheme } from "../../../ThemeContext";
 import { StreakSyncService } from "../../services/StreakSyncService";
+import { usePremium } from '../../contexts/PremiumContext';
+
 
 interface RoutineWithCompletion extends UserRoutine {
   isCompleted: boolean;

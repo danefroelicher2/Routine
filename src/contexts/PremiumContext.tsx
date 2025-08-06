@@ -161,7 +161,7 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
             try {
                 const data = JSON.parse(responseText);
                 console.log("✅ Subscription status data:", data);
-                return data.isPremium || false;
+                return false; // Temporarily force non-premium for testing
             } catch (parseError) {
                 console.error('❌ Subscription status JSON Parse Error:', parseError);
                 console.error('❌ Response was:', responseText);
