@@ -1,6 +1,6 @@
 // ============================================
 // src/screens/Premium/PremiumScreen.tsx
-// Main Premium Screen Component - UPDATED WITH NEW FEATURE ORDER
+// Main Premium Screen Component - DIRECT PAYMENT ON CARD CLICK
 // ============================================
 
 import React, { useState } from "react";
@@ -51,8 +51,7 @@ interface PricingPlan {
 
 const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
     const { colors } = useTheme();
-    const [selectedPlan, setSelectedPlan] = useState<string>("monthly");
-    const [isProcessing, setIsProcessing] = useState(false);
+    const [isProcessing, setIsProcessing] = useState<string | null>(null); // Track which plan is processing
     const source = route?.params?.source || "unknown";
 
     // ✅ UPDATED: Premium features data - NEW ORDER
@@ -108,17 +107,17 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             popular: true,
             features: ["All Premium Features", "Priority Support", "Early Access to New Features"]
         },
-
     ];
 
-    const handlePurchase = async (planId: string) => {
-        setIsProcessing(true);
-        console.log(`🚀 Starting purchase for plan: ${planId} from source: ${source}`);
+    const handleDirectPurchase = async (planId: string) => {
+        setIsProcessing(planId);
+        console.log(`🚀 Direct purchase for plan: ${planId} from source: ${source}`);
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
                 Alert.alert("Error", "Please sign in to continue");
+                setIsProcessing(null);
                 return;
             }
 
@@ -134,7 +133,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             });
 
             const paymentUrl = `${baseUrl}?${params.toString()}`;
-            console.log(`💳 Opening payment URL: ${paymentUrl}`);
+            console.log(`💳 Opening payment URL for ${planId}: ${paymentUrl}`);
 
             // Open payment URL
             const supported = await Linking.canOpenURL(paymentUrl);
@@ -145,10 +144,10 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             }
 
         } catch (error) {
-            console.error("❌ Purchase error:", error);
+            console.error(`❌ Purchase error for ${planId}:`, error);
             Alert.alert("Error", "Failed to start purchase. Please try again.");
         } finally {
-            setIsProcessing(false);
+            setIsProcessing(null);
         }
     };
 
@@ -168,56 +167,70 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
         </View>
     );
 
-    const renderPricingPlan = (plan: PricingPlan) => (
-        <TouchableOpacity
-            key={plan.id}
-            style={[
-                styles.pricingCard,
-                {
-                    backgroundColor: colors.surface,
-                    borderColor: selectedPlan === plan.id ? "#007AFF" : colors.border,
-                },
-                plan.popular && styles.popularCard,
-            ]}
-            onPress={() => setSelectedPlan(plan.id)}
-        >
-            {plan.popular && (
-                <View style={styles.popularBadge}>
-                    <Text style={styles.popularBadgeText}>Most Popular</Text>
-                </View>
-            )}
+    const renderPricingPlan = (plan: PricingPlan) => {
+        const isCurrentlyProcessing = isProcessing === plan.id;
 
-            <Text style={[styles.planName, { color: colors.text }]}>{plan.name}</Text>
-
-            <View style={styles.priceContainer}>
-                <Text style={[styles.price, { color: colors.text }]}>{plan.price}</Text>
-                {plan.originalPrice && (
-                    <Text style={[styles.originalPrice, { color: colors.textSecondary }]}>
-                        {plan.originalPrice}
-                    </Text>
-                )}
-            </View>
-
-            <Text style={[styles.period, { color: colors.textSecondary }]}>{plan.period}</Text>
-
-            {plan.savings && (
-                <View style={styles.savingsBadge}>
-                    <Text style={styles.savingsText}>{plan.savings}</Text>
-                </View>
-            )}
-
-            <View style={styles.planFeatures}>
-                {plan.features.map((feature, index) => (
-                    <View key={index} style={styles.planFeature}>
-                        <Ionicons name="checkmark-circle" size={16} color="#34C759" />
-                        <Text style={[styles.planFeatureText, { color: colors.textSecondary }]}>
-                            {feature}
-                        </Text>
+        return (
+            <TouchableOpacity
+                key={plan.id}
+                style={[
+                    styles.pricingCard,
+                    {
+                        backgroundColor: colors.surface,
+                        borderColor: "#007AFF", // ✅ PERMANENT BLUE BORDER
+                        borderWidth: 2, // Make sure border is visible
+                    },
+                    plan.popular && styles.popularCard,
+                    isCurrentlyProcessing && styles.processingCard,
+                ]}
+                onPress={() => handleDirectPurchase(plan.id)}
+                disabled={isProcessing !== null} // Disable all cards when any is processing
+            >
+                {plan.popular && (
+                    <View style={styles.popularBadge}>
+                        <Text style={styles.popularBadgeText}>Most Popular</Text>
                     </View>
-                ))}
-            </View>
-        </TouchableOpacity>
-    );
+                )}
+
+                <Text style={[styles.planName, { color: colors.text }]}>{plan.name}</Text>
+
+                <View style={styles.priceContainer}>
+                    <Text style={[styles.price, { color: colors.text }]}>{plan.price}</Text>
+                    {plan.originalPrice && (
+                        <Text style={[styles.originalPrice, { color: colors.textSecondary }]}>
+                            {plan.originalPrice}
+                        </Text>
+                    )}
+                </View>
+
+                <Text style={[styles.period, { color: colors.textSecondary }]}>{plan.period}</Text>
+
+                {plan.savings && (
+                    <View style={styles.savingsBadge}>
+                        <Text style={styles.savingsText}>{plan.savings}</Text>
+                    </View>
+                )}
+
+                <View style={styles.planFeatures}>
+                    {plan.features.map((feature, index) => (
+                        <View key={index} style={styles.planFeature}>
+                            <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+                            <Text style={[styles.planFeatureText, { color: colors.textSecondary }]}>
+                                {feature}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+
+                {/* ✅ PROCESSING INDICATOR */}
+                {isCurrentlyProcessing && (
+                    <View style={styles.processingOverlay}>
+                        <Text style={styles.processingText}>Opening payment...</Text>
+                    </View>
+                )}
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -254,24 +267,16 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                     <Text style={[styles.sectionTitle, { color: colors.text }]}>
                         Choose Your Plan
                     </Text>
+                    <Text style={[styles.pricingSubtitle, { color: colors.textSecondary }]}>
+                        Tap a plan to start your premium subscription
+                    </Text>
                     {pricingPlans.map(renderPricingPlan)}
                 </View>
 
-                {/* Purchase Button */}
-                <View style={styles.purchaseSection}>
-                    <TouchableOpacity
-                        style={[
-                            styles.purchaseButton,
-                            isProcessing && styles.purchaseButtonDisabled,
-                        ]}
-                        onPress={() => handlePurchase(selectedPlan)}
-                        disabled={isProcessing}
-                    >
-                        <Text style={styles.purchaseButtonText}>
-                            {isProcessing ? "Processing..." : "Start Premium"}
-                        </Text>
-                    </TouchableOpacity>
+                {/* ✅ REMOVED: Purchase Button Section - No longer needed! */}
 
+                {/* Footer */}
+                <View style={styles.footerSection}>
                     <Text style={[styles.disclaimer, { color: colors.textTertiary }]}>
                         Cancel anytime. No commitments.
                     </Text>
@@ -353,15 +358,32 @@ const styles = StyleSheet.create({
     pricingSection: {
         padding: 20,
     },
+    pricingSubtitle: {
+        fontSize: 14,
+        textAlign: "center",
+        marginBottom: 20,
+        fontStyle: "italic",
+    },
     pricingCard: {
-        borderWidth: 2,
         borderRadius: 16,
         padding: 20,
         marginBottom: 16,
         position: "relative",
+        // ✅ Enhanced visual feedback for clickable cards
+        shadowColor: "#007AFF",
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
     },
     popularCard: {
-        borderColor: "#007AFF",
+        // Keep the same style, border is already permanent blue
+    },
+    processingCard: {
+        opacity: 0.7,
     },
     popularBadge: {
         position: "absolute",
@@ -425,24 +447,26 @@ const styles = StyleSheet.create({
         fontSize: 14,
         flex: 1,
     },
-    purchaseSection: {
+    processingOverlay: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 122, 255, 0.1)",
+        borderRadius: 16,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    processingText: {
+        color: "#007AFF",
+        fontSize: 16,
+        fontWeight: "600",
+    },
+    footerSection: {
         padding: 20,
         paddingBottom: 40,
-    },
-    purchaseButton: {
-        backgroundColor: "#007AFF",
-        paddingVertical: 16,
-        borderRadius: 12,
         alignItems: "center",
-        marginBottom: 12,
-    },
-    purchaseButtonDisabled: {
-        opacity: 0.6,
-    },
-    purchaseButtonText: {
-        color: "#fff",
-        fontSize: 18,
-        fontWeight: "700",
     },
     disclaimer: {
         fontSize: 12,
