@@ -11,7 +11,8 @@ import {
     Modal,
     FlatList,
     Platform,
-    InteractionManager
+    InteractionManager,
+    Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
@@ -19,6 +20,7 @@ import { UserSettings } from '../../types/database';
 import { useTheme } from '../../../ThemeContext';
 import { usePremium } from '../../contexts/PremiumContext';
 import { useNavigation } from '@react-navigation/native';
+import MonthlyCancellationFlow from '../../components/subscription/MonthlyCancellationFlow';
 
 interface SettingsScreenProps {
     navigation: any;
@@ -42,6 +44,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     const [showTimePickerModal, setShowTimePickerModal] = useState(false);
     const [selectedDay, setSelectedDay] = useState<DaySchedule | null>(null);
     const [timePickerType, setTimePickerType] = useState<'start' | 'end'>('start');
+
+    // ✅ NEW: Cancellation flow state
+    const [showCancellationModal, setShowCancellationModal] = useState(false);
 
     // Use theme context
     const { isDarkMode, colors, setDarkMode } = useTheme();
@@ -516,8 +521,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
             <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
                 <ScrollView style={styles.scrollView}>
-           // In your SettingsScreen.tsx, find the "App Preferences" section and replace it with this:
-
                     {/* App Preferences */}
                     <View style={[styles.section, { backgroundColor: colors.surface }]}>
                         <Text style={[styles.sectionTitle, {
@@ -671,6 +674,40 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                         </TouchableOpacity>
                     </View>
 
+                    {/* ✅ NEW: Subscription Management Section (only show if premium) */}
+                    {isPremium && (
+                        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                            <Text style={[styles.sectionTitle, {
+                                backgroundColor: colors.background,
+                                color: colors.text,
+                                borderBottomColor: colors.border
+                            }]}>Subscription</Text>
+
+                            {renderSettingItem(
+                                'Manage Subscription',
+                                'View billing, change plan, or cancel subscription',
+                                '',
+                                () => {
+                                    console.log('💳 Opening subscription management');
+                                    // You could also create a full subscription management screen
+                                    // For now, we'll use the simple approach
+                                    Alert.alert(
+                                        'Manage Subscription',
+                                        'What would you like to do?',
+                                        [
+                                            { text: 'Cancel', style: 'cancel' },
+                                            {
+                                                text: 'Cancel Subscription',
+                                                style: 'destructive',
+                                                onPress: () => setShowCancellationModal(true)
+                                            }
+                                        ]
+                                    );
+                                }
+                            )}
+                        </View>
+                    )}
+
                     {/* Account & Security */}
                     <View style={[styles.section, { backgroundColor: colors.surface }]}>
                         <Text style={[styles.sectionTitle, {
@@ -737,6 +774,27 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                             </View>
                         </TouchableOpacity>
                     </View>
+
+                    {/* ✅ NEW: Monthly Cancellation Flow Modal */}
+                    <Modal
+                        visible={showCancellationModal}
+                        animationType="slide"
+                        presentationStyle="pageSheet"
+                        onRequestClose={() => setShowCancellationModal(false)}
+                    >
+                        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+                            <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+                                <TouchableOpacity onPress={() => setShowCancellationModal(false)}>
+                                    <Ionicons name="close" size={24} color={colors.text} />
+                                </TouchableOpacity>
+                                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                                    Subscription Management
+                                </Text>
+                                <View style={{ width: 24 }} />
+                            </View>
+                            <MonthlyCancellationFlow onClose={() => setShowCancellationModal(false)} />
+                        </SafeAreaView>
+                    </Modal>
 
                     {/* Schedule Settings Modal - Only show if premium */}
                     <Modal
