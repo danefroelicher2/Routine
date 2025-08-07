@@ -1,5 +1,5 @@
 // ============================================
-// FIXED App.tsx - REPLACE YOUR ENTIRE App.tsx WITH THIS
+// COMPLETE App.tsx - WITH HomeViewProvider ADDED
 // ============================================
 
 import React, { useEffect, useState } from "react";
@@ -9,8 +9,8 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { Session } from "./src/services/supabase";
-import "react-native-url-polyfill/auto";
 
+import "react-native-url-polyfill/auto";
 
 // Services
 import { supabase } from "./src/services/supabase";
@@ -21,12 +21,14 @@ import { ThemeProvider, useTheme } from "./ThemeContext";
 // ✅ PREMIUM PROVIDER
 import { PremiumProvider } from "./src/contexts/PremiumContext";
 
+// ✅ HOME VIEW PROVIDER
+import { HomeViewProvider } from './src/contexts/HomeViewContext';
+
 // Auth Screens
 import LoginScreen from "./src/screens/Auth/LoginScreen";
 import SignupScreen from "./src/screens/Auth/SignupScreen";
 import ChangePasswordScreen from "./src/screens/Profile/ChangePasswordScreen";
 import ResetPasswordScreen from "./src/screens/Auth/ResetPasswordScreen";
-
 
 // Main App Screens
 import HomeScreen from "./src/screens/Home/HomeScreen";
@@ -37,8 +39,6 @@ import StatsScreen from "./src/screens/Stats/StatsScreen";
 import AIChatScreen from "./src/screens/AI/AIChatScreen";
 import AISettingsScreen from "./src/screens/AI/AISettingsScreen";
 import AIPremiumPaywall from "./src/screens/AI/AIPremiumPaywall";
-
-
 
 // Other Screens
 import NotesScreen from "./src/screens/Notes/NotesScreen";
@@ -313,7 +313,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <PremiumProvider>
-        <AppContent />
+        <HomeViewProvider>  {/* ✅ ADDED HOME VIEW PROVIDER */}
+          <AppContent />
+        </HomeViewProvider>  {/* ✅ ADDED HOME VIEW PROVIDER */}
       </PremiumProvider>
     </ThemeProvider>
   );

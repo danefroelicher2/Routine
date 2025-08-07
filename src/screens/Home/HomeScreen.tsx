@@ -31,6 +31,7 @@ import { UserRoutine } from "../../types/database";
 import { useTheme } from "../../../ThemeContext";
 import { StreakSyncService } from "../../services/StreakSyncService";
 import { usePremium } from '../../contexts/PremiumContext';
+import { useHomeView } from '../../contexts/HomeViewContext';
 
 
 interface RoutineWithCompletion extends UserRoutine {
@@ -138,6 +139,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   // Get screen dimensions for better calculations
   const { width: screenWidth } = Dimensions.get("window");
+  const { defaultToCalendarView, isLoading: homeViewLoading } = useHomeView();
 
   // Days of the week
   const daysOfWeek = [
@@ -702,7 +704,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     initializeTimeSlots();
     loadData();
   }, [selectedDay]);
-
+  useEffect(() => {
+    // Set the initial view based on user's preference when component loads
+    if (!homeViewLoading && isPremium) {
+      setIsCalendarView(defaultToCalendarView);
+      console.log(`🗓️ Setting initial view to: ${defaultToCalendarView ? 'Calendar' : 'Daily'}`);
+    }
+  }, [defaultToCalendarView, homeViewLoading, isPremium]);
   // ✅ MODIFIED: Reload scheduled routines when day or view changes, and refresh time slots with user's schedule
   useEffect(() => {
     if (isCalendarView) {

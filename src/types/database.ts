@@ -1,8 +1,3 @@
-// ============================================
-// COMPLETE DATABASE TYPES WITH AI INTEGRATION
-// Replace your entire src/types/database.ts with this
-// ============================================
-
 export interface Database {
   public: {
     Tables: {
@@ -232,6 +227,7 @@ export interface Database {
           dark_mode: boolean | null;
           notifications_enabled: boolean | null;
           weekly_reset_day: number | null;
+          default_calendar_view: boolean | null; // ✅ ADDED THIS LINE
           created_at: string;
           updated_at: string;
         };
@@ -241,6 +237,7 @@ export interface Database {
           dark_mode?: boolean | null;
           notifications_enabled?: boolean | null;
           weekly_reset_day?: number | null;
+          default_calendar_view?: boolean | null; // ✅ ADDED THIS LINE
           created_at?: string;
           updated_at?: string;
         };
@@ -250,6 +247,7 @@ export interface Database {
           dark_mode?: boolean | null;
           notifications_enabled?: boolean | null;
           weekly_reset_day?: number | null;
+          default_calendar_view?: boolean | null; // ✅ ADDED THIS LINE
           created_at?: string;
           updated_at?: string;
         };

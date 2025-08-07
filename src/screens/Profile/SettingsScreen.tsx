@@ -189,6 +189,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                     dark_mode: false,
                     notifications_enabled: true,
                     weekly_reset_day: 1,
+                    default_calendar_view: false,
                 };
 
                 const { data: newSettings, error: insertError } = await supabase
@@ -515,6 +516,8 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
             <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
                 <ScrollView style={styles.scrollView}>
+           // In your SettingsScreen.tsx, find the "App Preferences" section and replace it with this:
+
                     {/* App Preferences */}
                     <View style={[styles.section, { backgroundColor: colors.surface }]}>
                         <Text style={[styles.sectionTitle, {
@@ -530,6 +533,61 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                             () => updateSetting('dark_mode', !isDarkMode),
                             'switch'
                         )}
+
+                        {/* ✅ PREMIUM PROTECTED Auto Populate Calendar View */}
+                        <TouchableOpacity
+                            style={[
+                                styles.settingItem,
+                                {
+                                    borderBottomColor: colors.separator,
+                                    opacity: isPremium ? 1 : 0.6
+                                }
+                            ]}
+                            onPress={() => {
+                                if (!isPremium) {
+                                    console.log("🚫 Non-premium user trying to access calendar auto-populate - redirecting to premium");
+                                    navigation.navigate('Premium', { source: 'calendar_auto_populate' });
+                                } else {
+                                    // Toggle the setting for premium users
+                                    updateSetting('default_calendar_view', !settings?.default_calendar_view);
+                                }
+                            }}
+                        >
+                            <View style={styles.settingContent}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Text style={[styles.settingTitle, { color: isPremium ? colors.text : colors.textSecondary }]}>
+                                        Auto Populate Calendar View
+                                    </Text>
+                                    {!isPremium && (
+                                        <View style={[styles.premiumBadge, { backgroundColor: '#007AFF', marginLeft: 8 }]}>
+                                            <Ionicons name="lock-closed" size={12} color="#FFFFFF" />
+                                        </View>
+                                    )}
+                                </View>
+                                <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>
+                                    {isPremium
+                                        ? "Start app in calendar view instead of daily routines"
+                                        : "Unlock to customize your default home screen view"
+                                    }
+                                </Text>
+                            </View>
+                            <View style={styles.settingValue}>
+                                {isPremium ? (
+                                    <Switch
+                                        value={settings?.default_calendar_view || false}
+                                        onValueChange={(value) => updateSetting('default_calendar_view', value)}
+                                        trackColor={{ false: colors.border, true: '#007AFF' }}
+                                        thumbColor={settings?.default_calendar_view ? "#007AFF" : "#FFFFFF"}
+                                    />
+                                ) : (
+                                    <Ionicons
+                                        name="lock-closed"
+                                        size={16}
+                                        color="#007AFF"
+                                    />
+                                )}
+                            </View>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Notifications */}
@@ -769,13 +827,13 @@ const styles = StyleSheet.create({
     dangerText: {
         color: '#ff6b6b',
     },
-    // ✅ NEW: Premium badge style
     premiumBadge: {
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 8,
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
     },
     modalContainer: {
         flex: 1,
