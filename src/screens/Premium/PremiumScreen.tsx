@@ -121,26 +121,45 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                 return;
             }
 
-            // Create payment URL with plan and user info
-            const baseUrl = "https://stripe-premium-endpoint.com";
-            const params = new URLSearchParams({
-                plan: planId,
-                userId: user.id,
-                email: user.email || "",
-                source: source,
-                returnUrl: "routinebuilder://premium-success",
-                cancelUrl: "routinebuilder://premium-cancel"
+            console.log('🚀 Starting Stripe checkout for plan:', planId);
+
+            // ✅ POST REQUEST TO YOUR LOCAL SERVER
+            const response = await fetch('http://localhost:3001/create-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: user.id,
+                    userEmail: user.email,
+                    planId: planId
+                }),
             });
 
-            const paymentUrl = `${baseUrl}?${params.toString()}`;
-            console.log(`💳 Opening payment URL for ${planId}: ${paymentUrl}`);
+            console.log('📊 Create-payment response status:', response.status);
 
-            // Open payment URL
-            const supported = await Linking.canOpenURL(paymentUrl);
-            if (supported) {
-                await Linking.openURL(paymentUrl);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Create-payment error response:', errorText);
+                throw new Error('Failed to create checkout session');
+            }
+
+            const data = await response.json();
+            console.log('✅ Payment response:', data);
+
+            if (data.success && data.url) {
+                // Open the REAL Stripe checkout URL
+                console.log(`💳 Opening Stripe checkout: ${data.url}`);
+
+                const supported = await Linking.canOpenURL(data.url);
+                if (supported) {
+                    await Linking.openURL(data.url);
+                    console.log("🌐 Opened Stripe checkout in browser");
+                } else {
+                    Alert.alert("Error", "Unable to open payment page");
+                }
             } else {
-                Alert.alert("Error", "Unable to open payment page");
+                throw new Error('Invalid response from payment server');
             }
 
         } catch (error) {
@@ -150,7 +169,6 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             setIsProcessing(null);
         }
     };
-
     const renderFeature = (feature: PremiumFeature, index: number) => (
         <View key={index} style={[styles.featureItem, { backgroundColor: colors.surface }]}>
             <View style={[styles.featureIcon, { backgroundColor: feature.color }]}>
@@ -267,9 +285,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                     <Text style={[styles.sectionTitle, { color: colors.text }]}>
                         Choose Your Plan
                     </Text>
-                    <Text style={[styles.pricingSubtitle, { color: colors.textSecondary }]}>
-                        Tap a plan to start your premium subscription
-                    </Text>
+
                     {pricingPlans.map(renderPricingPlan)}
                 </View>
 
