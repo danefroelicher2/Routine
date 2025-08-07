@@ -1,6 +1,6 @@
 // ============================================
 // src/screens/Premium/PremiumScreen.tsx
-// Main Premium Screen Component
+// Main Premium Screen Component - UPDATED WITH NEW FEATURE ORDER
 // ============================================
 
 import React, { useState } from "react";
@@ -19,7 +19,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../../ThemeContext";
 import { Linking } from 'react-native';
 import { supabase } from "../../services/supabase";
-
 
 const { width } = Dimensions.get("window");
 
@@ -56,169 +55,107 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const source = route?.params?.source || "unknown";
 
-    // Premium features data
+    // ✅ UPDATED: Premium features data - NEW ORDER
     const premiumFeatures: PremiumFeature[] = [
         {
-            icon: "infinite",
-            title: "Unlimited Routines",
-            description: "Create as many routines as you want",
+            icon: "sparkles",
+            title: "AI Coaching",
+            description: "Personalized AI-powered recommendations and smart routine suggestions",
             color: "#FF6B6B",
         },
         {
             icon: "analytics",
             title: "Advanced Analytics",
-            description: "Detailed insights and progress tracking",
+            description: "Detailed insights, progress tracking, and comprehensive habit analysis",
             color: "#4ECDC4",
         },
         {
-            icon: "cloud",
-            title: "Cloud Sync",
-            description: "Access your data across all devices",
+            icon: "calendar",
+            title: "Smart Schedule Management",
+            description: "Custom daily time ranges, flexible scheduling, and calendar integration",
             color: "#45B7D1",
-        },
-        {
-            icon: "sparkles",
-            title: "AI Coaching",
-            description: "Personalized AI-powered recommendations",
-            color: "#96CEB4",
         },
         {
             icon: "trophy",
             title: "Premium Badges",
-            description: "Exclusive achievements and rewards",
-            color: "#FFEAA7",
+            description: "Exclusive achievements, special rewards, and milestone celebrations",
+            color: "#96CEB4",
         },
         {
             icon: "color-palette",
-            title: "Custom Themes",
-            description: "Personalize your app appearance",
-            color: "#DDA0DD",
+            title: "Personalization",
+            description: "Complete customization of the app",
+            color: "#FFEAA7",
         },
     ];
 
-    // Pricing plans
+    // Pricing plans data
     const pricingPlans: PricingPlan[] = [
         {
             id: "monthly",
             name: "Monthly",
             price: "$2.94",
             period: "per month",
-            features: ["All Premium Features", "Cancel Anytime", "24/7 Support"],
+            features: ["All Premium Features", "Cancel Anytime", "24/7 Support"]
         },
         {
             id: "yearly",
             name: "Yearly",
             price: "$27.99",
-            originalPrice: "$34.99",
+            originalPrice: "$35.00",
             period: "per year",
             savings: "Save 20%",
             popular: true,
-            features: [
-                "All Premium Features",
-                "2 Months Free",
-                "Priority Support",
-                "Early Access to New Features",
-            ],
+            features: ["All Premium Features", "Priority Support", "Early Access to New Features"]
         },
 
     ];
-    const handlePurchase = async (planId: string) => {
-        try {
-            setIsProcessing(true);
 
-            // Get current user
+    const handlePurchase = async (planId: string) => {
+        setIsProcessing(true);
+        console.log(`🚀 Starting purchase for plan: ${planId} from source: ${source}`);
+
+        try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
-                Alert.alert('Error', 'Please log in to upgrade to Premium');
+                Alert.alert("Error", "Please sign in to continue");
                 return;
             }
 
-            console.log(`🚀 Starting Stripe checkout for plan: ${planId}`);
-            console.log(`📊 Source: ${source}`);
-
-            // Call our local server
-            const response = await fetch('http://localhost:3001/create-payment', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    userId: user.id,
-                    userEmail: user.email,
-                    planId: planId
-                }),
+            // Create payment URL with plan and user info
+            const baseUrl = "https://stripe-premium-endpoint.com";
+            const params = new URLSearchParams({
+                plan: planId,
+                userId: user.id,
+                email: user.email || "",
+                source: source,
+                returnUrl: "routinebuilder://premium-success",
+                cancelUrl: "routinebuilder://premium-cancel"
             });
 
-            console.log(`📊 Create-checkout response status: ${response.status}`);
-            console.log(`📊 Create-checkout response ok: ${response.ok}`);
+            const paymentUrl = `${baseUrl}?${params.toString()}`;
+            console.log(`💳 Opening payment URL: ${paymentUrl}`);
 
-            if (!response.ok) {
-                // Get the raw response text first
-                const errorText = await response.text();
-                console.error('❌ Create-checkout error response:', errorText);
-
-                try {
-                    const errorData = JSON.parse(errorText);
-                    throw new Error(errorData.error || 'Failed to create checkout session');
-                } catch (parseError) {
-                    throw new Error(`API Error: ${response.status} - Server returned HTML instead of JSON`);
-                }
-            }
-
-            // Get response text first, then parse
-            const responseText = await response.text();
-            console.log(`📊 Create-checkout raw response:`, responseText);
-
-            try {
-                const data = JSON.parse(responseText);
-                console.log(`✅ Payment response received:`, data);
-
-                // Check if we're in test mode
-                if (data.testMode) {
-                    Alert.alert(
-                        'Test Success! ✅',
-                        'Payment API is working perfectly! Ready for Stripe integration.',
-                        [{ text: 'OK' }]
-                    );
-                    return;
-                }
-
-                // If we have a real Stripe URL, open it
-                if (data.url && data.sessionId) {
-                    console.log(`✅ Checkout URL created: ${data.url}`);
-                    console.log(`🎫 Session ID: ${data.sessionId}`);
-
-                    // Open Stripe checkout in browser
-                    const canOpen = await Linking.canOpenURL(data.url);
-                    if (canOpen) {
-                        await Linking.openURL(data.url);
-                        console.log(`🌐 Opened Stripe checkout in browser`);
-                        console.log(`Premium checkout opened from: ${source}`);
-                    } else {
-                        throw new Error('Cannot open checkout URL');
-                    }
-                } else {
-                    // Handle other success responses
-                    Alert.alert('Success!', data.message || 'Payment processed successfully!');
-                }
-
-            } catch (parseError) {
-                console.error('❌ Create-checkout JSON Parse Error:', parseError);
-                console.error('❌ Response was:', responseText);
-                throw new Error('Server returned invalid JSON response');
+            // Open payment URL
+            const supported = await Linking.canOpenURL(paymentUrl);
+            if (supported) {
+                await Linking.openURL(paymentUrl);
+            } else {
+                Alert.alert("Error", "Unable to open payment page");
             }
 
         } catch (error) {
-            console.error('❌ Purchase failed:', error);
-            Alert.alert('Purchase Failed', error.message || 'Something went wrong. Please try again.');
+            console.error("❌ Purchase error:", error);
+            Alert.alert("Error", "Failed to start purchase. Please try again.");
         } finally {
             setIsProcessing(false);
         }
     };
+
     const renderFeature = (feature: PremiumFeature, index: number) => (
         <View key={index} style={[styles.featureItem, { backgroundColor: colors.surface }]}>
-            <View style={[styles.featureIcon, { backgroundColor: feature.color + "20" }]}>
-                <Ionicons name={feature.icon as any} size={24} color={feature.color} />
+            <View style={[styles.featureIcon, { backgroundColor: feature.color }]}>
+                <Ionicons name={feature.icon as any} size={24} color="#FFFFFF" />
             </View>
             <View style={styles.featureContent}>
                 <Text style={[styles.featureTitle, { color: colors.text }]}>
@@ -230,7 +167,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             </View>
         </View>
     );
-    //test
+
     const renderPricingPlan = (plan: PricingPlan) => (
         <TouchableOpacity
             key={plan.id}
