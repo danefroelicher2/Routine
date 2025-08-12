@@ -13,6 +13,7 @@ import {
   Linking,
   Image,
   ActivityIndicator,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -47,6 +48,13 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [avatarData, setAvatarData] = useState<string | null>(null);
+
+  // ✅ NEW: Help form state
+  const [helpForm, setHelpForm] = useState({
+    name: '',
+    email: '',
+    message: ''
+  });
 
   const { colors } = useTheme();
   const { isPremium } = usePremium();
@@ -1020,6 +1028,63 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     setShowHelpModal(true);
   };
 
+  // ✅ NEW: Handle help form submission
+  const handleHelpSubmit = async () => {
+    try {
+      // Get current user
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        Alert.alert('Error', 'You must be logged in to submit a support request');
+        return;
+      }
+
+      // Insert the support message into the database
+      const { data, error } = await supabase
+        .from('contact_support_messages')
+        .insert([
+          {
+            user_id: user.id,
+            name: helpForm.name.trim(),
+            email: helpForm.email.trim(),
+            message: helpForm.message.trim(),
+            status: 'new',
+            user_agent: navigator.userAgent || 'Unknown',
+            ip_address: null, // Will be handled by Supabase if needed
+          }
+        ])
+        .select();
+
+      if (error) {
+        console.error('❌ Database submission error:', error);
+        Alert.alert(
+          'Submission Failed',
+          `Failed to submit your message: ${error.message}\n\nPlease try again or contact support directly.`
+        );
+        return;
+      }
+
+      console.log('✅ Support message submitted successfully:', data);
+
+      // Reset form and close modal
+      setHelpForm({ name: '', email: '', message: '' });
+      setShowHelpModal(false);
+
+      // Show success message
+      Alert.alert('Success', 'Your message has been sent. We\'ll get back to you soon!');
+
+    } catch (error) {
+      console.error('💥 Unexpected error submitting support message:', error);
+      Alert.alert(
+        'Error',
+        'An unexpected error occurred. Please try again or contact support directly.'
+      );
+    }
+  };
+
   const handleContactSupport = () => {
     const email = "support@example.com";
     const subject = "Support Request";
@@ -1448,53 +1513,125 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         </View>
       </Modal>
 
+      {/* ✅ UPDATED: Help & Support Modal with Form */}
       <Modal
         visible={showHelpModal}
         transparent={true}
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setShowHelpModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View
-            style={[styles.modalContent, { backgroundColor: colors.surface }]}
-          >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Help & Support
-            </Text>
-
-            <View style={styles.modalSection}>
-              <Text style={[styles.modalSectionTitle, { color: colors.text }]}>
-                Frequently Asked Questions
-              </Text>
-              <Text style={[styles.modalText, { color: colors.textSecondary }]}>
-                • How do I add a new routine?{"\n"}• How do I track my progress?
-                {"\n"}• Can I customize my routine schedule?{"\n"}• How are
-                achievements calculated?
-              </Text>
-            </View>
-
-            <View style={styles.modalSection}>
-              <Text style={[styles.modalSectionTitle, { color: colors.text }]}>
-                Contact Support
-              </Text>
-              <Text style={[styles.modalText, { color: colors.textSecondary }]}>
-                Need more help? Reach out to our support team and we'll get back
-                to you as soon as possible.
+          <View style={[styles.helpModalContent, { backgroundColor: colors.surface }]}>
+            {/* ✅ UPDATED: Header with close button */}
+            <View style={[styles.helpModalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.helpModalTitle, { color: colors.text }]}>
+                Help & Support
               </Text>
               <TouchableOpacity
-                style={styles.modalButton}
-                onPress={handleContactSupport}
+                onPress={() => setShowHelpModal(false)}
+                style={styles.helpModalCloseButton}
               >
-                <Text style={styles.modalButtonText}>Contact Support</Text>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setShowHelpModal(false)}
-            >
-              <Text style={styles.modalButtonText}>Got it</Text>
-            </TouchableOpacity>
+            {/* ✅ NEW: Form content */}
+            <View style={styles.helpFormContainer}>
+              {/* Name input */}
+              <View style={styles.helpInputGroup}>
+                <Text style={[styles.helpInputLabel, { color: colors.textSecondary }]}>
+                  name
+                </Text>
+                <TextInput
+                  style={[
+                    styles.helpTextInput,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                      color: colors.text,
+                    }
+                  ]}
+                  placeholder=""
+                  placeholderTextColor={colors.textTertiary}
+                  value={helpForm.name}
+                  onChangeText={(text) => setHelpForm({ ...helpForm, name: text })}
+                />
+              </View>
+
+              {/* Email input */}
+              <View style={styles.helpInputGroup}>
+                <Text style={[styles.helpInputLabel, { color: colors.textSecondary }]}>
+                  email
+                </Text>
+                <TextInput
+                  style={[
+                    styles.helpTextInput,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                      color: colors.text,
+                    }
+                  ]}
+                  placeholder=""
+                  placeholderTextColor={colors.textTertiary}
+                  value={helpForm.email}
+                  onChangeText={(text) => setHelpForm({ ...helpForm, email: text })}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              {/* Message input */}
+              <View style={styles.helpInputGroup}>
+                <Text style={[styles.helpInputLabel, { color: colors.textSecondary }]}>
+                  message
+                </Text>
+                <TextInput
+                  style={[
+                    styles.helpTextAreaInput,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                      color: colors.text,
+                    }
+                  ]}
+                  placeholder=""
+                  placeholderTextColor={colors.textTertiary}
+                  value={helpForm.message}
+                  onChangeText={(text) => setHelpForm({ ...helpForm, message: text })}
+                  multiline={true}
+                  numberOfLines={5}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              {/* Submit button */}
+              <TouchableOpacity
+                style={[
+                  styles.helpSubmitButton,
+                  {
+                    backgroundColor: helpForm.name && helpForm.email && helpForm.message
+                      ? "#007AFF"
+                      : colors.border,
+                  }
+                ]}
+                onPress={handleHelpSubmit}
+                disabled={!helpForm.name || !helpForm.email || !helpForm.message}
+              >
+                <Text
+                  style={[
+                    styles.helpSubmitButtonText,
+                    {
+                      color: helpForm.name && helpForm.email && helpForm.message
+                        ? "#fff"
+                        : colors.textTertiary,
+                    }
+                  ]}
+                >
+                  submit
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1773,40 +1910,61 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
   },
-  modalContent: {
-    width: "100%",
-    maxWidth: 400,
-    borderRadius: 12,
-    padding: 20,
+  // ✅ NEW: Help Modal Styles
+  helpModalContent: {
+    width: "90%",
+    maxWidth: 500,
+    borderRadius: 16,
+    maxHeight: "80%",
   },
-  modalTitle: {
+  helpModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+  },
+  helpModalTitle: {
     fontSize: 20,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  modalSection: {
-    marginBottom: 20,
-  },
-  modalSectionTitle: {
-    fontSize: 16,
     fontWeight: "600",
+  },
+  helpModalCloseButton: {
+    padding: 4,
+  },
+  helpFormContainer: {
+    padding: 24,
+  },
+  helpInputGroup: {
+    marginBottom: 20,
+  },
+  helpInputLabel: {
+    fontSize: 14,
+    fontWeight: "500",
     marginBottom: 8,
   },
-  modalText: {
-    fontSize: 14,
-    lineHeight: 20,
+  helpTextInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
   },
-  modalButton: {
-    backgroundColor: "#007AFF",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+  helpTextAreaInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    minHeight: 120,
+  },
+  helpSubmitButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 12,
   },
-  modalButtonText: {
-    color: "#fff",
+  helpSubmitButtonText: {
     fontSize: 16,
     fontWeight: "600",
   },
