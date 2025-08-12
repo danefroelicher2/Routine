@@ -42,13 +42,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     const [showTimePickerModal, setShowTimePickerModal] = useState(false);
     const [selectedDay, setSelectedDay] = useState<DaySchedule | null>(null);
     const [timePickerType, setTimePickerType] = useState<'start' | 'end'>('start');
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     // Use theme context
     const { isDarkMode, colors, setDarkMode } = useTheme();
     const { isPremium } = usePremium();
     const navigationHook = useNavigation<any>();
-
-
 
     // Default day schedules
     const defaultDaySchedules: DaySchedule[] = [
@@ -401,33 +400,105 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         </TouchableOpacity>
     );
 
+    // ✅ UPDATED: Enhanced logout function with Modal instead of Alert
     const handleLogout = () => {
-        Alert.alert(
-            'Log Out',
-            'Are you sure you want to log out?',
-            [
-                {
-                    text: 'Cancel',
-                    style: 'cancel'
-                },
-                {
-                    text: 'Log Out',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            const { error } = await supabase.auth.signOut();
-                            if (error) throw error;
+        console.log('🚨 LOGOUT BUTTON PRESSED - handleLogout called');
+        console.log('🔔 Opening logout confirmation modal...');
+        setShowLogoutModal(true);
+    };
 
-                            // The auth state listener in App.tsx will handle navigation
-                            console.log('User logged out successfully');
-                        } catch (error) {
-                            console.error('Error logging out:', error);
-                            Alert.alert('Error', 'Failed to log out. Please try again.');
-                        }
+    // ✅ NEW: Actual logout execution function
+    const executeLogout = async () => {
+        console.log('🔓 User confirmed logout - starting process...');
+        setShowLogoutModal(false); // Close modal first
+
+        try {
+            // Step 1: Check current auth state
+            console.log('🔍 Step 1: Checking current auth state...');
+            const { data: { session: currentSession } } = await supabase.auth.getSession();
+            console.log('📋 Current session before logout:', currentSession ? 'EXISTS' : 'NULL');
+
+            if (currentSession) {
+                console.log('👤 Current user ID:', currentSession.user?.id);
+                console.log('📧 Current user email:', currentSession.user?.email);
+            }
+
+            // Step 2: Attempt logout
+            console.log('🔓 Step 2: Calling supabase.auth.signOut()...');
+            const { error } = await supabase.auth.signOut();
+
+            if (error) {
+                console.error('❌ Supabase signOut error:', error);
+                console.error('❌ Error code:', error.message);
+                throw error;
+            }
+
+            console.log('✅ Supabase signOut completed successfully');
+
+            // Step 3: Verify logout
+            console.log('🔍 Step 3: Verifying logout...');
+            const { data: { session: afterSession } } = await supabase.auth.getSession();
+            console.log('📋 Session after logout:', afterSession ? 'STILL EXISTS (BAD)' : 'NULL (GOOD)');
+
+            // Step 4: Manual navigation as backup
+            console.log('🧭 Step 4: Attempting manual navigation...');
+
+            // Try different navigation methods
+            try {
+                console.log('🧭 Trying navigation.reset()...');
+                navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Login' }],
+                });
+                console.log('✅ Navigation reset successful');
+            } catch (navError) {
+                console.error('❌ Navigation reset failed:', navError);
+
+                // Fallback: try navigationHook
+                try {
+                    console.log('🧭 Trying navigationHook.reset()...');
+                    navigationHook.reset({
+                        index: 0,
+                        routes: [{ name: 'Login' }],
+                    });
+                    console.log('✅ NavigationHook reset successful');
+                } catch (navHookError) {
+                    console.error('❌ NavigationHook reset failed:', navHookError);
+
+                    // Last resort: try navigate
+                    try {
+                        console.log('🧭 Trying navigation.navigate()...');
+                        navigation.navigate('Login');
+                        console.log('✅ Navigation navigate successful');
+                    } catch (navNavigateError) {
+                        console.error('❌ Navigation navigate failed:', navNavigateError);
                     }
                 }
-            ]
-        );
+            }
+
+            console.log('✅ LOGOUT PROCESS COMPLETED');
+
+        } catch (error) {
+            console.error('💥 CRITICAL LOGOUT ERROR:', error);
+            console.error('💥 Error type:', typeof error);
+            console.error('💥 Error message:', error?.message);
+            console.error('💥 Error stack:', error?.stack);
+
+            Alert.alert(
+                'Logout Failed',
+                `Failed to log out: ${error?.message || 'Unknown error'}\n\nPlease close and reopen the app, or try again.`,
+                [
+                    {
+                        text: 'Try Again',
+                        onPress: () => {
+                            console.log('🔄 User chose to try logout again');
+                            handleLogout();
+                        }
+                    },
+                    { text: 'OK' }
+                ]
+            );
+        }
     };
 
     const renderDayScheduleItem = (day: DaySchedule) => (
@@ -518,8 +589,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
             <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
                 <ScrollView style={styles.scrollView}>
-           // In your SettingsScreen.tsx, find the "App Preferences" section and replace it with this:
-
                     {/* App Preferences */}
                     <View style={[styles.section, { backgroundColor: colors.surface }]}>
                         <Text style={[styles.sectionTitle, {
@@ -685,14 +754,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                             'Change Password',
                             'Send password reset email to your account',
                             '',
-                            handleChangePassword
+                            () => {
+                                console.log('🔑 Change Password button pressed');
+                                handleChangePassword();
+                            }
                         )}
 
                         {renderSettingItem(
                             'Log Out',
                             'Sign out of your account',
                             '',
-                            handleLogout
+                            () => {
+                                console.log('🚨 LOG OUT BUTTON CLICKED - calling handleLogout');
+                                handleLogout();
+                            }
                         )}
 
                         <TouchableOpacity
@@ -766,6 +841,54 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                                 </View>
                             </ScrollView>
                         </SafeAreaView>
+                    </Modal>
+
+                    {/* ✅ NEW: Logout Confirmation Modal */}
+                    <Modal
+                        visible={showLogoutModal}
+                        transparent={true}
+                        animationType="fade"
+                        onRequestClose={() => {
+                            console.log('❌ User cancelled logout via modal close');
+                            setShowLogoutModal(false);
+                        }}
+                    >
+                        <View style={styles.logoutModalOverlay}>
+                            <View style={[styles.logoutModalContent, { backgroundColor: colors.surface }]}>
+                                <Text style={[styles.logoutModalTitle, { color: colors.text }]}>
+                                    Log Out
+                                </Text>
+                                <Text style={[styles.logoutModalMessage, { color: colors.textSecondary }]}>
+                                    Are you sure you want to log out?
+                                </Text>
+
+                                <View style={styles.logoutModalButtons}>
+                                    <TouchableOpacity
+                                        style={[styles.logoutModalButton, styles.logoutCancelButton, { borderColor: colors.border }]}
+                                        onPress={() => {
+                                            console.log('❌ User cancelled logout');
+                                            setShowLogoutModal(false);
+                                        }}
+                                    >
+                                        <Text style={[styles.logoutModalButtonText, { color: colors.text }]}>
+                                            Cancel
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[styles.logoutModalButton, styles.logoutConfirmButton]}
+                                        onPress={() => {
+                                            console.log('✅ User confirmed logout via modal');
+                                            executeLogout();
+                                        }}
+                                    >
+                                        <Text style={[styles.logoutModalButtonText, { color: '#fff' }]}>
+                                            Yes, Log Out
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
                     </Modal>
                 </ScrollView>
             </SafeAreaView>
@@ -956,5 +1079,55 @@ const styles = StyleSheet.create({
     timePickerItemText: {
         fontSize: 18,
         flex: 1,
+    },
+    // ✅ NEW: Logout Modal Styles
+    logoutModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+    },
+    logoutModalContent: {
+        width: '100%',
+        maxWidth: 350,
+        borderRadius: 16,
+        padding: 24,
+        alignItems: 'center',
+    },
+    logoutModalTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    logoutModalMessage: {
+        fontSize: 16,
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 22,
+    },
+    logoutModalButtons: {
+        flexDirection: 'row',
+        gap: 12,
+        width: '100%',
+    },
+    logoutModalButton: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    logoutCancelButton: {
+        borderWidth: 1,
+        backgroundColor: 'transparent',
+    },
+    logoutConfirmButton: {
+        backgroundColor: '#ff3b30',
+    },
+    logoutModalButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
