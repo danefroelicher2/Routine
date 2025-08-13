@@ -1,6 +1,3 @@
-// src/screens/Auth/ResetPasswordScreen.tsx
-// SIMPLIFIED VERSION - Just email input, Supabase handles the rest
-
 import React, { useState } from 'react';
 import {
     View,
@@ -31,10 +28,13 @@ export default function ResetPasswordScreen({ navigation }: any) {
 
         setLoading(true);
         try {
-            // Use Supabase's built-in password reset
-            const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-                redirectTo: 'Routine://reset-password', // Use your app's deep link scheme
-            });
+            // Use Supabase's built-in password reset with redirect
+            const { error } = await supabase.auth.resetPasswordForEmail(
+                email.trim(),
+                {
+                    redirectTo: 'routine://reset-password-confirm'
+                }
+            );
 
             if (error) {
                 Alert.alert('Error', error.message);
@@ -42,8 +42,8 @@ export default function ResetPasswordScreen({ navigation }: any) {
             }
 
             Alert.alert(
-                'Reset Email Sent!',
-                'We\'ve sent you a password reset link. Please check your email and click the link to reset your password.',
+                'Reset Email Sent! 📧',
+                'Check your email for the reset link. Click it to reset your password.',
                 [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
             );
 
@@ -61,20 +61,16 @@ export default function ResetPasswordScreen({ navigation }: any) {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
             >
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        onPress={() => navigation.goBack()}
-                        style={styles.backButton}
-                    >
-                        <Ionicons name="arrow-back" size={24} color={colors.text} />
-                    </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Ionicons name="arrow-back" size={24} color={colors.text} />
+                </TouchableOpacity>
 
-                {/* Content */}
                 <View style={styles.content}>
                     <View style={styles.iconContainer}>
-                        <Ionicons name="mail-outline" size={80} color="#007AFF" />
+                        <Ionicons name="lock-closed" size={80} color="#007AFF" />
                     </View>
 
                     <Text style={[styles.title, { color: colors.text }]}>
@@ -82,7 +78,7 @@ export default function ResetPasswordScreen({ navigation }: any) {
                     </Text>
 
                     <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                        Enter your email address and we'll send you a link to reset your password.
+                        Enter your email address and we'll send you a link to reset your password
                     </Text>
 
                     <View style={[styles.inputContainer, { backgroundColor: colors.surface }]}>
@@ -107,16 +103,16 @@ export default function ResetPasswordScreen({ navigation }: any) {
                         {loading ? (
                             <ActivityIndicator color="white" />
                         ) : (
-                            <Text style={styles.buttonText}>Send Reset Link</Text>
+                            <Text style={styles.buttonText}>Send Reset Email</Text>
                         )}
                     </TouchableOpacity>
 
                     <TouchableOpacity
                         onPress={() => navigation.navigate('Login')}
-                        style={styles.backToLoginButton}
+                        style={styles.linkButton}
                     >
-                        <Text style={[styles.backToLoginText, { color: '#007AFF' }]}>
-                            Back to Sign In
+                        <Text style={[styles.linkText, { color: '#007AFF' }]}>
+                            Back to Login
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -132,56 +128,52 @@ const styles = StyleSheet.create({
     keyboardView: {
         flex: 1,
     },
-    header: {
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 20,
-    },
     backButton: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
+        position: 'absolute',
+        top: 50,
+        left: 20,
+        zIndex: 1,
     },
     content: {
         flex: 1,
-        paddingHorizontal: 20,
         justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 30,
     },
     iconContainer: {
-        alignItems: 'center',
         marginBottom: 30,
     },
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        textAlign: 'center',
         marginBottom: 10,
     },
     subtitle: {
         fontSize: 16,
         textAlign: 'center',
-        marginBottom: 40,
-        lineHeight: 22,
+        marginBottom: 30,
         paddingHorizontal: 20,
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 12,
+        borderRadius: 10,
         paddingHorizontal: 15,
-        paddingVertical: 15,
+        paddingVertical: 12,
         marginBottom: 20,
-        gap: 12,
+        width: '100%',
     },
     input: {
         flex: 1,
+        marginLeft: 10,
         fontSize: 16,
     },
     button: {
         backgroundColor: '#007AFF',
-        borderRadius: 12,
+        borderRadius: 10,
         paddingVertical: 15,
+        paddingHorizontal: 30,
+        width: '100%',
         alignItems: 'center',
         marginBottom: 20,
     },
@@ -190,12 +182,10 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
-    backToLoginButton: {
-        alignItems: 'center',
-        paddingVertical: 10,
+    linkButton: {
+        marginTop: 10,
     },
-    backToLoginText: {
+    linkText: {
         fontSize: 16,
-        fontWeight: '500',
     },
 });
