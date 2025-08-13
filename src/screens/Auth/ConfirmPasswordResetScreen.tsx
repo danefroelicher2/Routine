@@ -1,6 +1,3 @@
-// src/screens/Auth/ConfirmPasswordResetScreen.tsx
-// NEW FILE - Create this new screen
-
 import React, { useState, useEffect } from 'react';
 import {
     View,
@@ -18,35 +15,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
 import { useTheme } from '../../../ThemeContext';
 
-export default function ConfirmPasswordResetScreen({ navigation, route }: any) {
+export default function ConfirmPasswordResetScreen({ navigation }: any) {
     const { colors } = useTheme();
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-    // Get the access token from route params (if using deep linking)
-    // or check if user is in password recovery session
-    const accessToken = route?.params?.access_token;
+    const [sessionValid, setSessionValid] = useState(false);
 
     useEffect(() => {
-        // Check if user has a valid session for password reset
-        checkResetSession();
+        checkSession();
     }, []);
 
-    const checkResetSession = async () => {
+    const checkSession = async () => {
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
+            if (session) {
+                setSessionValid(true);
+            } else {
                 Alert.alert(
-                    'Invalid Reset Link',
-                    'This password reset link is invalid or has expired. Please request a new one.',
-                    [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+                    'Session Expired',
+                    'Your reset session has expired. Please request a new reset email.',
+                    [{ text: 'OK', onPress: () => navigation.navigate('ResetPassword') }]
                 );
             }
         } catch (error) {
-            console.error('Error checking reset session:', error);
+            console.error('Session check error:', error);
         }
     };
 
@@ -75,14 +70,15 @@ export default function ConfirmPasswordResetScreen({ navigation, route }: any) {
 
             if (error) {
                 Alert.alert('Error', error.message);
+                setLoading(false);
                 return;
             }
 
-            // Success! Sign out the user so they can log in with new password
+            // Sign out and redirect to login
             await supabase.auth.signOut();
 
             Alert.alert(
-                'Password Updated Successfully!',
+                'Success! 🎉',
                 'Your password has been updated. Please log in with your new password.',
                 [
                     {
@@ -100,6 +96,19 @@ export default function ConfirmPasswordResetScreen({ navigation, route }: any) {
         }
     };
 
+    if (!sessionValid) {
+        return (
+            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+                <View style={styles.content}>
+                    <ActivityIndicator size="large" color="#007AFF" />
+                    <Text style={[styles.loadingText, { color: colors.text }]}>
+                        Validating session...
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
             <KeyboardAvoidingView
@@ -116,7 +125,7 @@ export default function ConfirmPasswordResetScreen({ navigation, route }: any) {
                     </Text>
 
                     <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                        Enter your new password below. Make sure it's secure and at least 6 characters long.
+                        Create a strong password that you haven't used before
                     </Text>
 
                     {/* New Password Input */}
@@ -145,7 +154,7 @@ export default function ConfirmPasswordResetScreen({ navigation, route }: any) {
                         <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} />
                         <TextInput
                             style={[styles.input, { color: colors.text }]}
-                            placeholder="Confirm new password"
+                            placeholder="Confirm password"
                             placeholderTextColor={colors.textSecondary}
                             value={confirmPassword}
                             onChangeText={setConfirmPassword}
@@ -162,15 +171,12 @@ export default function ConfirmPasswordResetScreen({ navigation, route }: any) {
                     </View>
 
                     {/* Password Requirements */}
-                    <View style={[styles.requirementsContainer, { backgroundColor: colors.surface }]}>
-                        <Text style={[styles.requirementsTitle, { color: colors.text }]}>
-                            Password Requirements:
-                        </Text>
+                    <View style={[styles.requirementsBox, { backgroundColor: colors.surface }]}>
                         <View style={styles.requirement}>
                             <Ionicons
                                 name="checkmark-circle"
                                 size={16}
-                                color={newPassword.length >= 6 ? '#4CAF50' : colors.textSecondary}
+                                color={newPassword.length >= 6 ? '#4CAF50' : colors.textTertiary}
                             />
                             <Text style={[
                                 styles.requirementText,
@@ -183,18 +189,17 @@ export default function ConfirmPasswordResetScreen({ navigation, route }: any) {
                             <Ionicons
                                 name="checkmark-circle"
                                 size={16}
-                                color={newPassword && confirmPassword && newPassword === confirmPassword ? '#4CAF50' : colors.textSecondary}
+                                color={newPassword && newPassword === confirmPassword ? '#4CAF50' : colors.textTertiary}
                             />
                             <Text style={[
                                 styles.requirementText,
-                                { color: newPassword && confirmPassword && newPassword === confirmPassword ? '#4CAF50' : colors.textSecondary }
+                                { color: newPassword && newPassword === confirmPassword ? '#4CAF50' : colors.textSecondary }
                             ]}>
                                 Passwords match
                             </Text>
                         </View>
                     </View>
 
-                    {/* Update Password Button */}
                     <TouchableOpacity
                         style={[styles.button, { opacity: loading ? 0.7 : 1 }]}
                         onPress={handlePasswordUpdate}
@@ -205,16 +210,6 @@ export default function ConfirmPasswordResetScreen({ navigation, route }: any) {
                         ) : (
                             <Text style={styles.buttonText}>Update Password</Text>
                         )}
-                    </TouchableOpacity>
-
-                    {/* Cancel Button */}
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate('Login')}
-                        style={styles.cancelButton}
-                    >
-                        <Text style={[styles.cancelText, { color: '#007AFF' }]}>
-                            Cancel
-                        </Text>
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -231,76 +226,68 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        paddingHorizontal: 20,
         justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 30,
     },
     iconContainer: {
-        alignItems: 'center',
         marginBottom: 30,
     },
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        textAlign: 'center',
         marginBottom: 10,
     },
     subtitle: {
         fontSize: 16,
         textAlign: 'center',
-        marginBottom: 40,
-        lineHeight: 22,
-        paddingHorizontal: 10,
+        marginBottom: 30,
+        paddingHorizontal: 20,
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 12,
+        borderRadius: 10,
         paddingHorizontal: 15,
-        paddingVertical: 15,
+        paddingVertical: 12,
         marginBottom: 15,
-        gap: 12,
+        width: '100%',
     },
     input: {
         flex: 1,
+        marginLeft: 10,
         fontSize: 16,
     },
-    requirementsContainer: {
-        borderRadius: 12,
+    requirementsBox: {
+        width: '100%',
         padding: 15,
+        borderRadius: 10,
         marginBottom: 20,
-    },
-    requirementsTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        marginBottom: 10,
     },
     requirement: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 5,
-        gap: 8,
+        marginBottom: 8,
     },
     requirementText: {
+        marginLeft: 8,
         fontSize: 14,
     },
     button: {
         backgroundColor: '#007AFF',
-        borderRadius: 12,
+        borderRadius: 10,
         paddingVertical: 15,
+        paddingHorizontal: 30,
+        width: '100%',
         alignItems: 'center',
-        marginBottom: 15,
     },
     buttonText: {
         color: 'white',
         fontSize: 16,
         fontWeight: '600',
     },
-    cancelButton: {
-        alignItems: 'center',
-        paddingVertical: 10,
-    },
-    cancelText: {
+    loadingText: {
+        marginTop: 20,
         fontSize: 16,
-        fontWeight: '500',
     },
 });
