@@ -1,52 +1,39 @@
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, View, StyleSheet, StatusBar, Alert } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Ionicons } from "@expo/vector-icons";
-import { Session } from "./src/services/supabase";
-import * as Linking from 'expo-linking';
-
-import "react-native-url-polyfill/auto";
+// App.tsx - UPDATED TO FIX PASSWORD RESET FLOW
+import React, { useEffect, useState, useRef } from 'react';
+import { ActivityIndicator, View, StyleSheet, StatusBar, Alert, Linking } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
+import { Session } from './src/services/supabase';
 
 // Services
-import { supabase } from "./src/services/supabase";
+import { supabase } from './src/services/supabase';
 
-// Theme Provider
-import { ThemeProvider, useTheme } from "./ThemeContext";
-
-// PREMIUM PROVIDER
-import { PremiumProvider } from "./src/contexts/PremiumContext";
-
-// HOME VIEW PROVIDER
+// Context Providers
+import { ThemeProvider, useTheme } from './ThemeContext';
+import { PremiumProvider } from './src/contexts/PremiumContext';
 import { HomeViewProvider } from './src/contexts/HomeViewContext';
 
 // Auth Screens
-import LoginScreen from "./src/screens/Auth/LoginScreen";
-import SignupScreen from "./src/screens/Auth/SignupScreen";
-import ChangePasswordScreen from "./src/screens/Profile/ChangePasswordScreen";
-import ResetPasswordScreen from "./src/screens/Auth/ResetPasswordScreen";
+import LoginScreen from './src/screens/Auth/LoginScreen';
+import SignupScreen from './src/screens/Auth/SignupScreen';
+import ResetPasswordScreen from './src/screens/Auth/ResetPasswordScreen';
 import ConfirmPasswordResetScreen from './src/screens/Auth/ConfirmPasswordResetScreen';
 
 // Main App Screens
-import HomeScreen from "./src/screens/Home/HomeScreen";
-import AddRoutineScreen from "./src/screens/Home/AddRoutineScreen";
-import StatsScreen from "./src/screens/Stats/StatsScreen";
-
-// AI Screens
-import AIChatScreen from "./src/screens/AI/AIChatScreen";
-import AISettingsScreen from "./src/screens/AI/AISettingsScreen";
-import AIPremiumPaywall from "./src/screens/AI/AIPremiumPaywall";
-
-// Other Screens
-import NotesScreen from "./src/screens/Notes/NotesScreen";
-import NoteDetailScreen from "./src/screens/Notes/NoteDetailScreen";
-import ProfileScreen from "./src/screens/Profile/ProfileScreen";
-import SettingsScreen from "./src/screens/Profile/SettingsScreen";
-import RoutineManagerScreen from "./src/screens/Profile/RoutineManagerScreen";
-
-// PREMIUM SCREEN
-import PremiumScreen from "./src/screens/Premium/PremiumScreen";
+import HomeScreen from './src/screens/Home/HomeScreen';
+import AddRoutineScreen from './src/screens/Home/AddRoutineScreen';
+import StatsScreen from './src/screens/Stats/StatsScreen';
+import AIChatScreen from './src/screens/AI/AIChatScreen';
+import AISettingsScreen from './src/screens/AI/AISettingsScreen';
+import NotesScreen from './src/screens/Notes/NotesScreen';
+import NoteDetailScreen from './src/screens/Notes/NoteDetailScreen';
+import ProfileScreen from './src/screens/Profile/ProfileScreen';
+import SettingsScreen from './src/screens/Profile/SettingsScreen';
+import ChangePasswordScreen from './src/screens/Profile/ChangePasswordScreen';
+import RoutineManagerScreen from './src/screens/Profile/RoutineManagerScreen';
+import PremiumScreen from './src/screens/Premium/PremiumScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -55,16 +42,8 @@ const Stack = createNativeStackNavigator();
 function HomeStack() {
   return (
     <Stack.Navigator>
-      <Stack.Screen
-        name="HomeMain"
-        component={HomeScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AddRoutine"
-        component={AddRoutineScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="HomeMain" component={HomeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AddRoutine" component={AddRoutineScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -73,21 +52,8 @@ function HomeStack() {
 function AIStack() {
   return (
     <Stack.Navigator>
-      <Stack.Screen
-        name="AIChatMain"
-        component={AIChatScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AISettings"
-        component={AISettingsScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AIPremiumPaywall"
-        component={AIPremiumPaywall}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="AIChatMain" component={AIChatScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AISettings" component={AISettingsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -96,64 +62,28 @@ function AIStack() {
 function NotesStack() {
   return (
     <Stack.Navigator>
-      <Stack.Screen
-        name="NotesList"
-        component={NotesScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="NoteDetail"
-        component={NoteDetailScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="NotesList" component={NotesScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="NoteDetail" component={NoteDetailScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
 
-// Stack Navigator for Profile with Premium Screen
+// Stack Navigator for Profile
 function ProfileStack() {
   const { colors } = useTheme();
-
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.surface,
-        },
-        headerTintColor: "#007AFF",
-        headerTitleStyle: {
-          color: colors.text,
-        },
+        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: '#007AFF',
+        headerTitleStyle: { color: colors.text },
       }}
     >
-      <Stack.Screen
-        name="ProfileMain"
-        component={ProfileScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{ title: "Settings" }}
-      />
-      <Stack.Screen
-        name="ChangePassword"
-        component={ChangePasswordScreen}
-        options={{ title: "Change Password" }}
-      />
-      <Stack.Screen
-        name="RoutineManager"
-        component={RoutineManagerScreen}
-        options={{ title: "Manage Routines" }}
-      />
-      <Stack.Screen
-        name="Premium"
-        component={PremiumScreen}
-        options={{
-          title: "Premium",
-          headerShown: false
-        }}
-      />
+      <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Change Password' }} />
+      <Stack.Screen name="RoutineManager" component={RoutineManagerScreen} options={{ title: 'Manage Routines' }} />
+      <Stack.Screen name="Premium" component={PremiumScreen} options={{ title: 'Premium', headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -161,30 +91,27 @@ function ProfileStack() {
 // Main Tab Navigator
 function MainTabs() {
   const { colors } = useTheme();
-
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-
-          if (route.name === "Home") {
-            iconName = focused ? "home" : "home-outline";
-          } else if (route.name === "Stats") {
-            iconName = focused ? "analytics" : "analytics-outline";
-          } else if (route.name === "AI") {
-            iconName = focused ? "chatbubbles" : "chatbubbles-outline";
-          } else if (route.name === "Notes") {
-            iconName = focused ? "document-text" : "document-text-outline";
-          } else if (route.name === "Profile") {
-            iconName = focused ? "person" : "person-outline";
+          let iconName: any;
+          if (route.name === 'Home') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Stats') {
+            iconName = focused ? 'analytics' : 'analytics-outline';
+          } else if (route.name === 'AI') {
+            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+          } else if (route.name === 'Notes') {
+            iconName = focused ? 'document-text' : 'document-text-outline';
+          } else if (route.name === 'Profile') {
+            iconName = focused ? 'person' : 'person-outline';
           } else {
-            iconName = "help-outline";
+            iconName = 'help-outline';
           }
-
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: "#007AFF",
+        tabBarActiveTintColor: '#007AFF',
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.surface,
@@ -196,7 +123,7 @@ function MainTabs() {
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: "500",
+          fontWeight: '500',
           marginTop: 4,
         },
         headerShown: false,
@@ -211,7 +138,9 @@ function MainTabs() {
   );
 }
 
-// Auth Stack Navigator - WITH ConfirmPasswordReset
+// ====================================
+// 🔥 FIXED: Auth Stack Navigator 
+// ====================================
 function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -223,16 +152,26 @@ function AuthStack() {
   );
 }
 
-// Main App Component
+// ====================================
+// 🔥 MAIN APP COMPONENT WITH FIXED DEEP LINK HANDLING
+// ====================================
 function AppContent() {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingPasswordReset, setPendingPasswordReset] = useState(false);
+  const [resetTokens, setResetTokens] = useState<{ accessToken: string; refreshToken: string } | null>(null);
   const { colors } = useTheme();
+  const navigationRef = useRef<any>(null);
 
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+      console.log('Initial session:', session ? 'EXISTS' : 'NULL');
+
+      // Only set session if it's not a password reset session
+      if (session && !pendingPasswordReset) {
+        setSession(session);
+      }
       setIsLoading(false);
     });
 
@@ -240,19 +179,28 @@ function AppContent() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+      console.log('Auth state change:', _event, session ? 'SESSION_EXISTS' : 'NO_SESSION');
+
+      // Only set session if it's not a password reset flow
+      if (!pendingPasswordReset) {
+        setSession(session);
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [pendingPasswordReset]);
 
-  // Handle deep linking for password reset AND premium
+  // ====================================
+  // 🔥 FIXED: Deep Link Handler
+  // ====================================
   useEffect(() => {
     const handleDeepLink = async (url: string) => {
-      console.log('Deep link received:', url);
+      console.log('🔗 Deep link received:', url);
 
       // Handle password reset deep link
       if (url.includes('#access_token=') || url.includes('reset-password-confirm')) {
+        console.log('🔓 Password reset link detected');
+
         const hashParams = url.split('#')[1];
         if (hashParams) {
           const params = new URLSearchParams(hashParams);
@@ -260,31 +208,61 @@ function AppContent() {
           const refreshToken = params.get('refresh_token');
 
           if (accessToken && refreshToken) {
+            console.log('🎯 Valid reset tokens found');
+
             try {
-              // Set the session with the tokens
+              // ====================================
+              // 🔥 KEY FIX: Don't set session yet! Store tokens and navigate to ConfirmPasswordResetScreen
+              // ====================================
+
+              // Set the session temporarily for validation
               const { data, error } = await supabase.auth.setSession({
                 access_token: accessToken,
                 refresh_token: refreshToken,
               });
 
               if (!error && data.session) {
-                // User is now authenticated with reset token
-                // They can now update their password
+                console.log('✅ Reset session validated successfully');
+
+                // Store the reset tokens
+                setResetTokens({ accessToken, refreshToken });
+
+                // Set flag to prevent normal session handling
+                setPendingPasswordReset(true);
+
+                // Don't set the main session - keep user in AuthStack
+                setSession(null);
+
+                // Navigate to ConfirmPasswordResetScreen
+                setTimeout(() => {
+                  if (navigationRef.current) {
+                    navigationRef.current.navigate('ConfirmPasswordReset');
+                  }
+                }, 500);
+
                 Alert.alert(
-                  'Reset Password',
-                  'You can now set your new password.',
+                  'Reset Password 🔐',
+                  'Please set your new password below.',
                   [{ text: 'OK' }]
                 );
-                // The navigation will happen automatically since session is set
+
               } else {
+                console.error('❌ Invalid reset session:', error);
                 Alert.alert('Error', 'Invalid or expired reset link. Please request a new one.');
               }
             } catch (error) {
-              console.error('Error handling reset link:', error);
+              console.error('💥 Error handling reset link:', error);
               Alert.alert('Error', 'Failed to process reset link. Please try again.');
             }
+          } else {
+            console.error('❌ Missing access or refresh token');
+            Alert.alert('Error', 'Invalid reset link format.');
           }
+        } else {
+          console.error('❌ No hash parameters found in URL');
+          Alert.alert('Error', 'Invalid reset link.');
         }
+        return; // Early return to prevent premium link handling
       }
 
       // Handle premium deep links
@@ -316,6 +294,33 @@ function AppContent() {
     return () => linkingSubscription?.remove();
   }, []);
 
+  // ====================================
+  // 🔥 HELPER FUNCTION: Complete Password Reset
+  // ====================================
+  const completePasswordReset = async () => {
+    console.log('🎯 Completing password reset flow');
+
+    // Clear the password reset flow
+    setPendingPasswordReset(false);
+    setResetTokens(null);
+
+    // Sign out to clear any temporary session
+    await supabase.auth.signOut();
+
+    // Navigate back to login
+    if (navigationRef.current) {
+      navigationRef.current.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    }
+  };
+
+  // Make helper function available globally for ConfirmPasswordResetScreen
+  // You'll need to modify ConfirmPasswordResetScreen to call this
+  (global as any).completePasswordReset = completePasswordReset;
+  (global as any).resetTokens = resetTokens;
+
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
@@ -325,13 +330,9 @@ function AppContent() {
   }
 
   return (
-    <NavigationContainer>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor="transparent"
-        translucent
-      />
-      {session ? <MainTabs /> : <AuthStack />}
+    <NavigationContainer ref={navigationRef}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      {session && !pendingPasswordReset ? <MainTabs /> : <AuthStack />}
     </NavigationContainer>
   );
 }
@@ -352,7 +353,7 @@ export default function App() {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

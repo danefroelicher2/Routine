@@ -1,3 +1,4 @@
+// src/screens/Auth/ConfirmPasswordResetScreen.tsx - FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import {
     View,
@@ -28,23 +29,50 @@ export default function ConfirmPasswordResetScreen({ navigation }: any) {
         checkSession();
     }, []);
 
+    // ====================================
+    // 🔥 FIXED: Session validation
+    // ====================================
     const checkSession = async () => {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                setSessionValid(true);
+            console.log('🔍 Checking session for password reset...');
+
+            // Check if we have reset tokens from the global state
+            const resetTokens = (global as any).resetTokens;
+
+            if (resetTokens) {
+                console.log('✅ Reset tokens found from deep link');
+
+                // Validate the session
+                const { data: { session } } = await supabase.auth.getSession();
+
+                if (session) {
+                    console.log('✅ Valid reset session confirmed');
+                    setSessionValid(true);
+                } else {
+                    console.log('❌ No active session found');
+                    handleSessionExpired();
+                }
             } else {
-                Alert.alert(
-                    'Session Expired',
-                    'Your reset session has expired. Please request a new reset email.',
-                    [{ text: 'OK', onPress: () => navigation.navigate('ResetPassword') }]
-                );
+                console.log('❌ No reset tokens found');
+                handleSessionExpired();
             }
         } catch (error) {
-            console.error('Session check error:', error);
+            console.error('💥 Session check error:', error);
+            handleSessionExpired();
         }
     };
 
+    const handleSessionExpired = () => {
+        Alert.alert(
+            'Session Expired',
+            'Your reset session has expired. Please request a new reset email.',
+            [{ text: 'OK', onPress: () => navigation.navigate('ResetPassword') }]
+        );
+    };
+
+    // ====================================
+    // 🔥 FIXED: Password update handler
+    // ====================================
     const handlePasswordUpdate = async () => {
         if (!newPassword || !confirmPassword) {
             Alert.alert('Error', 'Please fill in all fields');
@@ -63,52 +91,82 @@ export default function ConfirmPasswordResetScreen({ navigation }: any) {
 
         setLoading(true);
         try {
-            // Update the user's password
+            console.log('🔐 Starting password update...');
+
+            // Update the user's password using the current session
             const { error } = await supabase.auth.updateUser({
                 password: newPassword
             });
 
             if (error) {
+                console.error('❌ Password update error:', error);
                 Alert.alert('Error', error.message);
                 setLoading(false);
                 return;
             }
 
-            // Sign out and redirect to login
-            await supabase.auth.signOut();
+            console.log('✅ Password updated successfully');
+
+            // ====================================
+            // 🔥 FIXED: Complete the reset flow properly
+            // ====================================
+
+            // Call the global helper function to complete the reset
+            const completeReset = (global as any).completePasswordReset;
+            if (completeReset) {
+                await completeReset();
+            } else {
+                // Fallback: manual cleanup
+                await supabase.auth.signOut();
+                navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Login' }],
+                });
+            }
 
             Alert.alert(
                 'Success! 🎉',
-                'Your password has been updated. Please log in with your new password.',
+                'Your password has been updated successfully. Please log in with your new password.',
                 [
                     {
                         text: 'OK',
-                        onPress: () => navigation.navigate('Login')
+                        onPress: () => {
+                            // Navigation will be handled by completeReset above
+                        }
                     }
                 ]
             );
 
         } catch (error: any) {
-            console.error('Password update error:', error);
+            console.error('💥 Password update error:', error);
             Alert.alert('Error', 'Failed to update password. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
+    // ====================================
+    // 🔥 LOADING STATE: While validating session
+    // ====================================
     if (!sessionValid) {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
                 <View style={styles.content}>
+                    <View style={styles.iconContainer}>
+                        <Ionicons name="shield-checkmark" size={80} color="#007AFF" />
+                    </View>
                     <ActivityIndicator size="large" color="#007AFF" />
                     <Text style={[styles.loadingText, { color: colors.text }]}>
-                        Validating session...
+                        Validating reset session...
                     </Text>
                 </View>
             </SafeAreaView>
         );
     }
 
+    // ====================================
+    // 🔥 MAIN UI: Password reset form
+    // ====================================
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
             <KeyboardAvoidingView
@@ -211,6 +269,16 @@ export default function ConfirmPasswordResetScreen({ navigation }: any) {
                             <Text style={styles.buttonText}>Update Password</Text>
                         )}
                     </TouchableOpacity>
+
+                    {/* Cancel option */}
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('Login')}
+                        style={styles.cancelButton}
+                    >
+                        <Text style={[styles.cancelText, { color: colors.textSecondary }]}>
+                            Cancel and return to login
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -237,12 +305,14 @@ const styles = StyleSheet.create({
         fontSize: 28,
         fontWeight: 'bold',
         marginBottom: 10,
+        textAlign: 'center',
     },
     subtitle: {
         fontSize: 16,
         textAlign: 'center',
         marginBottom: 30,
         paddingHorizontal: 20,
+        lineHeight: 22,
     },
     inputContainer: {
         flexDirection: 'row',
@@ -280,14 +350,24 @@ const styles = StyleSheet.create({
         paddingHorizontal: 30,
         width: '100%',
         alignItems: 'center',
+        marginBottom: 15,
     },
     buttonText: {
         color: 'white',
         fontSize: 16,
         fontWeight: '600',
     },
+    cancelButton: {
+        marginTop: 10,
+        paddingVertical: 10,
+    },
+    cancelText: {
+        fontSize: 14,
+        textAlign: 'center',
+    },
     loadingText: {
         marginTop: 20,
         fontSize: 16,
+        textAlign: 'center',
     },
 });
