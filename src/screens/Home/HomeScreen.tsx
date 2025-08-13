@@ -288,56 +288,59 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   // Memoized greeting that only changes when the time period changes
+  // REPLACE THE ENTIRE personalizedGreeting useMemo section (around lines 282-346) with this:
+
+  // Memoized greeting that only changes when the time period changes
   const personalizedGreeting = useMemo(() => {
     const { timePeriod, seed, hour } = getTimePeriodInfo();
     const firstName = userProfile?.full_name?.split(" ")[0] || "there";
 
     const morningGreetings = [
-      `Good morning, ${firstName}!`,
-      `Rise and shine, ${firstName}`,
-      `Morning, ${firstName}.`,
-      `Start strong, ${firstName}`,
-      `New day, new you, ${firstName}.`,
-      `Let's conquer today, ${firstName}!`,
-      `Early bird gets the worm, ${firstName}`,
-      `Ready to seize the day, ${firstName}?`,
-      `Fresh start awaits, ${firstName}.`,
+      `Good morning,\n${firstName}!`,
+      `Rise and shine,\n${firstName}`,
+      `Morning,\n${firstName}.`,
+      `Start strong,\n${firstName}`,
+      `New day, new you,\n${firstName}.`,
+      `Let's conquer today,\n${firstName}!`,
+      `Early bird gets the worm,\n${firstName}`,
+      `Ready to seize the day,\n${firstName}?`,
+      `Fresh start awaits,\n${firstName}.`,
     ];
 
     const afternoonGreetings = [
-      `Good afternoon, ${firstName}`,
-      `Halfway there, ${firstName}!`,
-      `Keep it up, ${firstName}.`,
-      `Afternoon momentum, ${firstName}`,
-      `You're crushing it, ${firstName}`,
-      `Stay focused, ${firstName}.`,
-      `Pushing through, ${firstName}?`,
-      `Making progress, ${firstName}`,
-      `Steady as she goes, ${firstName}.`,
+      `Good afternoon,\n${firstName}`,
+      `Halfway there,\n${firstName}!`,
+      `Keep it up,\n${firstName}.`,
+      `Afternoon momentum,\n${firstName}`,
+      `You're crushing it,\n${firstName}`,
+      `Stay focused,\n${firstName}.`,
+      `Pushing through,\n${firstName}?`,
+      `Making progress,\n${firstName}`,
+      `Steady as she goes,\n${firstName}.`,
     ];
 
     const eveningGreetings = [
-      `Good evening, ${firstName}`,
-      `Evening wind down, ${firstName}`,
-      `How did today go, ${firstName}?`,
-      `Wrapping up strong, ${firstName}?`,
-      `Reflect and recharge, ${firstName}`,
-      `Proud of today, ${firstName}?`,
-      `Rest well tonight, ${firstName}`,
-      `Tomorrow awaits, ${firstName}`,
-      `End on a high note, ${firstName}`,
+      `Good evening,\n${firstName}`,
+      `Evening wind down,\n${firstName}`,
+      `How did today go,\n${firstName}?`,
+      `Wrapping up strong,\n${firstName}?`,
+      `Reflect and recharge,\n${firstName}`,
+      `Proud of today,\n${firstName}?`,
+      `Rest well tonight,\n${firstName}`,
+      `Tomorrow awaits,\n${firstName}`,
+      `End on a high note,\n${firstName}`,
     ];
 
     const nightGreetings = [
-      `Working late, ${firstName}?`,
-      `Night owl mode, ${firstName}`,
-      `Burning the midnight oil, ${firstName}?`,
-      `Late night productivity, ${firstName}`,
-      `Making the most of tonight, ${firstName}?`,
-      `Night shift, ${firstName}?`,
-      `Still going strong, ${firstName}`,
-      `Quiet hours, ${firstName}`,
-      `Peace and focus, ${firstName}`,
+      `Working late,\n${firstName}?`,
+      `Night owl mode,\n${firstName}`,
+      `Burning the midnight oil,\n${firstName}?`,
+      `Late night productivity,\n${firstName}`,
+      `Making the most of tonight,\n${firstName}?`,
+      `Night shift,\n${firstName}?`,
+      `Still going strong,\n${firstName}`,
+      `Quiet hours,\n${firstName}`,
+      `Peace and focus,\n${firstName}`,
     ];
 
     let greetingArray = morningGreetings;
