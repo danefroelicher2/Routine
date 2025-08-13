@@ -29,6 +29,8 @@ import LoginScreen from "./src/screens/Auth/LoginScreen";
 import SignupScreen from "./src/screens/Auth/SignupScreen";
 import ChangePasswordScreen from "./src/screens/Profile/ChangePasswordScreen";
 import ResetPasswordScreen from "./src/screens/Auth/ResetPasswordScreen";
+import ConfirmPasswordResetScreen from './src/screens/Auth/ConfirmPasswordResetScreen';
+
 
 // Main App Screens
 import HomeScreen from "./src/screens/Home/HomeScreen";
@@ -60,6 +62,11 @@ function HomeStack() {
       <Stack.Screen
         name="HomeMain"
         component={HomeScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ConfirmPasswordReset"
+        component={ConfirmPasswordResetScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
