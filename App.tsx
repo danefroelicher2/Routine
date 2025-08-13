@@ -1,5 +1,5 @@
 // ============================================
-// COMPLETE App.tsx - WITH HomeViewProvider ADDED
+// FIXED App.tsx - Move ConfirmPasswordReset to AuthStack
 // ============================================
 
 import React, { useEffect, useState } from "react";
@@ -31,7 +31,6 @@ import ChangePasswordScreen from "./src/screens/Profile/ChangePasswordScreen";
 import ResetPasswordScreen from "./src/screens/Auth/ResetPasswordScreen";
 import ConfirmPasswordResetScreen from './src/screens/Auth/ConfirmPasswordResetScreen';
 
-
 // Main App Screens
 import HomeScreen from "./src/screens/Home/HomeScreen";
 import AddRoutineScreen from "./src/screens/Home/AddRoutineScreen";
@@ -55,18 +54,13 @@ import PremiumScreen from "./src/screens/Premium/PremiumScreen";
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// Stack Navigator for Home
+// Stack Navigator for Home (REMOVED ConfirmPasswordReset from here)
 function HomeStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen
         name="HomeMain"
         component={HomeScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="ConfirmPasswordReset"
-        component={ConfirmPasswordResetScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -228,13 +222,15 @@ function MainTabs() {
   );
 }
 
-// Auth Stack Navigator
+// ✅ FIXED: Auth Stack Navigator with ConfirmPasswordReset added
 function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+      {/* ✅ MOVED HERE - Now unauthenticated users can access this */}
+      <Stack.Screen name="ConfirmPasswordReset" component={ConfirmPasswordResetScreen} />
     </Stack.Navigator>
   );
 }
@@ -320,9 +316,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <PremiumProvider>
-        <HomeViewProvider>  {/* ✅ ADDED HOME VIEW PROVIDER */}
+        <HomeViewProvider>
           <AppContent />
-        </HomeViewProvider>  {/* ✅ ADDED HOME VIEW PROVIDER */}
+        </HomeViewProvider>
       </PremiumProvider>
     </ThemeProvider>
   );
