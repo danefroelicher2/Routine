@@ -27,7 +27,10 @@
                         ]
                     }
                 ]
-            }
+            },
+            "associatedDomains": [
+                "applinks:YOUR-SUPABASE-PROJECT-ID.supabase.co"
+            ]
         },
         "android": {
             "adaptiveIcon": {
