@@ -44,6 +44,13 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     "It always seems impossible until it's done. — Nelson Mandela",
     "The future depends on what you do today. — Mahatma Gandhi",
     "Dreams don't work unless you do. — John C. Maxwell",
+    "Early to bed, early to rise, makes a man healthy, wealthy, and wise. - Benjamin Franklin",
+    "Action is the foundation, learning is the supplementation",
+    "Do not make promises, with yourself or others, you do not intend to keep",
+    "As you are now, so once were they, as they are now, so shall you be",
+    "Opportunities don’t happen. You create them. — Chris Grosser",
+    "Hard work beats talent when talent doesn’t work hard. — Tim Notke",
+    "You don’t have to be great to start, but you have to start to be great. — Zig Zigla",
   ];
 
   useFocusEffect(
