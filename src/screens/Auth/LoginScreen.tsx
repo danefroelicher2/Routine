@@ -102,6 +102,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                                 color="#666"
                             />
                         </TouchableOpacity>
+
                     </View>
 
 
