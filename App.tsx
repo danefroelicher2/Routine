@@ -1,14 +1,11 @@
-// ============================================
-// FIXED App.tsx - Move ConfirmPasswordReset to AuthStack
-// ============================================
-
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, View, StyleSheet, StatusBar, Linking, Alert } from "react-native";
+import { ActivityIndicator, View, StyleSheet, StatusBar, Alert } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { Session } from "./src/services/supabase";
+import * as Linking from 'expo-linking';
 
 import "react-native-url-polyfill/auto";
 
@@ -18,10 +15,10 @@ import { supabase } from "./src/services/supabase";
 // Theme Provider
 import { ThemeProvider, useTheme } from "./ThemeContext";
 
-// ✅ PREMIUM PROVIDER
+// PREMIUM PROVIDER
 import { PremiumProvider } from "./src/contexts/PremiumContext";
 
-// ✅ HOME VIEW PROVIDER
+// HOME VIEW PROVIDER
 import { HomeViewProvider } from './src/contexts/HomeViewContext';
 
 // Auth Screens
@@ -48,13 +45,13 @@ import ProfileScreen from "./src/screens/Profile/ProfileScreen";
 import SettingsScreen from "./src/screens/Profile/SettingsScreen";
 import RoutineManagerScreen from "./src/screens/Profile/RoutineManagerScreen";
 
-// ✅ PREMIUM SCREEN
+// PREMIUM SCREEN
 import PremiumScreen from "./src/screens/Premium/PremiumScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// Stack Navigator for Home (REMOVED ConfirmPasswordReset from here)
+// Stack Navigator for Home
 function HomeStack() {
   return (
     <Stack.Navigator>
@@ -113,7 +110,7 @@ function NotesStack() {
   );
 }
 
-// ✅ Stack Navigator for Profile with Premium Screen
+// Stack Navigator for Profile with Premium Screen
 function ProfileStack() {
   const { colors } = useTheme();
 
@@ -149,7 +146,6 @@ function ProfileStack() {
         component={RoutineManagerScreen}
         options={{ title: "Manage Routines" }}
       />
-      {/* ✅ PREMIUM SCREEN */}
       <Stack.Screen
         name="Premium"
         component={PremiumScreen}
@@ -175,13 +171,15 @@ function MainTabs() {
           if (route.name === "Home") {
             iconName = focused ? "home" : "home-outline";
           } else if (route.name === "Stats") {
-            iconName = focused ? "stats-chart" : "stats-chart-outline";
+            iconName = focused ? "analytics" : "analytics-outline";
           } else if (route.name === "AI") {
             iconName = focused ? "chatbubbles" : "chatbubbles-outline";
           } else if (route.name === "Notes") {
             iconName = focused ? "document-text" : "document-text-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
+          } else {
+            iconName = "help-outline";
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -209,27 +207,17 @@ function MainTabs() {
       <Tab.Screen name="AI" component={AIStack} />
       <Tab.Screen name="Notes" component={NotesStack} />
       <Tab.Screen name="Profile" component={ProfileStack} />
-
-      {/* Add Premium as a modal screen */}
-      <Tab.Screen
-        name="Premium"
-        component={PremiumScreen}
-        options={{
-          tabBarButton: () => null, // Hide from tab bar
-        }}
-      />
     </Tab.Navigator>
   );
 }
 
-// ✅ FIXED: Auth Stack Navigator with ConfirmPasswordReset added
+// Auth Stack Navigator - WITH ConfirmPasswordReset
 function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-      {/* ✅ MOVED HERE - Now unauthenticated users can access this */}
       <Stack.Screen name="ConfirmPasswordReset" component={ConfirmPasswordResetScreen} />
     </Stack.Navigator>
   );
@@ -258,11 +246,48 @@ function AppContent() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Handle deep linking for Stripe success/cancel
+  // Handle deep linking for password reset AND premium
   useEffect(() => {
-    const handleDeepLink = (url: string) => {
+    const handleDeepLink = async (url: string) => {
       console.log('Deep link received:', url);
 
+      // Handle password reset deep link
+      if (url.includes('#access_token=') || url.includes('reset-password-confirm')) {
+        const hashParams = url.split('#')[1];
+        if (hashParams) {
+          const params = new URLSearchParams(hashParams);
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+
+          if (accessToken && refreshToken) {
+            try {
+              // Set the session with the tokens
+              const { data, error } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+
+              if (!error && data.session) {
+                // User is now authenticated with reset token
+                // They can now update their password
+                Alert.alert(
+                  'Reset Password',
+                  'You can now set your new password.',
+                  [{ text: 'OK' }]
+                );
+                // The navigation will happen automatically since session is set
+              } else {
+                Alert.alert('Error', 'Invalid or expired reset link. Please request a new one.');
+              }
+            } catch (error) {
+              console.error('Error handling reset link:', error);
+              Alert.alert('Error', 'Failed to process reset link. Please try again.');
+            }
+          }
+        }
+      }
+
+      // Handle premium deep links
       if (url.includes('premium-success')) {
         Alert.alert(
           'Payment Successful! 🎉',
