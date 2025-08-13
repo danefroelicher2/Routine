@@ -33,7 +33,7 @@ export default function ResetPasswordScreen({ navigation }: any) {
         try {
             // Use Supabase's built-in password reset
             const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-                redirectTo: 'https://your-app-domain.com/reset-password', // Update this URL
+                redirectTo: 'Routine://reset-password', // Use your app's deep link scheme
             });
 
             if (error) {
