@@ -309,7 +309,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
     const afternoonGreetings = [
       `Good afternoon,\n${firstName}`,
-      `Halfway there,\n${firstName}!`,
+      `Keep pushing,\n${firstName}!`,
       `Keep it up,\n${firstName}.`,
       `Afternoon momentum,\n${firstName}`,
       `You're crushing it,\n${firstName}`,
