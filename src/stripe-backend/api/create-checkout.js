@@ -36,11 +36,11 @@ export default async function handler(req, res) {
         // Define your pricing plans
         const plans = {
             monthly: {
-                price: 'price_1234567890monthly', // Replace with your actual Stripe price ID
+                price: 'prod_SrZ5yU6F9GX3QQ', // Replace with your actual Stripe price ID
                 name: 'Monthly Premium'
             },
             yearly: {
-                price: 'price_1234567890yearly', // Replace with your actual Stripe price ID  
+                price: 'prod_SrZ6WtsR2fOvfF', // Replace with your actual Stripe price ID  
                 name: 'Yearly Premium'
             }
         };
