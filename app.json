@@ -37,7 +37,7 @@
                 "foregroundImage": "./assets/adaptive-icon.png",
                 "backgroundColor": "#ffffff"
             },
-            "package": "com.yourname.routineapp",
+            "package": "com.danefroelicher.routineapp",
             "intentFilters": [
                 {
                     "action": "VIEW",
