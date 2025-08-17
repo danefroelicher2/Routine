@@ -1,5 +1,5 @@
 // src/screens/Home/HomeScreen.tsx
-// ✅ COMPLETE: All existing functionality + working calendar scheduling + CREATE BUTTON + SCHEDULE SETTINGS INTEGRATION
+// ✅ COMPLETE: All existing functionality + working calendar scheduling + CREATE BUTTON + SCHEDULE SETTINGS INTEGRATION + CALENDAR EDIT FUNCTIONALITY
 
 import React, {
   useState,
@@ -108,15 +108,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [originalIndex, setOriginalIndex] = useState<number | null>(null);
   const [lastSwapIndex, setLastSwapIndex] = useState<number | null>(null);
-  const [draggedSection, setDraggedSection] = useState<"daily" | "weekly" | null>(null);
+  const [draggedSection, setDraggedSection] = useState<"daily" | "weekly" | "calendar" | null>(null);
 
   // ENHANCED: New drag state for improved UX
   const [dropZoneIndex, setDropZoneIndex] = useState<number | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+
+  // ✅ NEW: Calendar drag state
+  const [draggedTimeSlot, setDraggedTimeSlot] = useState<number | null>(null);
 
   // ENHANCED: Edit mode state for delete functionality
   const [isEditMode, setIsEditMode] = useState(false);
-  const [editSection, setEditSection] = useState<"daily" | "weekly" | null>(null);
+  const [editSection, setEditSection] = useState<"daily" | "weekly" | "calendar" | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [routineToDelete, setRoutineToDelete] = useState<{
     routine: RoutineWithCompletion;
@@ -387,7 +391,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         `)
         .eq("user_id", user.id)
         .eq("day_of_week", selectedDay)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .order("scheduled_time");
 
       if (error) throw error;
 
@@ -1087,8 +1092,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ✅ RESTORED: Original Pan responder for drag and drop
-  const createPanResponder = (index: number, section: "daily" | "weekly") => {
+  // ✅ UPDATED: Pan responder for drag and drop with calendar support
+  const createPanResponder = (index: number, section: "daily" | "weekly" | "calendar", timeSlot?: number) => {
     return PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
         const { dx, dy } = gestureState;
@@ -1099,6 +1104,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setIsDragging(true);
         setDraggedIndex(index);
         setDraggedSection(section);
+        if (timeSlot !== undefined) {
+          setDraggedTimeSlot(timeSlot);
+        }
+        setDraggedItemId(section === "daily" ? dailyRoutines[index]?.id :
+          section === "weekly" ? weeklyRoutines[index]?.id :
+            timeSlots.find(slot => slot.hour === timeSlot)?.routines[index]?.id);
         setOriginalIndex(index);
         setIsDragActive(true);
         setScrollEnabled(false);
@@ -1121,9 +1132,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       onPanResponderMove: (evt, gestureState) => {
         dragY.setValue(gestureState.dy);
 
-        const routines = section === "daily" ? dailyRoutines : weeklyRoutines;
-        const maxRoutines = routines.length - 1;
-        const itemSpacing = 100;
+        const currentRoutines = section === "daily" ? dailyRoutines :
+          section === "weekly" ? weeklyRoutines :
+            timeSlots.find(slot => slot.hour === timeSlot)?.routines || [];
+
+        const maxRoutines = currentRoutines.length - 1;
+        const itemSpacing = section === "calendar" ? 60 : 100;
         const movementRatio = gestureState.dy / itemSpacing;
         const balancedMovement = movementRatio * 0.68;
 
@@ -1154,15 +1168,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         ) {
           setLastSwapIndex(newIndex);
 
-          const newRoutines = [...routines];
+          const newRoutines = [...currentRoutines];
           const draggedItem = newRoutines[index];
           newRoutines.splice(index, 1);
           newRoutines.splice(newIndex, 0, draggedItem);
 
           if (section === "daily") {
             setDailyRoutines(newRoutines);
-          } else {
+          } else if (section === "weekly") {
             setWeeklyRoutines(newRoutines);
+          } else if (section === "calendar" && timeSlot !== undefined) {
+            const newTimeSlots = timeSlots.map(slot =>
+              slot.hour === timeSlot ? { ...slot, routines: newRoutines } : slot
+            );
+            setTimeSlots(newTimeSlots);
           }
 
           setDraggedIndex(newIndex);
@@ -1200,14 +1219,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           }),
         ]).start();
 
+        if (originalIndex !== draggedIndex && draggedItemId) {
+          if (section === "calendar" && timeSlot !== undefined) {
+            await saveCalendarRoutineOrder(timeSlot, originalIndex!, draggedIndex!);
+          } else if (section === "daily" || section === "weekly") {
+            await saveRoutineOrder(section);
+          }
+        }
+
         setDraggedIndex(null);
         setDraggedSection(null);
+        setDraggedTimeSlot(null);
         setOriginalIndex(null);
         setLastSwapIndex(null);
-
-        if (originalIndex !== draggedIndex) {
-          await saveRoutineOrder(section);
-        }
+        setDraggedItemId(null);
       },
     });
   };
@@ -1236,8 +1261,35 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // ✅ RESTORED: Edit mode functions
-  const toggleEditMode = (section: "daily" | "weekly") => {
+  // ✅ NEW: Save calendar routine order
+  const saveCalendarRoutineOrder = async (timeSlot: number, fromIndex: number, toIndex: number) => {
+    try {
+      const slot = timeSlots.find(s => s.hour === timeSlot);
+      if (!slot || !slot.routines.length) return;
+
+      const reorderedRoutines = [...slot.routines];
+      const [movedItem] = reorderedRoutines.splice(fromIndex, 1);
+      reorderedRoutines.splice(toIndex, 0, movedItem);
+
+      // Update the time slots state
+      const newTimeSlots = timeSlots.map(s =>
+        s.hour === timeSlot ? { ...s, routines: reorderedRoutines } : s
+      );
+      setTimeSlots(newTimeSlots);
+
+      console.log("📝 Calendar routine order updated in UI - database save skipped (sort_order column not available)");
+
+      // TODO: Add sort_order column to routine_schedule table for persistent ordering
+      // For now, the reordering works in the UI but won't persist after reload
+
+    } catch (error) {
+      console.error("Error saving calendar routine order:", error);
+      // Don't show alert since this is expected without the sort_order column
+    }
+  };
+
+  // ✅ UPDATED: Edit mode functions with calendar support
+  const toggleEditMode = (section: "daily" | "weekly" | "calendar") => {
     if (isEditMode && editSection === section) {
       setIsEditMode(false);
       setEditSection(null);
@@ -1534,8 +1586,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-
-
         {/* Day selector calendar - ALWAYS visible in same position */}
         <View style={[styles.calendarContainer, { backgroundColor: colors.surface }]}>
           <View style={styles.calendarGrid}>
@@ -1598,6 +1648,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         {isCalendarView ? (
           /* ✅ MODIFIED: Calendar view with working time slots using user's custom schedule */
           <View style={styles.calendarViewContainer}>
+            {/* ✅ NEW: Calendar Edit Mode Toggle */}
+            <View style={[styles.sectionHeader, { backgroundColor: colors.surface, marginBottom: 12, marginHorizontal: 16, borderRadius: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }]}>
+              <Ionicons name="calendar" size={24} color="#007AFF" />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Calendar View
+              </Text>
+              <TouchableOpacity
+                onPress={() => toggleEditMode("calendar")}
+                style={[
+                  styles.editButton,
+                  isEditMode && editSection === "calendar" && styles.editButtonActive,
+                ]}
+              >
+                <Ionicons
+                  name={
+                    isEditMode && editSection === "calendar" ? "checkmark" : "pencil"
+                  }
+                  size={18}
+                  color={
+                    isEditMode && editSection === "calendar" ? "#34c759" : "#666"
+                  }
+                />
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.timeSlotsContainer}>
               {timeSlots.map((slot) => (
                 <View key={slot.hour} style={[styles.timeSlot, { borderBottomColor: colors.border }]}>
@@ -1622,79 +1697,182 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                         </Text>
                       </TouchableOpacity>
                     ) : (
-                      slot.routines.map((routine, index) => (
-                        <View
-                          key={`${routine.id}-${index}`}
-                          style={[
-                            styles.calendarRoutineItem,
-                            {
-                              borderColor: routine.isCompleted ? "#4CAF50" : colors.border,
-                              backgroundColor: routine.isCompleted ? "rgba(76, 175, 80, 0.1)" : colors.background
-                            }
-                          ]}
-                        >
-                          <TouchableOpacity
-                            style={styles.calendarRoutineLeft}
-                            onPress={() => {
-                              console.log("📅 CALENDAR: Toggling routine:", routine.name);
-                              console.log("  - Routine ID:", routine.id);
-                              console.log("  - Current completion status:", routine.isCompleted);
-                              console.log("  - Is scheduled routine:", !!routine.scheduled_id);
-                              console.log("  - Scheduled ID:", routine.scheduled_id);
-                              toggleRoutineCompletion(routine, false);
-                            }}
+                      slot.routines.map((routine, index) => {
+                        const calendarPanResponder = createPanResponder(index, "calendar", slot.hour);
+                        const isBeingDragged = isDragging && draggedIndex === index && draggedSection === "calendar" && draggedTimeSlot === slot.hour;
+                        const isDropZone = dropZoneIndex === index && isDragActive && !isBeingDragged && draggedSection === "calendar" && draggedTimeSlot === slot.hour;
+                        const isInEditMode = isEditMode && editSection === "calendar";
+
+                        return (
+                          <Animated.View
+                            key={`${routine.id}-${index}`}
+                            style={[
+                              styles.calendarRoutineItem,
+                              {
+                                borderColor: routine.isCompleted ? "#4CAF50" : colors.border,
+                                backgroundColor: routine.isCompleted ? "rgba(76, 175, 80, 0.1)" : colors.background
+                              },
+                              isBeingDragged && {
+                                transform: [
+                                  { translateY: dragY },
+                                  { scale: dragScale },
+                                ] as any,
+                                opacity: dragOpacity,
+                                elevation: 12,
+                                shadowColor: "#007AFF",
+                                shadowOffset: { width: 0, height: 6 },
+                                shadowOpacity: 0.4,
+                                shadowRadius: 12,
+                                zIndex: 1000,
+                              },
+                              isDropZone && {
+                                backgroundColor: colors.surface,
+                                borderColor: "#007AFF",
+                                borderWidth: 2,
+                                borderStyle: "dashed",
+                                opacity: 0.7,
+                              },
+                            ]}
                           >
-                            <View
-                              style={[
-                                styles.calendarCheckbox,
-                                { borderColor: routine.isCompleted ? "#4CAF50" : colors.border },
-                                routine.isCompleted && styles.calendarCheckboxCompleted
-                              ]}
-                            >
-                              {routine.isCompleted && (
-                                <Ionicons name="checkmark" size={12} color="white" />
-                              )}
-                            </View>
-                            <View style={styles.calendarRoutineInfo}>
-                              <Text
+                            {/* Drop zone indicator overlay */}
+                            {isDropZone && (
+                              <Animated.View
                                 style={[
-                                  styles.calendarRoutineName,
-                                  { color: colors.text },
-                                  routine.isCompleted && styles.calendarRoutineNameCompleted
+                                  StyleSheet.absoluteFill,
+                                  {
+                                    backgroundColor: "#007AFF",
+                                    opacity: dropZoneOpacity,
+                                    borderRadius: 8,
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                  },
                                 ]}
                               >
-                                {routine.name}
-                              </Text>
-                              {routine.description ? (
-                                <Text style={[styles.calendarRoutineDuration, { color: colors.textSecondary }]}>
-                                  {routine.description}
+                                <Ionicons name="add" size={20} color="white" />
+                              </Animated.View>
+                            )}
+
+                            <TouchableOpacity
+                              style={styles.calendarRoutineLeft}
+                              onPress={() => {
+                                console.log("📅 CALENDAR: Toggling routine:", routine.name);
+                                console.log("  - Routine ID:", routine.id);
+                                console.log("  - Current completion status:", routine.isCompleted);
+                                console.log("  - Is scheduled routine:", !!routine.scheduled_id);
+                                console.log("  - Scheduled ID:", routine.scheduled_id);
+                                toggleRoutineCompletion(routine, false);
+                              }}
+                            >
+                              <View
+                                style={[
+                                  styles.calendarCheckbox,
+                                  { borderColor: routine.isCompleted ? "#4CAF50" : colors.border },
+                                  routine.isCompleted && styles.calendarCheckboxCompleted
+                                ]}
+                              >
+                                {routine.isCompleted && (
+                                  <Ionicons name="checkmark" size={12} color="white" />
+                                )}
+                              </View>
+                              <View style={styles.calendarRoutineInfo}>
+                                <Text
+                                  style={[
+                                    styles.calendarRoutineName,
+                                    { color: colors.text },
+                                    routine.isCompleted && styles.calendarRoutineNameCompleted
+                                  ]}
+                                >
+                                  {routine.name}
                                 </Text>
-                              ) : null}
-                            </View>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.calendarRoutineOptions}
-                            onPress={() => {
-                              if (routine.scheduled_id) {
-                                Alert.alert(
-                                  "Remove Routine",
-                                  `Remove "${routine.name}" from this time slot?`,
-                                  [
-                                    { text: "Cancel", style: "cancel" },
-                                    {
-                                      text: "Remove",
-                                      style: "destructive",
-                                      onPress: () => removeRoutineFromTimeSlot(routine.scheduled_id!)
+                                {routine.description ? (
+                                  <Text style={[styles.calendarRoutineDuration, { color: colors.textSecondary }]}>
+                                    {routine.description}
+                                  </Text>
+                                ) : null}
+                              </View>
+                            </TouchableOpacity>
+
+                            {/* Edit mode - show edit and delete buttons, Normal mode - show drag handle */}
+                            {isInEditMode ? (
+                              <View style={styles.editModeButtons}>
+                                <TouchableOpacity
+                                  style={styles.editRoutineButton}
+                                  onPress={() => handleEditRoutine(routine)}
+                                >
+                                  <Ionicons name="create-outline" size={20} color="#007AFF" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={styles.deleteButton}
+                                  onPress={() => {
+                                    if (routine.scheduled_id) {
+                                      Alert.alert(
+                                        "Remove Routine",
+                                        `Remove "${routine.name}" from this time slot?`,
+                                        [
+                                          { text: "Cancel", style: "cancel" },
+                                          {
+                                            text: "Remove",
+                                            style: "destructive",
+                                            onPress: () => removeRoutineFromTimeSlot(routine.scheduled_id!)
+                                          }
+                                        ]
+                                      );
                                     }
-                                  ]
-                                );
-                              }
-                            }}
-                          >
-                            <Ionicons name="ellipsis-horizontal" size={16} color={colors.textTertiary} />
-                          </TouchableOpacity>
-                        </View>
-                      ))
+                                  }}
+                                >
+                                  <Ionicons name="remove-circle" size={20} color="#ff4444" />
+                                </TouchableOpacity>
+                              </View>
+                            ) : (
+                              <View
+                                style={[
+                                  styles.dragHandle,
+                                  isBeingDragged && styles.dragHandleActive,
+                                ]}
+                                {...calendarPanResponder.panHandlers}
+                              >
+                                <View
+                                  style={[
+                                    styles.dragIcon,
+                                    isBeingDragged && styles.dragIconActive,
+                                  ]}
+                                >
+                                  <View
+                                    style={[
+                                      styles.dragLine,
+                                      {
+                                        backgroundColor: isBeingDragged
+                                          ? "#007AFF"
+                                          : colors.textTertiary,
+                                      },
+                                    ]}
+                                  />
+                                  <View
+                                    style={[
+                                      styles.dragLine,
+                                      {
+                                        backgroundColor: isBeingDragged
+                                          ? "#007AFF"
+                                          : colors.textTertiary,
+                                      },
+                                    ]}
+                                  />
+                                  <View
+                                    style={[
+                                      styles.dragLine,
+                                      {
+                                        backgroundColor: isBeingDragged
+                                          ? "#007AFF"
+                                          : colors.textTertiary,
+                                      },
+                                    ]}
+                                  />
+                                </View>
+                              </View>
+                            )}
+                          </Animated.View>
+                        );
+                      })
                     )}
                   </View>
                 </View>
