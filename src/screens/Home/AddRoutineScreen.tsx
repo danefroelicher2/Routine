@@ -1082,7 +1082,7 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                 placeholderTextColor={colors.placeholder}
                 value={customDescription}
                 onChangeText={setCustomDescription}
-                maxLength={35}
+                maxLength={20}
                 multiline
                 numberOfLines={3}
               />
