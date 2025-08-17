@@ -1665,9 +1665,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                               >
                                 {routine.name}
                               </Text>
-                              <Text style={[styles.calendarRoutineDuration, { color: colors.textSecondary }]}>
-                                {routine.estimated_duration} min
-                              </Text>
+                              {routine.description ? (
+                                <Text style={[styles.calendarRoutineDuration, { color: colors.textSecondary }]}>
+                                  {routine.description}
+                                </Text>
+                              ) : null}
                             </View>
                           </TouchableOpacity>
                           <TouchableOpacity
