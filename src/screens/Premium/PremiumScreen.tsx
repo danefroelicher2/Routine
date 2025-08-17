@@ -124,7 +124,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             console.log('🚀 Starting Stripe checkout for plan:', planId);
 
             // ✅ POST REQUEST TO YOUR LOCAL SERVER
-            const response = await fetch('https://routine-payments-v3-ntprj9rwq-dane-froelichers-projects.vercel.app/api/create-checkout', {
+            const response = await fetch('http://192.168.1.6:3001/create-checkout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

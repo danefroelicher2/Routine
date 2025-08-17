@@ -131,8 +131,7 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
 
             // ✅ CHANGE FROM:
 
-            const url = `http://localhost:3001/premium-status?userId=${userId}`; console.log(`📡 Making request to: ${url}`);
-
+            const url = `http://192.168.1.6:3001/premium-status?userId=${userId}`;
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
@@ -161,7 +160,7 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
             try {
                 const data = JSON.parse(responseText);
                 console.log("✅ Subscription status data:", data);
-                return data.isPremium || false; // Temporarily force non-premium for testing
+                return data.isPremium || false;
             } catch (parseError) {
                 console.error('❌ Subscription status JSON Parse Error:', parseError);
                 console.error('❌ Response was:', responseText);
