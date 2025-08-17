@@ -1087,7 +1087,7 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                 numberOfLines={3}
               />
               <Text style={[styles.charCount, { color: colors.textSecondary }]}>
-                {customDescription.length}/35
+                {customDescription.length}/20
               </Text>
             </View>
 
