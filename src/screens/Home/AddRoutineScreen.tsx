@@ -790,8 +790,8 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
       return;
     }
 
-    if (customDescription.length > 35) {
-      Alert.alert("Error", "Description must be 35 characters or less");
+    if (customDescription.length > 20) {
+      Alert.alert("Error", "Description must be 20 characters or less");
       return;
     }
 
