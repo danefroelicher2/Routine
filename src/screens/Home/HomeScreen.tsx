@@ -1097,7 +1097,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
         const { dx, dy } = gestureState;
-        return Math.abs(dy) > 3 && Math.abs(dy) > Math.abs(dx) * 0.5;
+        // More precise gesture detection for smoother initiation
+        return Math.abs(dy) > 5 && Math.abs(dy) > Math.abs(dx) * 0.6;
       },
 
       onPanResponderGrant: () => {
@@ -1114,16 +1115,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setIsDragActive(true);
         setScrollEnabled(false);
 
+        // Smoother initial animations
         Animated.parallel([
           Animated.spring(dragScale, {
             toValue: 1.05,
             useNativeDriver: false,
-            tension: 200,
+            tension: 300,
             friction: 8,
           }),
           Animated.timing(dragOpacity, {
             toValue: 0.9,
-            duration: 150,
+            duration: 100,
             useNativeDriver: false,
           }),
         ]).start();
@@ -1137,9 +1139,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             timeSlots.find(slot => slot.hour === timeSlot)?.routines || [];
 
         const maxRoutines = currentRoutines.length - 1;
-        const itemSpacing = section === "calendar" ? 60 : 100;
+
+        // Improved movement calculations for calendar vs normal items
+        const itemSpacing = section === "calendar" ? 70 : 100; // Adjusted for calendar item height
         const movementRatio = gestureState.dy / itemSpacing;
-        const balancedMovement = movementRatio * 0.68;
+        const balancedMovement = movementRatio * 0.7; // Slightly more responsive
 
         const newIndex = Math.max(
           0,
@@ -1154,17 +1158,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           setDropZoneIndex(newIndex);
 
           Animated.timing(dropZoneOpacity, {
-            toValue: newIndex !== index ? 0.3 : 0,
-            duration: 150,
+            toValue: newIndex !== index ? 0.4 : 0, // Slightly more visible
+            duration: 100, // Faster response
             useNativeDriver: false,
           }).start();
         }
 
+        // Improved swapping logic with better threshold
         if (
           newIndex !== lastSwapIndex &&
           newIndex !== index &&
           newIndex >= 0 &&
-          newIndex <= maxRoutines
+          newIndex <= maxRoutines &&
+          Math.abs(gestureState.dy) > itemSpacing * 0.4 // Better threshold
         ) {
           setLastSwapIndex(newIndex);
 
@@ -1194,27 +1200,29 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setScrollEnabled(true);
         setDropZoneIndex(null);
 
+        // Enhanced release animations
         Animated.parallel([
           Animated.spring(dragY, {
             toValue: 0,
             useNativeDriver: false,
-            tension: 300,
-            friction: 10,
+            tension: 400,
+            friction: 12,
+            velocity: gestureState.vy, // Use release velocity for natural feel
           }),
           Animated.spring(dragScale, {
             toValue: 1,
             useNativeDriver: false,
-            tension: 200,
-            friction: 8,
+            tension: 300,
+            friction: 10,
           }),
           Animated.timing(dragOpacity, {
             toValue: 1,
-            duration: 200,
+            duration: 150,
             useNativeDriver: false,
           }),
           Animated.timing(dropZoneOpacity, {
             toValue: 0,
-            duration: 150,
+            duration: 100,
             useNativeDriver: false,
           }),
         ]).start();
