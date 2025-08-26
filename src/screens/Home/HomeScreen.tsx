@@ -2034,7 +2034,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.addButton}
-                  onPress={() => navigation.navigate("AddRoutine")}
+                  onPress={() => navigation.navigate("AddRoutine", { isWeekly: true })}
                 >
                   <Ionicons name="add" size={20} color="#007AFF" />
                 </TouchableOpacity>
