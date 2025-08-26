@@ -32,11 +32,15 @@ export default async function handler(req, res) {
 
         // Search for customer by user ID (stored in metadata)
         const customers = await stripe.customers.list({
-            limit: 1,
-            metadata: { userId: userId }
+            limit: 100  // Increase limit since we can't filter by metadata
         });
 
-        if (customers.data.length === 0) {
+        // Filter manually to find customer with matching userId in metadata
+        const matchingCustomer = customers.data.find(customer =>
+            customer.metadata && customer.metadata.userId === userId
+        );
+
+        if (!matchingCustomer) {
             console.log(`❌ No customer found for user: ${userId}`);
             res.status(200).json({
                 isPremium: false,
@@ -47,7 +51,7 @@ export default async function handler(req, res) {
             return;
         }
 
-        const customer = customers.data[0];
+        const customer = matchingCustomer;
         console.log(`✅ Customer found: ${customer.id}`);
 
         // Get active subscriptions for this customer
