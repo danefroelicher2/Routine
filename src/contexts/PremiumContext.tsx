@@ -243,7 +243,17 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         setModalSource("");
     };
 
+    // ✅ NEW: Enhanced premium checking with AI tier support
+    const [premiumTier, setPremiumTier] = useState<'free' | 'premium' | 'premiumAI'>('free');
+    const [hasAIAccess, setHasAIAccess] = useState(false);
+
     const checkPremiumFeature = (featureId: string): boolean => {
+        // AI features require premiumAI tier
+        if (featureId === "ai_assistant") {
+            return hasAIAccess;
+        }
+
+        // All other premium features work with premium or premiumAI
         if (isPremium) return true;
 
         // Check if feature is available in free tier
