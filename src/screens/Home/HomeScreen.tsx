@@ -1268,7 +1268,114 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       Alert.alert("Error", "Failed to save routine order");
     }
   };
+  // ✅ NEW: Arrow-based movement functions for calendar variation
+  const moveRoutineUp = (routine: ScheduledRoutine, currentHour: number, currentIndex: number) => {
+    const currentSlot = timeSlots.find(slot => slot.hour === currentHour);
+    if (!currentSlot) return;
 
+    // If it's not the first item in current slot, move up within the slot
+    if (currentIndex > 0) {
+      const newRoutines = [...currentSlot.routines];
+      const temp = newRoutines[currentIndex];
+      newRoutines[currentIndex] = newRoutines[currentIndex - 1];
+      newRoutines[currentIndex - 1] = temp;
+
+      const newTimeSlots = timeSlots.map(slot =>
+        slot.hour === currentHour ? { ...slot, routines: newRoutines } : slot
+      );
+      setTimeSlots(newTimeSlots);
+    } else {
+      // Move to previous hour if exists
+      const previousHour = currentHour - 1;
+      const previousSlot = timeSlots.find(slot => slot.hour === previousHour);
+
+      if (previousSlot) {
+        // Remove from current slot
+        const newCurrentRoutines = currentSlot.routines.filter((_, i) => i !== currentIndex);
+
+        // Add to end of previous slot
+        const newPreviousRoutines = [...previousSlot.routines, routine];
+
+        const newTimeSlots = timeSlots.map(slot => {
+          if (slot.hour === currentHour) {
+            return { ...slot, routines: newCurrentRoutines };
+          } else if (slot.hour === previousHour) {
+            return { ...slot, routines: newPreviousRoutines };
+          }
+          return slot;
+        });
+
+        setTimeSlots(newTimeSlots);
+
+        // Update the routine's scheduled time in the database
+        updateRoutineTime(routine, previousHour);
+      }
+    }
+  };
+
+  const moveRoutineDown = (routine: ScheduledRoutine, currentHour: number, currentIndex: number) => {
+    const currentSlot = timeSlots.find(slot => slot.hour === currentHour);
+    if (!currentSlot) return;
+
+    // If it's not the last item in current slot, move down within the slot
+    if (currentIndex < currentSlot.routines.length - 1) {
+      const newRoutines = [...currentSlot.routines];
+      const temp = newRoutines[currentIndex];
+      newRoutines[currentIndex] = newRoutines[currentIndex + 1];
+      newRoutines[currentIndex + 1] = temp;
+
+      const newTimeSlots = timeSlots.map(slot =>
+        slot.hour === currentHour ? { ...slot, routines: newRoutines } : slot
+      );
+      setTimeSlots(newTimeSlots);
+    } else {
+      // Move to next hour if exists
+      const nextHour = currentHour + 1;
+      const nextSlot = timeSlots.find(slot => slot.hour === nextHour);
+
+      if (nextSlot) {
+        // Remove from current slot
+        const newCurrentRoutines = currentSlot.routines.filter((_, i) => i !== currentIndex);
+
+        // Add to beginning of next slot
+        const newNextRoutines = [routine, ...nextSlot.routines];
+
+        const newTimeSlots = timeSlots.map(slot => {
+          if (slot.hour === currentHour) {
+            return { ...slot, routines: newCurrentRoutines };
+          } else if (slot.hour === nextHour) {
+            return { ...slot, routines: newNextRoutines };
+          }
+          return slot;
+        });
+
+        setTimeSlots(newTimeSlots);
+
+        // Update the routine's scheduled time in the database
+        updateRoutineTime(routine, nextHour);
+      }
+    }
+  };
+
+  const updateRoutineTime = async (routine: ScheduledRoutine, newHour: number) => {
+    if (!routine.scheduled_id) return;
+
+    try {
+      const newTime = `${newHour.toString().padStart(2, '0')}:00`;
+
+      const { error } = await supabase
+        .from("routine_schedule")
+        .update({ scheduled_time: newTime })
+        .eq("id", routine.scheduled_id);
+
+      if (error) throw error;
+
+      console.log(`Updated routine ${routine.name} to ${newTime}`);
+    } catch (error) {
+      console.error("Error updating routine time:", error);
+      Alert.alert("Error", "Failed to update routine time");
+    }
+  };
   // ✅ NEW: Save calendar routine order
   const saveCalendarRoutineOrder = async (timeSlot: number, fromIndex: number, toIndex: number) => {
     try {
@@ -1706,60 +1813,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                       </TouchableOpacity>
                     ) : (
                       slot.routines.map((routine, index) => {
-                        const calendarPanResponder = createPanResponder(index, "calendar", slot.hour);
-                        const isBeingDragged = isDragging && draggedIndex === index && draggedSection === "calendar" && draggedTimeSlot === slot.hour;
-                        const isDropZone = dropZoneIndex === index && isDragActive && !isBeingDragged && draggedSection === "calendar" && draggedTimeSlot === slot.hour;
                         const isInEditMode = isEditMode && editSection === "calendar";
 
                         return (
-                          <Animated.View
+                          <View
                             key={`${routine.id}-${index}`}
                             style={[
                               styles.calendarRoutineItem,
                               {
                                 borderColor: routine.isCompleted ? "#4CAF50" : colors.border,
                                 backgroundColor: routine.isCompleted ? "rgba(76, 175, 80, 0.1)" : colors.background
-                              },
-                              isBeingDragged && {
-                                transform: [
-                                  { translateY: dragY },
-                                  { scale: dragScale },
-                                ] as any,
-                                opacity: dragOpacity,
-                                elevation: 12,
-                                shadowColor: "#007AFF",
-                                shadowOffset: { width: 0, height: 6 },
-                                shadowOpacity: 0.4,
-                                shadowRadius: 12,
-                                zIndex: 1000,
-                              },
-                              isDropZone && {
-                                backgroundColor: colors.surface,
-                                borderColor: "#007AFF",
-                                borderWidth: 2,
-                                borderStyle: "dashed",
-                                opacity: 0.7,
-                              },
+                              }
                             ]}
                           >
-                            {/* Drop zone indicator overlay */}
-                            {isDropZone && (
-                              <Animated.View
-                                style={[
-                                  StyleSheet.absoluteFill,
-                                  {
-                                    backgroundColor: "#007AFF",
-                                    opacity: dropZoneOpacity,
-                                    borderRadius: 8,
-                                    justifyContent: "center",
-                                    alignItems: "center",
-                                  },
-                                ]}
-                              >
-                                <Ionicons name="add" size={20} color="white" />
-                              </Animated.View>
-                            )}
-
                             <TouchableOpacity
                               style={styles.calendarRoutineLeft}
                               onPress={() => {
@@ -1800,7 +1866,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                               </View>
                             </TouchableOpacity>
 
-                            {/* Edit mode - show edit and delete buttons, Normal mode - show drag handle */}
+                            {/* Edit mode - show edit and delete buttons, Normal mode - show arrow controls */}
                             {isInEditMode ? (
                               <View style={styles.editModeButtons}>
                                 <TouchableOpacity
@@ -1832,53 +1898,40 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                                 </TouchableOpacity>
                               </View>
                             ) : (
-                              <View
-                                style={[
-                                  styles.dragHandle,
-                                  isBeingDragged && styles.dragHandleActive,
-                                ]}
-                                {...calendarPanResponder.panHandlers}
-                              >
-                                <View
-                                  style={[
-                                    styles.dragIcon,
-                                    isBeingDragged && styles.dragIconActive,
-                                  ]}
+                              <View style={styles.arrowControls}>
+                                <TouchableOpacity
+                                  style={styles.arrowButton}
+                                  onPress={() => moveRoutineUp(routine, slot.hour, index)}
+                                  disabled={index === 0 && slot.hour === 0}
                                 >
-                                  <View
-                                    style={[
-                                      styles.dragLine,
-                                      {
-                                        backgroundColor: isBeingDragged
-                                          ? "#007AFF"
-                                          : colors.textTertiary,
-                                      },
-                                    ]}
+                                  <Ionicons
+                                    name="chevron-up"
+                                    size={16}
+                                    color={
+                                      index === 0 && slot.hour === 0
+                                        ? colors.textTertiary
+                                        : "#007AFF"
+                                    }
                                   />
-                                  <View
-                                    style={[
-                                      styles.dragLine,
-                                      {
-                                        backgroundColor: isBeingDragged
-                                          ? "#007AFF"
-                                          : colors.textTertiary,
-                                      },
-                                    ]}
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={styles.arrowButton}
+                                  onPress={() => moveRoutineDown(routine, slot.hour, index)}
+                                  disabled={index === slot.routines.length - 1 && slot.hour === 23}
+                                >
+                                  <Ionicons
+                                    name="chevron-down"
+                                    size={16}
+                                    color={
+                                      index === slot.routines.length - 1 && slot.hour === 23
+                                        ? colors.textTertiary
+                                        : "#007AFF"
+                                    }
                                   />
-                                  <View
-                                    style={[
-                                      styles.dragLine,
-                                      {
-                                        backgroundColor: isBeingDragged
-                                          ? "#007AFF"
-                                          : colors.textTertiary,
-                                      },
-                                    ]}
-                                  />
-                                </View>
+                                </TouchableOpacity>
                               </View>
                             )}
-                          </Animated.View>
+                          </View>
                         );
                       })
                     )}
@@ -2705,6 +2758,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     marginBottom: 8,
+  },
+  // ✅ NEW: Arrow control styles for calendar variation
+  arrowControls: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    gap: 4,
+  },
+  arrowButton: {
+    padding: 4,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
   },
   calendarRoutineLeft: {
     flex: 1,
