@@ -36,15 +36,22 @@ export default async function handler(req, res) {
         // Define your pricing plans
         const plans = {
             monthly: {
-                price: 'price_1RvpxdRrlTgvstUYtzK63A85', // ← Your monthly price ID
+                price: 'price_1RvpxdRrlTgvstUYtzK63A85', // ← $2.94 Monthly (NO AI)
                 name: 'Monthly Premium'
             },
             yearly: {
-                price: 'price_1Rvpy5RrlTgvstUYtZWQF2vf', // ← Your annual price ID
+                price: 'price_1Rvpy5RrlTgvstUYtZWQF2vf', // ← $27.99 Yearly (NO AI)
                 name: 'Yearly Premium'
+            },
+            monthlyAI: {
+                price: 'price_1S0SLTRrlTgvstUY0hMnFnJM', // ← $7.99 Monthly (WITH AI)
+                name: 'Monthly Premium + AI'
+            },
+            yearlyAI: {
+                price: 'price_1S0SM5RrlTgvstUY2FBY8DCn', // ← $74.99 Yearly (WITH AI)
+                name: 'Yearly Premium + AI'
             }
         };
-
         const selectedPlan = plans[planId];
         if (!selectedPlan) {
             res.status(400).json({ error: 'Invalid plan ID' });
