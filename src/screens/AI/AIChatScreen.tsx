@@ -40,7 +40,7 @@ interface ChatMessageWithLoading extends ChatMessage {
 
 const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     const { colors } = useTheme();
-    const { isPremium } = usePremium();
+    const { isPremium, checkPremiumFeature } = usePremium();
 
     // State management
     const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
@@ -54,10 +54,11 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     // Refs
     const flatListRef = useRef<FlatList>(null);
 
-    // 🔒 PREMIUM CHECK - Redirect non-premium users immediately
+    // 🔒 AI ACCESS CHECK - Redirect users without AI access
     useEffect(() => {
-        if (!isPremium) {
-            console.log('🚫 Non-premium user accessing AI - redirecting to paywall');
+        const hasAIAccess = checkPremiumFeature("ai_assistant");
+        if (!hasAIAccess) {
+            console.log('🚫 User without AI access - redirecting to paywall');
             navigation.navigate('Premium', { source: 'ai_tab' });
             return;
         }

@@ -47,6 +47,8 @@ interface PricingPlan {
     savings?: string;
     popular?: boolean;
     features: string[];
+    tier: 'free' | 'premium' | 'premiumAI';  // ✅ ADD THIS LINE
+    hasAI: boolean;                           // ✅ ADD THIS LINE
 }
 
 const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
@@ -88,27 +90,69 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
         },
     ];
 
-    // Pricing plans data
+    // ✅ NEW: 4-Tier Pricing Structure
     const pricingPlans: PricingPlan[] = [
         {
             id: "monthly",
-            name: "Monthly",
+            name: "Premium",
             price: "$2.94",
             period: "per month",
-            features: ["All Premium Features", "Cancel Anytime", "24/7 Support"]
+            tier: 'premium',
+            hasAI: false,
+            features: [
+                "Daily Calendar",
+                "Advanced Analytics",
+                "Priority Support",
+                "Cancel Anytime"
+            ]
         },
         {
             id: "yearly",
-            name: "Yearly",
+            name: "Premium",
             price: "$27.99",
-            originalPrice: "$35.00",
+            originalPrice: "$35.28",
             period: "per year",
             savings: "Save 20%",
+            tier: 'premium',
+            hasAI: false,
+            features: [
+                "All Premium Features",
+                "Priority Support",
+                "Early Access to New Features"
+            ]
+        },
+        {
+            id: "monthlyAI",
+            name: "Premium + AI",
+            price: "$7.99",
+            period: "per month",
             popular: true,
-            features: ["All Premium Features", "Priority Support", "Early Access to New Features"]
+            tier: 'premiumAI',
+            hasAI: true,
+            features: [
+                "Everything in Premium",
+                "🤖 Unlimited AI Assistant",
+                "Personalized Recommendations",
+                "Smart Scheduling"
+            ]
+        },
+        {
+            id: "yearlyAI",
+            name: "Premium + AI",
+            price: "$74.99",
+            originalPrice: "$95.88",
+            period: "per year",
+            savings: "Save 22%",
+            tier: 'premiumAI',
+            hasAI: true,
+            features: [
+                "Everything in Premium",
+                "🤖 Unlimited AI Assistant",
+                "Priority AI Responses",
+                "Advanced AI Coaching"
+            ]
         },
     ];
-
     const handleDirectPurchase = async (planId: string) => {
         setIsProcessing(planId);
         console.log(`🚀 Direct purchase for plan: ${planId} from source: ${source}`);
