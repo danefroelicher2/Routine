@@ -1743,36 +1743,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* ✅ CORRECTED: CREATE BUTTON SECTION - Only show when calendar view is ON */}
+        {/* ✅ MODIFIED: CREATE BUTTON SECTION with inline edit icon */}
         {isCalendarView && (
           <View style={[styles.createButtonContainer, { backgroundColor: colors.surface }]}>
-            <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: "#007AFF" }]}
-              onPress={() => navigation.navigate("AddRoutine", {
-                selectedDay,
-                isCalendarMode: true  // ✅ ADD this parameter
-              })}
-            >
-              <Ionicons name="add" size={24} color="white" />
-              <Text style={styles.createButtonText}>Create Routine</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+            <View style={styles.createButtonRow}>
+              <TouchableOpacity
+                style={[styles.createButton, styles.createButtonShortened, { backgroundColor: "#007AFF" }]}
+                onPress={() => navigation.navigate("AddRoutine", {
+                  selectedDay,
+                  isCalendarMode: true
+                })}
+              >
+                <Ionicons name="add" size={24} color="white" />
+                <Text style={styles.createButtonText}>Create Routine</Text>
+              </TouchableOpacity>
 
-        {/* ✅ ENHANCED: Main content - conditional rendering based on calendar view */}
-        {isCalendarView ? (
-          /* ✅ MODIFIED: Calendar view with working time slots using user's custom schedule */
-          <View style={styles.calendarViewContainer}>
-            {/* ✅ NEW: Calendar Edit Mode Toggle */}
-            <View style={[styles.sectionHeader, { backgroundColor: colors.surface, marginBottom: 12, marginHorizontal: 16, borderRadius: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }]}>
-              <Ionicons name="calendar" size={24} color="#007AFF" />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Calendar View
-              </Text>
               <TouchableOpacity
                 onPress={() => toggleEditMode("calendar")}
                 style={[
-                  styles.editButton,
+                  styles.inlineEditButton,
                   isEditMode && editSection === "calendar" && styles.editButtonActive,
                 ]}
               >
@@ -1787,7 +1776,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 />
               </TouchableOpacity>
             </View>
+          </View>
+        )}
 
+        {/* ✅ ENHANCED: Main content - conditional rendering based on calendar view */}
+        {isCalendarView ? (
+          /* ✅ MODIFIED: Calendar view without header section */
+          <View style={styles.calendarViewContainer}>
             <View style={styles.timeSlotsContainer}>
               {timeSlots.map((slot) => (
                 <View key={slot.hour} style={[styles.timeSlot, { borderBottomColor: colors.border }]}>
@@ -2556,6 +2551,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 12,
     gap: 8,
+  },
+  createButtonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  createButtonShortened: {
+    flex: 1,
+  },
+  inlineEditButton: {
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.05)",
   },
   createButtonText: {
     color: "white",
