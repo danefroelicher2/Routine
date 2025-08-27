@@ -1,7 +1,4 @@
-// ============================================
-// COMPLETE PremiumContext.tsx - REPLACE YOUR ENTIRE FILE
-// ============================================
-
+// src/contexts/PremiumContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "../services/supabase";
@@ -29,6 +26,8 @@ interface PremiumContextType {
     // Premium Status
     isPremium: boolean;
     isLoading: boolean;
+    premiumTier: 'free' | 'premium' | 'premiumAI';
+    hasAIAccess: boolean;
 
     // Premium Features
     premiumFeatures: PremiumFeature[];
@@ -57,7 +56,7 @@ interface PremiumContextType {
     isLimitReached: (feature: keyof CurrentUsage) => boolean;
     updateUsage: (feature: keyof CurrentUsage, count: number) => void;
 
-    // ✅ NEW: Stripe Integration
+    // Stripe Integration
     refreshSubscriptionStatus: () => Promise<boolean>;
 }
 
@@ -71,6 +70,8 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
     // Premium Status
     const [isPremium, setIsPremium] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [premiumTier, setPremiumTier] = useState<'free' | 'premium' | 'premiumAI'>('free');
+    const [hasAIAccess, setHasAIAccess] = useState(false);
 
     // Modal State
     const [showPremiumModal, setShowPremiumModal] = useState<boolean>(false);
@@ -125,13 +126,11 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         maxAIQueries: 5,
     };
 
-    const checkStripeSubscriptionStatus = async (userId: string): Promise<boolean> => {
+    const checkStripeSubscriptionStatus = async (userId: string): Promise<{ isPremium: boolean, tier: 'free' | 'premium' | 'premiumAI', hasAIAccess: boolean }> => {
         try {
             console.log(`🔍 Checking Stripe subscription for user: ${userId}`);
 
-            // ✅ CHANGE FROM:
-
-            const url = `http://192.168.1.6:3001/premium-status?userId=${userId}`;
+            const url = `https://routine-payments-v3-ou91brf2m-dane-froelichers-projects.vercel.app/api/premium-status?userId=${userId}`;
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
@@ -145,13 +144,7 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('❌ Subscription status error response:', errorText);
-
-                try {
-                    const errorJson = JSON.parse(errorText);
-                    throw new Error(errorJson.error || 'Failed to check subscription status');
-                } catch (parseError) {
-                    throw new Error(`API Error: ${response.status} - Server returned HTML instead of JSON`);
-                }
+                return { isPremium: false, tier: 'free', hasAIAccess: false };
             }
 
             const responseText = await response.text();
@@ -160,16 +153,21 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
             try {
                 const data = JSON.parse(responseText);
                 console.log("✅ Subscription status data:", data);
-                return data.isPremium || false;
+
+                return {
+                    isPremium: data.isPremium || false,
+                    tier: data.tier || 'free',
+                    hasAIAccess: data.hasAIAccess || false
+                };
             } catch (parseError) {
                 console.error('❌ Subscription status JSON Parse Error:', parseError);
                 console.error('❌ Response was:', responseText);
-                throw new Error('Server returned invalid JSON response');
+                return { isPremium: false, tier: 'free', hasAIAccess: false };
             }
 
         } catch (error) {
             console.error('❌ Network Error:', error);
-            return false;
+            return { isPremium: false, tier: 'free', hasAIAccess: false };
         }
     };
 
@@ -184,20 +182,42 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
 
             // Load cached premium status
             const cachedPremiumStatus = await AsyncStorage.getItem("@premium_status");
+            const cachedTier = await AsyncStorage.getItem("@premium_tier");
+            const cachedAIAccess = await AsyncStorage.getItem("@ai_access");
+
             if (cachedPremiumStatus !== null) {
                 setIsPremium(JSON.parse(cachedPremiumStatus));
             }
+            if (cachedTier !== null) {
+                setPremiumTier(cachedTier as 'free' | 'premium' | 'premiumAI');
+            }
+            if (cachedAIAccess !== null) {
+                setHasAIAccess(JSON.parse(cachedAIAccess));
+            }
 
-            // ✅ Check with Stripe for real-time status
+            // Check with Stripe for real-time status
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 const stripeStatus = await checkStripeSubscriptionStatus(user.id);
 
                 // Update if status changed
-                if (stripeStatus !== JSON.parse(cachedPremiumStatus || 'false')) {
-                    setIsPremium(stripeStatus);
-                    await AsyncStorage.setItem("@premium_status", JSON.stringify(stripeStatus));
-                    console.log(`✅ Premium status updated from Stripe: ${stripeStatus}`);
+                const oldStatus = JSON.parse(cachedPremiumStatus || 'false');
+                const oldTier = cachedTier || 'free';
+                const oldAIAccess = JSON.parse(cachedAIAccess || 'false');
+
+                if (stripeStatus.isPremium !== oldStatus ||
+                    stripeStatus.tier !== oldTier ||
+                    stripeStatus.hasAIAccess !== oldAIAccess) {
+
+                    setIsPremium(stripeStatus.isPremium);
+                    setPremiumTier(stripeStatus.tier);
+                    setHasAIAccess(stripeStatus.hasAIAccess);
+
+                    await AsyncStorage.setItem("@premium_status", JSON.stringify(stripeStatus.isPremium));
+                    await AsyncStorage.setItem("@premium_tier", stripeStatus.tier);
+                    await AsyncStorage.setItem("@ai_access", JSON.stringify(stripeStatus.hasAIAccess));
+
+                    console.log(`✅ Premium status updated from Stripe:`, stripeStatus);
                 }
             }
 
@@ -242,10 +262,6 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         setShowPremiumModal(false);
         setModalSource("");
     };
-
-    // ✅ NEW: Enhanced premium checking with AI tier support
-    const [premiumTier, setPremiumTier] = useState<'free' | 'premium' | 'premiumAI'>('free');
-    const [hasAIAccess, setHasAIAccess] = useState(false);
 
     const checkPremiumFeature = (featureId: string): boolean => {
         // AI features require premiumAI tier
@@ -313,18 +329,24 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         }
     };
 
-    // ✅ NEW: Refresh subscription status from Stripe
+    // Refresh subscription status from Stripe
     const refreshSubscriptionStatus = async (): Promise<boolean> => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return false;
 
             const stripeStatus = await checkStripeSubscriptionStatus(user.id);
-            setIsPremium(stripeStatus);
-            await AsyncStorage.setItem("@premium_status", JSON.stringify(stripeStatus));
 
-            console.log(`🔄 Subscription status refreshed: ${stripeStatus}`);
-            return stripeStatus;
+            setIsPremium(stripeStatus.isPremium);
+            setPremiumTier(stripeStatus.tier);
+            setHasAIAccess(stripeStatus.hasAIAccess);
+
+            await AsyncStorage.setItem("@premium_status", JSON.stringify(stripeStatus.isPremium));
+            await AsyncStorage.setItem("@premium_tier", stripeStatus.tier);
+            await AsyncStorage.setItem("@ai_access", JSON.stringify(stripeStatus.hasAIAccess));
+
+            console.log(`🔄 Subscription status refreshed:`, stripeStatus);
+            return stripeStatus.isPremium;
         } catch (error) {
             console.error('❌ Error refreshing subscription status:', error);
             return false;
@@ -335,6 +357,8 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         // Premium Status
         isPremium,
         isLoading,
+        premiumTier,
+        hasAIAccess,
 
         // Premium Features
         premiumFeatures,
@@ -363,7 +387,7 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         isLimitReached,
         updateUsage,
 
-        // ✅ NEW: Stripe Integration
+        // Stripe Integration
         refreshSubscriptionStatus,
     };
 

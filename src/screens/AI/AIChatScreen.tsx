@@ -59,7 +59,10 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
         const hasAIAccess = checkPremiumFeature("ai_assistant");
         if (!hasAIAccess) {
             console.log('🚫 User without AI access - redirecting to paywall');
-            navigation.navigate('Premium', { source: 'ai_tab' });
+            navigation.navigate('Profile', {
+                screen: 'Premium',
+                params: { source: 'ai_tab' }
+            });
             return;
         }
     }, [isPremium, navigation]);

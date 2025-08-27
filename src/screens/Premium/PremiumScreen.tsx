@@ -168,7 +168,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             console.log('🚀 Starting Stripe checkout for plan:', planId);
 
             // ✅ POST REQUEST TO YOUR LOCAL SERVER
-            const response = await fetch('http://192.168.1.6:3001/create-checkout', {
+            const response = await fetch('https://routine-payments-v3-ou91brf2m-dane-froelichers-projects.vercel.app/api/create-checkout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -191,7 +191,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             const data = await response.json();
             console.log('✅ Payment response:', data);
 
-            if (data.success && data.url) {
+            if (data.url) {  // Remove data.success check since your backend doesn't send it
                 // Open the REAL Stripe checkout URL
                 console.log(`💳 Opening Stripe checkout: ${data.url}`);
 
@@ -203,9 +203,8 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                     Alert.alert("Error", "Unable to open payment page");
                 }
             } else {
-                throw new Error('Invalid response from payment server');
+                throw new Error('No checkout URL received from server');
             }
-
         } catch (error) {
             console.error(`❌ Purchase error for ${planId}:`, error);
             Alert.alert("Error", "Failed to start purchase. Please try again.");
