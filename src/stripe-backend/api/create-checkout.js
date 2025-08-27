@@ -3,6 +3,9 @@ import Stripe from 'stripe';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
+
+    console.log('🔥 FUNCTION DEFINITELY CALLED at:', new Date().toISOString());
+
     console.log('🚀 Create-checkout API called');
     console.log('📦 Method:', req.method);
     console.log('📦 Body:', req.body);
