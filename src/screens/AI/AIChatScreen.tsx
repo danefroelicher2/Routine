@@ -42,6 +42,7 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     const { colors } = useTheme();
     const { isPremium, checkPremiumFeature } = usePremium();
 
+
     // State management
     const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
     const [messages, setMessages] = useState<ChatMessageWithLoading[]>([]);
@@ -65,16 +66,17 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
             });
             return;
         }
-    }, [isPremium, navigation]);
+    }, [isPremium, navigation, checkPremiumFeature]);
 
     // Load data when screen focuses
     useFocusEffect(
         useCallback(() => {
-            if (isPremium) { // Only initialize if premium
+            const hasAIAccess = checkPremiumFeature("ai_assistant");
+            if (hasAIAccess) { // Only initialize if has AI access
                 initializeChat();
                 checkAIConnection();
             }
-        }, [isPremium])
+        }, [isPremium, checkPremiumFeature])
     );
 
     /**
@@ -448,8 +450,8 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
         );
     };
 
-    // 🔒 Show loading screen while redirecting non-premium users
-    if (!isPremium) {
+    // 🔒 Show loading screen while redirecting users without AI access
+    if (!checkPremiumFeature("ai_assistant")) {
         return (
             <View style={[styles.container, { backgroundColor: colors.background }]}>
                 <View style={styles.premiumLoadingContainer}>
