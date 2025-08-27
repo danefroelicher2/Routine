@@ -36,29 +36,43 @@ export default async function handler(req, res) {
         // Define your pricing plans
         const plans = {
             monthly: {
-                price: 'price_1RvpxdRrlTgvstUYtzK63A85', // ← $2.94 Monthly (NO AI)
+                price: 'price_1RvpxdRrlTgvstUYtzK63A85', // $2.94 Monthly (NO AI)
                 name: 'Monthly Premium'
             },
             yearly: {
-                price: 'price_1Rvpy5RrlTgvstUYtZWQF2vf', // ← $27.99 Yearly (NO AI)
+                price: 'price_1Rvpy5RrlTgvstUYtZWQF2vf', // $27.99 Yearly (NO AI)
                 name: 'Yearly Premium'
             },
             monthlyAI: {
-                price: 'price_1S0SLTRrlTgvstUY0hMnFnJM', // ← $7.99 Monthly (WITH AI)
+                price: 'price_1S0SLTRrlTgvstUY0hMnFnJM', // $7.99 Monthly (WITH AI)
                 name: 'Monthly Premium + AI'
             },
             yearlyAI: {
-                price: 'price_1S0SM5RrlTgvstUY2FBY8DCn', // ← $74.99 Yearly (WITH AI)
+                price: 'price_1S0SM5RrlTgvstUY2FBY8DCn', // $74.99 Yearly (WITH AI)
                 name: 'Yearly Premium + AI'
             }
         };
+
         const selectedPlan = plans[planId];
         if (!selectedPlan) {
             res.status(400).json({ error: 'Invalid plan ID' });
             return;
         }
 
-        // Create Stripe checkout session
+        console.log(`Creating customer for user: ${userId}, email: ${userEmail}`);
+
+        // Create customer with metadata first
+        const customer = await stripe.customers.create({
+            email: userEmail,
+            metadata: {
+                userId: userId,
+                planId: planId
+            }
+        });
+
+        console.log(`Customer created with ID: ${customer.id}, metadata:`, customer.metadata);
+
+        // Then create the checkout session
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [{
@@ -66,10 +80,9 @@ export default async function handler(req, res) {
                 quantity: 1,
             }],
             mode: 'subscription',
-            success_url: `${process.env.FRONTEND_URL || 'https://your-app.com'}/premium/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.FRONTEND_URL || 'https://your-app.com'}/premium/cancel`,
-            customer_email: userEmail,
-            client_reference_id: userId,
+            success_url: process.env.FRONTEND_URL || 'exp://192.168.1.6:8081/--/premium-success',
+            cancel_url: process.env.FRONTEND_URL || 'exp://192.168.1.6:8081/--/premium-cancel',
+            customer: customer.id,  // Use the customer ID
             metadata: {
                 userId: userId,
                 planId: planId
