@@ -1,4 +1,4 @@
-// App.tsx - UPDATED TO FIX PASSWORD RESET FLOW
+// App.tsx - UPDATED TO FIX PASSWORD RESET FLOW + PREMIUM DEEP LINKS
 import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, View, StyleSheet, StatusBar, Alert, Linking } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -12,7 +12,7 @@ import { supabase } from './src/services/supabase';
 
 // Context Providers
 import { ThemeProvider, useTheme } from './ThemeContext';
-import { PremiumProvider } from './src/contexts/PremiumContext';
+import { PremiumProvider, usePremium } from './src/contexts/PremiumContext';
 import { HomeViewProvider } from './src/contexts/HomeViewContext';
 
 // Auth Screens
@@ -139,7 +139,7 @@ function MainTabs() {
 }
 
 // ====================================
-// 🔥 FIXED: Auth Stack Navigator 
+// FIXED: Auth Stack Navigator 
 // ====================================
 function AuthStack() {
   return (
@@ -153,7 +153,7 @@ function AuthStack() {
 }
 
 // ====================================
-// 🔥 MAIN APP COMPONENT WITH FIXED DEEP LINK HANDLING
+// MAIN APP COMPONENT WITH FIXED DEEP LINK HANDLING + PREMIUM LINKS
 // ====================================
 function AppContent() {
   const [session, setSession] = useState<Session | null>(null);
@@ -161,6 +161,7 @@ function AppContent() {
   const [pendingPasswordReset, setPendingPasswordReset] = useState(false);
   const [resetTokens, setResetTokens] = useState<{ accessToken: string; refreshToken: string } | null>(null);
   const { colors } = useTheme();
+  const { refreshSubscriptionStatus } = usePremium();
   const navigationRef = useRef<any>(null);
 
   useEffect(() => {
@@ -191,15 +192,15 @@ function AppContent() {
   }, [pendingPasswordReset]);
 
   // ====================================
-  // 🔥 FIXED: Deep Link Handler
+  // FIXED: Deep Link Handler + Premium Support
   // ====================================
   useEffect(() => {
     const handleDeepLink = async (url: string) => {
-      console.log('🔗 Deep link received:', url);
+      console.log('Deep link received:', url);
 
       // Handle password reset deep link
       if (url.includes('#access_token=') || url.includes('reset-password-confirm')) {
-        console.log('🔓 Password reset link detected');
+        console.log('Password reset link detected');
 
         const hashParams = url.split('#')[1];
         if (hashParams) {
@@ -208,12 +209,10 @@ function AppContent() {
           const refreshToken = params.get('refresh_token');
 
           if (accessToken && refreshToken) {
-            console.log('🎯 Valid reset tokens found');
+            console.log('Valid reset tokens found');
 
             try {
-              // ====================================
-              // 🔥 KEY FIX: Don't set session yet! Store tokens and navigate to ConfirmPasswordResetScreen
-              // ====================================
+              // KEY FIX: Don't set session yet! Store tokens and navigate to ConfirmPasswordResetScreen
 
               // Set the session temporarily for validation
               const { data, error } = await supabase.auth.setSession({
@@ -222,7 +221,7 @@ function AppContent() {
               });
 
               if (!error && data.session) {
-                console.log('✅ Reset session validated successfully');
+                console.log('Reset session validated successfully');
 
                 // Store the reset tokens
                 setResetTokens({ accessToken, refreshToken });
@@ -241,25 +240,25 @@ function AppContent() {
                 }, 500);
 
                 Alert.alert(
-                  'Reset Password 🔐',
+                  'Reset Password',
                   'Please set your new password below.',
                   [{ text: 'OK' }]
                 );
 
               } else {
-                console.error('❌ Invalid reset session:', error);
+                console.error('Invalid reset session:', error);
                 Alert.alert('Error', 'Invalid or expired reset link. Please request a new one.');
               }
             } catch (error) {
-              console.error('💥 Error handling reset link:', error);
+              console.error('Error handling reset link:', error);
               Alert.alert('Error', 'Failed to process reset link. Please try again.');
             }
           } else {
-            console.error('❌ Missing access or refresh token');
+            console.error('Missing access or refresh token');
             Alert.alert('Error', 'Invalid reset link format.');
           }
         } else {
-          console.error('❌ No hash parameters found in URL');
+          console.error('No hash parameters found in URL');
           Alert.alert('Error', 'Invalid reset link.');
         }
         return; // Early return to prevent premium link handling
@@ -267,11 +266,27 @@ function AppContent() {
 
       // Handle premium deep links
       if (url.includes('premium-success')) {
-        Alert.alert(
-          'Payment Successful! 🎉',
-          'Welcome to Premium! Your subscription is now active.',
-          [{ text: 'OK' }]
-        );
+        console.log('Premium success deep link received');
+
+        // Refresh subscription status with delay to ensure webhook processed
+        setTimeout(async () => {
+          try {
+            await refreshSubscriptionStatus();
+            Alert.alert(
+              'Payment Successful!',
+              'Welcome to Premium! Your subscription is now active.',
+              [{ text: 'OK' }]
+            );
+          } catch (error) {
+            console.error('Error refreshing premium status:', error);
+            Alert.alert(
+              'Payment Successful!',
+              'Your premium subscription is active. Please restart the app to see your new features.',
+              [{ text: 'OK' }]
+            );
+          }
+        }, 2000);
+
       } else if (url.includes('premium-cancel')) {
         Alert.alert(
           'Payment Cancelled',
@@ -292,13 +307,13 @@ function AppContent() {
     });
 
     return () => linkingSubscription?.remove();
-  }, []);
+  }, [refreshSubscriptionStatus]);
 
   // ====================================
-  // 🔥 HELPER FUNCTION: Complete Password Reset
+  // HELPER FUNCTION: Complete Password Reset
   // ====================================
   const completePasswordReset = async () => {
-    console.log('🎯 Completing password reset flow');
+    console.log('Completing password reset flow');
 
     // Clear the password reset flow
     setPendingPasswordReset(false);
@@ -317,7 +332,6 @@ function AppContent() {
   };
 
   // Make helper function available globally for ConfirmPasswordResetScreen
-  // You'll need to modify ConfirmPasswordResetScreen to call this
   (global as any).completePasswordReset = completePasswordReset;
   (global as any).resetTokens = resetTokens;
 

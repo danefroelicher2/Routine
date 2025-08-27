@@ -83,8 +83,12 @@ export default async function handler(req, res) {
                 quantity: 1,
             }],
             mode: 'subscription',
-            success_url: process.env.FRONTEND_URL || 'exp://192.168.1.6:8081/--/premium-success',
-            cancel_url: process.env.FRONTEND_URL || 'exp://192.168.1.6:8081/--/premium-cancel',
+            success_url: process.env.NODE_ENV === 'production'
+                ? 'routineapp://premium-success'
+                : 'exp://192.168.1.6:8081/--/premium-success',
+            cancel_url: process.env.NODE_ENV === 'production'
+                ? 'routineapp://premium-cancel'
+                : 'exp://192.168.1.6:8081/--/premium-cancel',
             customer: customer.id,  // Use the customer ID
             metadata: {
                 userId: userId,
