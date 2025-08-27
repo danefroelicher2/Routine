@@ -14,11 +14,14 @@ import {
     Dimensions,
     Alert,
     Animated,
+    AppState
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../../ThemeContext";
 import { Linking } from 'react-native';
 import { supabase } from "../../services/supabase";
+import { usePremium } from "../../contexts/PremiumContext";
+
 
 const { width } = Dimensions.get("window");
 
@@ -53,10 +56,39 @@ interface PricingPlan {
 
 const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
     const { colors } = useTheme();
+    const { refreshSubscriptionStatus } = usePremium();
     const [isProcessing, setIsProcessing] = useState<string | null>(null); // Track which plan is processing
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const source = route?.params?.source || "unknown";
 
-    // ✅ UPDATED: Premium features data - NEW ORDER
+    // Auto-refresh premium status when app becomes active
+    React.useEffect(() => {
+        const handleAppStateChange = async (nextAppState: string) => {
+            if (nextAppState === 'active') {
+                console.log('🔄 App became active - checking for premium updates');
+
+                setTimeout(async () => {
+                    try {
+                        setIsRefreshing(true);
+                        await refreshSubscriptionStatus();
+                        console.log('✅ Premium status refreshed automatically');
+                    } catch (error) {
+                        console.error('Error auto-refreshing premium status:', error);
+                    } finally {
+                        setIsRefreshing(false);
+                    }
+                }, 2000);
+            }
+        };
+
+        const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+        return () => {
+            subscription?.remove();
+        };
+    }, [refreshSubscriptionStatus]);
+
+    // ✅ UPDATED: Premium features data - NEW ORDER    // ✅ UPDATED: Premium features data - NEW ORDER
     const premiumFeatures: PremiumFeature[] = [
         {
             icon: "sparkles",
@@ -200,6 +232,13 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                 if (supported) {
                     await Linking.openURL(data.url);
                     console.log("🌐 Opened Stripe checkout in browser");
+
+                    // Show helpful message
+                    Alert.alert(
+                        "Payment in Progress",
+                        "After completing your purchase, return to the app. Your premium status will update automatically!",
+                        [{ text: "OK" }]
+                    );
                 } else {
                     Alert.alert("Error", "Unable to open payment page");
                 }
