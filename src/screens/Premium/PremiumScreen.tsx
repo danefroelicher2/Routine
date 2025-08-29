@@ -202,7 +202,8 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             // ✅ POST REQUEST TO YOUR LOCAL SERVER
             // NEW (v4) - matching what your build is expecting
             // Change from old URL to:
-            const response = await fetch('https://routine-payments-v4-pv4c3y90w-dane-froelichers-projects.vercel.app/api/create-checkout', {
+            // In PremiumScreen.tsx
+            const response = await fetch('https://routine-payments-v3-o7inkgiml-dane-froelichers-projects.vercel.app/api/create-checkout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
