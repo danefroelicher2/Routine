@@ -1,267 +1,210 @@
+// api/webhook.js
+// COMPLETELY NEW APPROACH FOR VERCEL WEBHOOK HANDLING
+
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-// Initialize Supabase client
 const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-export default async function handler(req, res) {
-    console.log('🎣 Webhook endpoint called at:', new Date().toISOString());
-    console.log('📦 Method:', req.method);
-    console.log('📦 Headers:', Object.keys(req.headers));
+// CRITICAL: Export config BEFORE the handler
+export const config = {
+    api: {
+        bodyParser: false, // This is CRITICAL for raw body access
+    },
+};
 
-    // CORS headers
+// Helper function to get raw body for Vercel
+async function getRawBody(readable) {
+    const chunks = [];
+    for await (const chunk of readable) {
+        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+    }
+    return Buffer.concat(chunks);
+}
+
+export default async function handler(req, res) {
+    // Enable CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, stripe-signature');
 
+    // Handle OPTIONS request for CORS
     if (req.method === 'OPTIONS') {
-        console.log('✅ OPTIONS request handled');
-        return res.status(200).end();
-    }
-
-    if (req.method !== 'POST') {
-        console.log('❌ Invalid method:', req.method);
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-
-    // TEMPORARY: Skip signature verification and work with the parsed body
-    console.log('⚠️ TEMPORARILY SKIPPING SIGNATURE VERIFICATION');
-    console.log('📦 Request body type:', typeof req.body);
-    console.log('📦 Request body keys:', Object.keys(req.body || {}));
-
-    let event;
-
-    try {
-        // For now, treat the parsed body as the event
-        event = req.body;
-
-        if (!event || !event.type) {
-            throw new Error('Invalid webhook event structure');
-        }
-
-        console.log(`✅ Processing webhook event: ${event.type}`);
-        console.log(`📋 Event ID: ${event.id}`);
-
-        // Basic validation - ensure this looks like a Stripe event
-        if (!event.data || !event.data.object) {
-            throw new Error('Invalid Stripe event structure');
-        }
-
-    } catch (err) {
-        console.error('❌ Webhook parsing failed:', err.message);
-        console.error('❌ Request body:', JSON.stringify(req.body, null, 2));
-        return res.status(400).json({ error: `Webhook Error: ${err.message}` });
-    }
-
-    console.log(`🎯 Processing webhook event: ${event.type}`);
-
-    try {
-        // Handle the specific webhook events
-        switch (event.type) {
-            case 'checkout.session.completed':
-                console.log('💳 Processing checkout completion...');
-                await handleCheckoutCompleted(event.data.object);
-                break;
-
-            case 'customer.subscription.deleted':
-                console.log('🗑️ Processing subscription deletion...');
-                await handleSubscriptionCancelled(event.data.object);
-                break;
-
-            case 'invoice.payment_failed':
-                console.log('💸 Processing payment failure...');
-                await handlePaymentFailed(event.data.object);
-                break;
-
-            case 'customer.subscription.updated':
-                console.log('🔄 Processing subscription update...');
-                await handleSubscriptionUpdated(event.data.object);
-                break;
-
-            default:
-                console.log(`🔔 Unhandled event type: ${event.type}`);
-        }
-
-        console.log('✅ Webhook processed successfully');
-        return res.status(200).json({
-            received: true,
-            processed: event.type,
-            event_id: event.id
-        });
-
-    } catch (error) {
-        console.error('❌ Webhook processing error:', error);
-        return res.status(500).json({
-            error: 'Webhook processing failed',
-            details: error.message
-        });
-    }
-}
-
-// Helper function: Handle successful checkout
-async function handleCheckoutCompleted(session) {
-    console.log('✅ Processing successful checkout...');
-    console.log('📊 Session ID:', session.id);
-    console.log('👤 Customer ID:', session.customer);
-    console.log('📋 Session metadata:', JSON.stringify(session.metadata, null, 2));
-
-    const userId = session.metadata?.userId;
-    const planId = session.metadata?.planId;
-    const customerId = session.customer;
-    const subscriptionId = session.subscription;
-
-    console.log(`🔍 Extracted data - User: ${userId}, Plan: ${planId}, Customer: ${customerId}, Sub: ${subscriptionId}`);
-
-    if (!userId) {
-        console.error('❌ Missing userId in checkout session metadata');
-        console.error('❌ Available metadata keys:', Object.keys(session.metadata || {}));
-        console.error('❌ Metadata values:', session.metadata);
+        res.status(200).end();
         return;
     }
 
-    console.log(`💾 Updating database for user: ${userId}, plan: ${planId}`);
+    // Only accept POST requests
+    if (req.method !== 'POST') {
+        console.log(`❌ Invalid method: ${req.method}`);
+        res.status(405).json({ error: 'Method not allowed' });
+        return;
+    }
+
+    console.log('🎣 Webhook endpoint hit!');
+    console.log('📦 Headers received:', req.headers);
+
+    const sig = req.headers['stripe-signature'];
+
+    // Check if we have the signature header
+    if (!sig) {
+        console.log('⚠️ No stripe-signature header found');
+        res.status(400).json({ error: 'No stripe-signature header' });
+        return;
+    }
+
+    let event;
+    let rawBody;
 
     try {
-        // Update user's premium status in Supabase
-        const { data, error } = await supabase
-            .from('user_subscriptions')
-            .upsert({
-                user_id: userId,
-                stripe_customer_id: customerId,
-                stripe_subscription_id: subscriptionId,
-                plan_id: planId,
-                status: 'active',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            }, {
-                onConflict: 'user_id'
-            });
+        // Get the raw body for signature verification
+        rawBody = await getRawBody(req);
+        console.log('📊 Raw body obtained, length:', rawBody.length);
 
-        if (error) {
-            console.error('❌ Supabase error details:', error);
-            throw error;
-        } else {
-            console.log(`✅ SUCCESS! User ${userId} premium status activated`);
-            console.log('📊 Database operation completed successfully');
-            if (data) {
-                console.log('📊 Database response:', data);
-            }
+        // Verify webhook signature
+        const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+        if (!webhookSecret) {
+            console.error('❌ STRIPE_WEBHOOK_SECRET not configured');
+            res.status(500).json({ error: 'Webhook secret not configured' });
+            return;
         }
 
-    } catch (error) {
-        console.error('❌ Database update error:', error.message);
-        console.error('❌ Full error object:', error);
-        throw error;
+        console.log('🔐 Attempting signature verification...');
+        event = stripe.webhooks.constructEvent(
+            rawBody.toString('utf8'),
+            sig,
+            webhookSecret
+        );
+
+        console.log('✅ Signature verified! Event type:', event.type);
+
+    } catch (err) {
+        console.error('❌ Webhook signature verification failed:', err.message);
+        console.error('Debug info:', {
+            signatureHeader: sig?.substring(0, 20) + '...',
+            bodyLength: rawBody?.length,
+            bodyPreview: rawBody?.toString('utf8').substring(0, 100)
+        });
+        res.status(400).json({ error: `Webhook Error: ${err.message}` });
+        return;
     }
-}
 
-// Helper function: Handle subscription cancellation
-async function handleSubscriptionCancelled(subscription) {
-    console.log('❌ Processing subscription cancellation...');
-    console.log('🆔 Subscription ID:', subscription.id);
-    console.log('👤 Customer ID:', subscription.customer);
-
-    const customerId = subscription.customer;
-    const subscriptionId = subscription.id;
+    // Handle the event
+    console.log(`📨 Processing ${event.type} event...`);
 
     try {
-        const { data, error } = await supabase
-            .from('user_subscriptions')
-            .update({
-                status: 'cancelled',
-                updated_at: new Date().toISOString()
-            })
-            .eq('stripe_customer_id', customerId)
-            .eq('stripe_subscription_id', subscriptionId);
+        switch (event.type) {
+            case 'checkout.session.completed':
+                const session = event.data.object;
+                console.log('💳 Payment successful!');
+                console.log('  User ID:', session.client_reference_id);
+                console.log('  Customer:', session.customer);
+                console.log('  Subscription:', session.subscription);
 
-        if (error) {
-            console.error('❌ Failed to cancel subscription:', error);
-            throw error;
-        } else {
-            console.log(`✅ Subscription ${subscriptionId} cancelled successfully`);
+                if (session.client_reference_id) {
+                    // Update user subscription in database
+                    const { data, error } = await supabase
+                        .from('user_subscriptions')
+                        .upsert({
+                            user_id: session.client_reference_id,
+                            stripe_customer_id: session.customer,
+                            stripe_subscription_id: session.subscription,
+                            plan_id: session.metadata?.plan_id || 'premium',
+                            status: 'active',
+                            updated_at: new Date().toISOString()
+                        }, {
+                            onConflict: 'user_id'
+                        });
+
+                    if (error) {
+                        console.error('❌ Database update failed:', error);
+                    } else {
+                        console.log('✅ Database updated successfully');
+                    }
+                }
+                break;
+
+            case 'customer.subscription.deleted':
+                const subscription = event.data.object;
+                console.log('🚫 Subscription cancelled');
+                console.log('  Subscription ID:', subscription.id);
+
+                // Update subscription status to cancelled
+                const { error: cancelError } = await supabase
+                    .from('user_subscriptions')
+                    .update({
+                        status: 'cancelled',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('stripe_subscription_id', subscription.id);
+
+                if (cancelError) {
+                    console.error('❌ Failed to update cancelled status:', cancelError);
+                } else {
+                    console.log('✅ Subscription marked as cancelled');
+                }
+                break;
+
+            case 'customer.subscription.updated':
+                const updatedSub = event.data.object;
+                console.log('🔄 Subscription updated');
+                console.log('  Status:', updatedSub.status);
+
+                // Update subscription status
+                const { error: updateError } = await supabase
+                    .from('user_subscriptions')
+                    .update({
+                        status: updatedSub.status,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('stripe_subscription_id', updatedSub.id);
+
+                if (updateError) {
+                    console.error('❌ Failed to update subscription:', updateError);
+                } else {
+                    console.log('✅ Subscription status updated');
+                }
+                break;
+
+            case 'invoice.payment_failed':
+                const invoice = event.data.object;
+                console.log('💔 Payment failed for subscription:', invoice.subscription);
+
+                // Update subscription status to payment_failed
+                const { error: failError } = await supabase
+                    .from('user_subscriptions')
+                    .update({
+                        status: 'payment_failed',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('stripe_subscription_id', invoice.subscription);
+
+                if (failError) {
+                    console.error('❌ Failed to update payment failed status:', failError);
+                }
+                break;
+
+            default:
+                console.log(`ℹ️ Unhandled event type: ${event.type}`);
         }
 
-    } catch (error) {
-        console.error('❌ Database update error:', error);
-        throw error;
-    }
-}
-
-// Helper function: Handle payment failure
-async function handlePaymentFailed(invoice) {
-    console.log('💳 Processing payment failure...');
-    console.log('🆔 Invoice ID:', invoice.id);
-    console.log('👤 Customer ID:', invoice.customer);
-
-    const customerId = invoice.customer;
-    const subscriptionId = invoice.subscription;
-
-    try {
-        const { data, error } = await supabase
-            .from('user_subscriptions')
-            .update({
-                status: 'past_due',
-                updated_at: new Date().toISOString()
-            })
-            .eq('stripe_customer_id', customerId)
-            .eq('stripe_subscription_id', subscriptionId);
-
-        if (error) {
-            console.error('❌ Failed to update payment status:', error);
-            throw error;
-        } else {
-            console.log(`✅ Subscription ${subscriptionId} marked as past_due`);
-        }
+        // Send success response
+        res.status(200).json({
+            received: true,
+            type: event.type,
+            processed: new Date().toISOString()
+        });
 
     } catch (error) {
-        console.error('❌ Database update error:', error);
-        throw error;
+        console.error('❌ Error processing webhook:', error);
+        res.status(500).json({
+            error: 'Failed to process webhook',
+            message: error.message
+        });
     }
 }
-
-// Helper function: Handle subscription updates
-async function handleSubscriptionUpdated(subscription) {
-    console.log('🔄 Processing subscription update...');
-    console.log('🆔 Subscription ID:', subscription.id);
-    console.log('📊 New status:', subscription.status);
-
-    const customerId = subscription.customer;
-    const subscriptionId = subscription.id;
-    const status = subscription.status;
-
-    try {
-        const { data, error } = await supabase
-            .from('user_subscriptions')
-            .update({
-                status: status,
-                updated_at: new Date().toISOString()
-            })
-            .eq('stripe_customer_id', customerId)
-            .eq('stripe_subscription_id', subscriptionId);
-
-        if (error) {
-            console.error('❌ Failed to update subscription:', error);
-            throw error;
-        } else {
-            console.log(`✅ Subscription ${subscriptionId} updated to ${status}`);
-        }
-
-    } catch (error) {
-        console.error('❌ Database update error:', error);
-        throw error;
-    }
-}
-
-// Enable body parsing (since we're not doing signature verification)
-export const config = {
-    api: {
-        bodyParser: {
-            sizeLimit: '1mb',
-        },
-    },
-};
