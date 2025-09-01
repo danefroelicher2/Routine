@@ -1,5 +1,5 @@
 // src/stripe-backend/api/subscription-status.js
-// FIXED VERSION THAT ACTUALLY CHECKS THE DATABASE
+// FIXED VERSION THAT ACTUALLY CHECKS THE DATABASE + PROPER AI DETECTION
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -58,20 +58,28 @@ export default async function handler(req, res) {
 
         console.log('📊 Database query result:', subscription);
 
-        // ✅ DETERMINE PREMIUM STATUS
+        // ✅ DETERMINE PREMIUM STATUS AND AI ACCESS
         const isPremium = !!subscription; // True if we found an active subscription
 
         let tier = 'free';
         let hasAIAccess = false;
 
         if (subscription) {
-            // You can expand this logic based on your plan_id values
-            if (subscription.plan_id?.includes('AI') || subscription.plan_id?.includes('ai')) {
+            console.log('📊 Subscription plan_id:', subscription.plan_id);
+
+            // ✅ IMPROVED AI DETECTION LOGIC
+            if (subscription.plan_id === 'premiumAI' ||
+                subscription.plan_id?.toLowerCase().includes('ai') ||
+                subscription.plan_id?.toLowerCase().includes('monthly_ai') ||
+                subscription.plan_id?.toLowerCase().includes('yearly_ai')) {
+
                 tier = 'premiumAI';
                 hasAIAccess = true;
+                console.log('✅ AI access granted based on plan_id');
             } else {
                 tier = 'premium';
                 hasAIAccess = false;
+                console.log('✅ Standard premium access (no AI)');
             }
         }
 
