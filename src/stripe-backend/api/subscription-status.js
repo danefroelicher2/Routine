@@ -1,6 +1,12 @@
-import Stripe from 'stripe';
+// src/stripe-backend/api/subscription-status.js
+// FIXED VERSION THAT ACTUALLY CHECKS THE DATABASE
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export default async function handler(req, res) {
     console.log('🔍 Subscription status API called');
@@ -24,66 +30,73 @@ export default async function handler(req, res) {
 
     try {
         const { userId } = req.query;
-        console.log('🔍 User ID:', userId);
+        console.log('🔍 Checking status for User ID:', userId);
 
         if (!userId) {
             res.status(400).json({ error: 'userId is required' });
             return;
         }
 
-        // TODO: Replace with your actual database lookup
-        // For now, returning a default response
-        // In production, you should:
-        // 1. Look up the user in your database (Supabase)
-        // 2. Check their Stripe customer ID
-        // 3. Query Stripe for active subscriptions
+        // ✅ CHECK THE USER_SUBSCRIPTIONS TABLE
+        console.log('📊 Querying user_subscriptions table...');
 
-        /*
-        Example implementation:
-        
-        // Get user from Supabase
-        const { data: user } = await supabase
-            .from('users')
-            .select('stripe_customer_id')
-            .eq('id', userId)
+        const { data: subscription, error } = await supabase
+            .from('user_subscriptions')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('status', 'active')
             .single();
-            
-        if (user?.stripe_customer_id) {
-            // Check Stripe for active subscriptions
-            const subscriptions = await stripe.subscriptions.list({
-                customer: user.stripe_customer_id,
-                status: 'active'
-            });
-            
-            const isPremium = subscriptions.data.length > 0;
-            
-            res.status(200).json({
-                isPremium,
-                subscriptionId: subscriptions.data[0]?.id || null,
-                status: isPremium ? 'active' : 'inactive'
-            });
-        } else {
-            res.status(200).json({
-                isPremium: false,
-                subscriptionId: null,
-                status: 'inactive'
-            });
-        }
-        */
 
-        // Temporary response for testing
-        res.status(200).json({
-            isPremium: false,
-            subscriptionId: null,
-            status: 'inactive',
-            message: 'API working! Ready for Stripe integration.'
-        });
+        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+            console.error('❌ Database error:', error);
+            res.status(500).json({
+                error: 'Database query failed',
+                details: error.message
+            });
+            return;
+        }
+
+        console.log('📊 Database query result:', subscription);
+
+        // ✅ DETERMINE PREMIUM STATUS
+        const isPremium = !!subscription; // True if we found an active subscription
+
+        let tier = 'free';
+        let hasAIAccess = false;
+
+        if (subscription) {
+            // You can expand this logic based on your plan_id values
+            if (subscription.plan_id?.includes('AI') || subscription.plan_id?.includes('ai')) {
+                tier = 'premiumAI';
+                hasAIAccess = true;
+            } else {
+                tier = 'premium';
+                hasAIAccess = false;
+            }
+        }
+
+        const response = {
+            isPremium,
+            tier,
+            hasAIAccess,
+            subscriptionId: subscription?.stripe_subscription_id || null,
+            customerId: subscription?.stripe_customer_id || null,
+            planId: subscription?.plan_id || null,
+            status: subscription?.status || 'inactive',
+            updatedAt: subscription?.updated_at || null
+        };
+
+        console.log('✅ Returning subscription status:', response);
+        res.status(200).json(response);
 
     } catch (error) {
         console.error('❌ Function error:', error);
         res.status(500).json({
             error: 'Internal server error',
-            details: error.message
+            details: error.message,
+            isPremium: false,
+            tier: 'free',
+            hasAIAccess: false
         });
     }
 }

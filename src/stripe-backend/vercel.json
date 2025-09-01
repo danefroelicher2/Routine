@@ -3,6 +3,9 @@
         "api/webhook.js": {
             "maxDuration": 30
         },
+        "api/webhook-v2.js": {
+            "maxDuration": 30
+        },
         "api/create-checkout.js": {
             "maxDuration": 30,
             "memory": 1024
