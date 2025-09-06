@@ -701,30 +701,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                                 styles.settingItem,
                                 {
                                     borderBottomColor: colors.separator,
-                                    opacity: isPremium ? 1 : 0.6
+                                    opacity: isPremium ? 1 : 0.7
                                 }
                             ]}
                             onPress={() => {
-                                if (!isPremium) {
-                                    console.log("🚫 Non-premium user trying to access schedule settings - redirecting to premium");
-                                    navigationHook.navigate('Premium', { source: 'schedule_settings' });
-                                } else {
+                                if (isPremium) {
                                     console.log('📅 DAILY TIME RANGES PRESSED - Opening schedule modal');
                                     setShowScheduleModal(true);
+                                } else {
+                                    navigation.navigate('Premium', { source: 'settings_daily_time_ranges' });
                                 }
                             }}
                         >
                             <View style={styles.settingContent}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Text style={[styles.settingTitle, { color: isPremium ? colors.text : colors.textSecondary }]}>
-                                        Daily Time Ranges
-                                    </Text>
-                                    {!isPremium && (
-                                        <View style={[styles.premiumBadge, { backgroundColor: '#007AFF', marginLeft: 8 }]}>
-                                            <Ionicons name="lock-closed" size={12} color="#FFFFFF" />
-                                        </View>
-                                    )}
-                                </View>
+                                <Text style={[styles.settingTitle, { color: colors.text }]}>Daily Time Ranges</Text>
                                 <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>
                                     {isPremium
                                         ? "Set your active hours for each day of the week"
@@ -741,6 +731,26 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                             </View>
                         </TouchableOpacity>
                     </View>
+
+                    {/* ===== NEW ABOUT SECTION - ADD THIS ENTIRE SECTION ===== */}
+                    <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.sectionTitle, {
+                            backgroundColor: colors.background,
+                            color: colors.text,
+                            borderBottomColor: colors.border
+                        }]}>About</Text>
+
+                        {renderSettingItem(
+                            'About Routine',
+                            'App information, privacy policy, and terms',
+                            '',
+                            () => {
+                                console.log('📱 About button pressed');
+                                navigation.navigate('About');
+                            }
+                        )}
+                    </View>
+                    {/* ===== END NEW ABOUT SECTION ===== */}
 
                     {/* Account & Security */}
                     <View style={[styles.section, { backgroundColor: colors.surface }]}>

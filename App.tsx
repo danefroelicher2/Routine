@@ -34,6 +34,9 @@ import SettingsScreen from './src/screens/Profile/SettingsScreen';
 import ChangePasswordScreen from './src/screens/Profile/ChangePasswordScreen';
 import RoutineManagerScreen from './src/screens/Profile/RoutineManagerScreen';
 import PremiumScreen from './src/screens/Premium/PremiumScreen';
+import AboutScreen from './src/screens/Profile/AboutScreen';
+import PrivacyScreen from './src/screens/Profile/PrivacyScreen';
+import TermsScreen from './src/screens/Profile/TermsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -68,7 +71,6 @@ function NotesStack() {
   );
 }
 
-// Stack Navigator for Profile
 function ProfileStack() {
   const { colors } = useTheme();
   return (
@@ -84,6 +86,9 @@ function ProfileStack() {
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Change Password' }} />
       <Stack.Screen name="RoutineManager" component={RoutineManagerScreen} options={{ title: 'Manage Routines' }} />
       <Stack.Screen name="Premium" component={PremiumScreen} options={{ title: 'Premium', headerShown: false }} />
+      <Stack.Screen name="About" component={AboutScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Terms" component={TermsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
