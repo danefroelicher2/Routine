@@ -1,3 +1,6 @@
+// Updated SignupScreen.tsx - REPLACE YOUR EXISTING SignupScreen.tsx WITH THIS
+// src/screens/Auth/SignupScreen.tsx
+
 import React, { useState } from 'react';
 import {
     View,
@@ -10,6 +13,7 @@ import {
     Platform,
     ScrollView,
     ActivityIndicator,
+    Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
@@ -26,6 +30,9 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    // NEW: Terms acceptance state
+    const [termsAccepted, setTermsAccepted] = useState(false);
 
     const validateForm = () => {
         if (!fullName.trim()) {
@@ -48,6 +55,11 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
             Alert.alert('Error', 'Passwords do not match');
             return false;
         }
+        // NEW: Check terms acceptance
+        if (!termsAccepted) {
+            Alert.alert('Terms Required', 'Please accept the Terms of Service and Privacy Policy to continue');
+            return false;
+        }
         return true;
     };
 
@@ -63,6 +75,8 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
                 options: {
                     data: {
                         full_name: fullName.trim(),
+                        terms_accepted: true, // Record that user accepted terms
+                        terms_accepted_at: new Date().toISOString(),
                     },
                 },
             });
@@ -86,6 +100,23 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
         } finally {
             setLoading(false);
         }
+    };
+
+    // NEW: Handle opening legal documents
+    const openPrivacyPolicy = () => {
+        // Option 1: Open within app (recommended)
+        navigation.navigate('Privacy');
+
+        // Option 2: Open in browser (alternative)
+        // Linking.openURL('https://danefroelicher2.github.io/routine-app-legal/privacy-policy.html');
+    };
+
+    const openTermsOfService = () => {
+        // Option 1: Open within app (recommended)
+        navigation.navigate('Terms');
+
+        // Option 2: Open in browser (alternative)
+        // Linking.openURL('https://danefroelicher2.github.io/routine-app-legal/terms-of-service.html');
     };
 
     return (
@@ -180,10 +211,39 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
                         </TouchableOpacity>
                     </View>
 
+                    {/* NEW: Terms and Privacy Agreement Section */}
+                    <View style={styles.termsContainer}>
+                        <TouchableOpacity
+                            style={styles.checkboxContainer}
+                            onPress={() => setTermsAccepted(!termsAccepted)}
+                        >
+                            <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
+                                {termsAccepted && (
+                                    <Ionicons name="checkmark" size={16} color="#fff" />
+                                )}
+                            </View>
+                            <View style={styles.termsTextContainer}>
+                                <Text style={styles.termsText}>
+                                    I agree to the{' '}
+                                    <Text style={styles.termsLink} onPress={openTermsOfService}>
+                                        Terms of Service
+                                    </Text>
+                                    {' '}and{' '}
+                                    <Text style={styles.termsLink} onPress={openPrivacyPolicy}>
+                                        Privacy Policy
+                                    </Text>
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+
                     <TouchableOpacity
-                        style={[styles.signupButton, loading && styles.disabledButton]}
+                        style={[
+                            styles.signupButton,
+                            (loading || !termsAccepted) && styles.disabledButton
+                        ]}
                         onPress={handleSignup}
-                        disabled={loading}
+                        disabled={loading || !termsAccepted}
                     >
                         {loading ? (
                             <ActivityIndicator color="#fff" />
@@ -261,6 +321,43 @@ const styles = StyleSheet.create({
     },
     eyeIcon: {
         padding: 5,
+    },
+    // NEW: Terms acceptance styles
+    termsContainer: {
+        marginBottom: 20,
+        marginTop: 10,
+    },
+    checkboxContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#ddd',
+        marginRight: 12,
+        marginTop: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    checkboxChecked: {
+        backgroundColor: '#007AFF',
+        borderColor: '#007AFF',
+    },
+    termsTextContainer: {
+        flex: 1,
+    },
+    termsText: {
+        fontSize: 14,
+        color: '#666',
+        lineHeight: 20,
+    },
+    termsLink: {
+        color: '#007AFF',
+        fontWeight: '600',
+        textDecorationLine: 'underline',
     },
     signupButton: {
         backgroundColor: '#007AFF',

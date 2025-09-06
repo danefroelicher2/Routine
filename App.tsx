@@ -153,6 +153,8 @@ function AuthStack() {
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
       <Stack.Screen name="ConfirmPasswordReset" component={ConfirmPasswordResetScreen} />
+      <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Terms" component={TermsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
