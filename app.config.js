@@ -19,6 +19,7 @@ export default {
       infoPlist: {
         NSFaceIDUsageDescription:
           "This app uses Face ID to secure your private notes.",
+        ITSAppUsesNonExemptEncryption: false
       },
     },
     android: {
@@ -42,5 +43,11 @@ export default {
         },
       ],
     ],
+    // ADD THIS SECTION: EAS Configuration
+    extra: {
+      eas: {
+        projectId: "c5578321-6c96-4f53-80f8-46cf2bc3bbcd"
+      }
+    }
   },
 };
