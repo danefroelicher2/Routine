@@ -224,6 +224,7 @@ export default function NoteDetailScreen({
   const titleInputRef = useRef<TextInput>(null);
   const contentInputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (isNew) {
@@ -231,26 +232,65 @@ export default function NoteDetailScreen({
     }
   }, [isNew]);
 
+  // ✅ FIXED: Real-time saving with faster response
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (hasChanges) {
-        saveNote();
-      }
-    }, 1000);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
 
-    return () => clearTimeout(timer);
+    if (hasChanges) {
+      saveTimeoutRef.current = setTimeout(() => {
+        saveNote();
+      }, 300); // ✅ REDUCED: From 1000ms to 300ms for much faster saving
+    }
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
   }, [title, content, hasChanges]);
 
+  // ✅ FIXED: Title changes now trigger saving
+  const handleTitleChange = (text: string) => {
+    setTitle(text);
+    setHasChanges(true); // ✅ CRITICAL: This was missing - title changes now save!
+  };
+
+  // ✅ ENHANCED: More responsive content saving
   const handleContentChange = (text: string) => {
     setContent(text);
     setHasChanges(true);
+  };
+
+  // ✅ ADDED: Immediate save when user stops focusing inputs
+  const handleTitleBlur = () => {
+    if (hasChanges) {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      saveNote(); // ✅ IMMEDIATE: Save as soon as user leaves title field
+    }
+  };
+
+  const handleContentBlur = () => {
+    if (hasChanges) {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      saveNote(); // ✅ IMMEDIATE: Save as soon as user leaves content field
+    }
   };
 
   const handleScroll = () => {
     Keyboard.dismiss();
   };
 
+  // ✅ ENHANCED: More robust saving with duplicate prevention
   const saveNote = async () => {
+    // ✅ PREVENT DUPLICATE SAVES: Don't save if already saving
+    if (saving) return;
+
     if (!title.trim() && !content.trim()) return;
 
     try {
@@ -294,6 +334,14 @@ export default function NoteDetailScreen({
       if (onSave) {
         onSave();
       }
+
+      // ✅ DEBUG: Log successful saves (remove in production if desired)
+      console.log("✅ Note saved:", {
+        title: title.slice(0, 20) + "...",
+        contentLength: content.length,
+        timestamp: new Date().toLocaleTimeString()
+      });
+
     } catch (error) {
       console.error("Error saving note:", error);
       Alert.alert("Error", "Failed to save note");
@@ -576,7 +624,8 @@ export default function NoteDetailScreen({
                 placeholder="Title"
                 placeholderTextColor={colors.placeholder}
                 value={title}
-                onChangeText={setTitle}
+                onChangeText={handleTitleChange}
+                onBlur={handleTitleBlur}
                 returnKeyType="next"
                 onSubmitEditing={() => contentInputRef.current?.focus()}
               />
@@ -588,6 +637,7 @@ export default function NoteDetailScreen({
                 placeholderTextColor={colors.placeholder}
                 value={content}
                 onChangeText={handleContentChange}
+                onBlur={handleContentBlur}
                 multiline
                 textAlignVertical="top"
                 scrollEnabled={false}
