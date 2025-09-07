@@ -132,7 +132,6 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
                     >
                         <Ionicons name="arrow-back" size={24} color="#007AFF" />
                     </TouchableOpacity>
-                    <Ionicons name="checkmark-circle" size={80} color="#007AFF" />
                     <Text style={styles.title}>Create Account</Text>
                     <Text style={styles.subtitle}>Start building better habits today</Text>
                 </View>
