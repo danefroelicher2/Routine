@@ -357,7 +357,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return greetingArray[greetingIndex];
   }, [userProfile?.full_name]);
 
-  // ✅ MODIFIED: Load scheduled routines function with user's custom time range
+  // ✅ FIXED: Load scheduled routines function with stable ordering within time slots
   const loadScheduledRoutines = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -365,34 +365,36 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       const today = getLocalDateString(new Date());
 
+      // ✅ ENHANCED: Order by scheduled_time first, then by sort_order for stability
       const { data: scheduledData, error } = await supabase
         .from("routine_schedule")
         .select(`
+        id,
+        routine_id,
+        scheduled_time,
+        estimated_duration,
+        day_of_week,
+        user_routines (
           id,
-          routine_id,
-          scheduled_time,
-          estimated_duration,
-          day_of_week,
-          user_routines (
-            id,
-            user_id,
-            name,
-            description,
-            icon,
-            target_value,
-            target_unit,
-            is_daily,
-            is_weekly,
-            is_active,
-            sort_order,
-            created_at,
-            updated_at
-          )
-        `)
+          user_id,
+          name,
+          description,
+          icon,
+          target_value,
+          target_unit,
+          is_daily,
+          is_weekly,
+          is_active,
+          sort_order,
+          created_at,
+          updated_at
+        )
+      `)
         .eq("user_id", user.id)
         .eq("day_of_week", selectedDay)
         .eq("is_active", true)
-        .order("scheduled_time");
+        .order("scheduled_time")
+        .order("created_at"); // ✅ ADD: Secondary sort by creation time for stability
 
       if (error) throw error;
 
@@ -445,17 +447,43 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       // ✅ IMPORTANT: Use user's custom time range for this day
       const daySchedule = userDaySchedules[selectedDay] || { day_id: selectedDay, start_hour: 6, end_hour: 23 };
 
-      // Regenerate time slots based on user's schedule
+      // ✅ FIXED: Generate time slots with stable ordering within each slot
       const newTimeSlots: TimeSlot[] = [];
       for (let hour = daySchedule.start_hour; hour <= daySchedule.end_hour; hour++) {
+        const routinesForHour = scheduledRoutines.filter(r => {
+          const [hourStr] = r.scheduled_time.split(':');
+          return parseInt(hourStr) === hour;
+        });
+
+        // ✅ CRITICAL FIX: Sort routines within the same hour by their original order
+        // This ensures that routines maintain their position regardless of completion status
+        routinesForHour.sort((a, b) => {
+          // Primary sort: by sort_order (if available)
+          if (a.sort_order !== b.sort_order) {
+            return a.sort_order - b.sort_order;
+          }
+
+          // Secondary sort: by creation time (oldest first)
+          // This preserves the order in which items were added to this time slot
+          const timeA = new Date(a.created_at).getTime();
+          const timeB = new Date(b.created_at).getTime();
+          return timeA - timeB;
+        });
+
         newTimeSlots.push({
           hour,
-          routines: scheduledRoutines.filter(r => {
-            const [hourStr] = r.scheduled_time.split(':');
-            return parseInt(hourStr) === hour;
-          })
+          routines: routinesForHour
         });
       }
+
+      console.log("✅ STABLE SORT: Time slots with preserved ordering:");
+      newTimeSlots.forEach(slot => {
+        if (slot.routines.length > 0) {
+          console.log(`  Hour ${slot.hour}:`, slot.routines.map(r =>
+            `${r.name} (order: ${r.sort_order}, created: ${r.created_at})`
+          ));
+        }
+      });
 
       setTimeSlots(newTimeSlots);
 
@@ -463,7 +491,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       console.error("Error loading scheduled routines:", error);
     }
   };
-
   // ✅ EXISTING: Schedule routine to time slot function
   const scheduleRoutineToTimeSlot = async (routineId: string, hour: number) => {
     try {
