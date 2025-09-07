@@ -10,7 +10,6 @@ import {
     Platform,
     ScrollView,
     ActivityIndicator,
-    Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
@@ -62,11 +61,6 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         >
             <ScrollView contentContainerStyle={styles.scrollContainer}>
                 <View style={styles.header}>
-                    <Image
-                        source={require('../../../assets/icon.png')}
-                        style={styles.appLogo}
-                        resizeMode="contain"
-                    />
                     <Text style={styles.title}>Routine</Text>
                     <Text style={styles.subtitle}>Build better habits every day</Text>
                 </View>
@@ -159,16 +153,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 40,
     },
-    appLogo: {
-        width: 80,
-        height: 80,
-        marginBottom: 20,
-    },
     title: {
         fontSize: 32,
         fontWeight: 'bold',
         color: '#333',
-        marginTop: 20,
     },
     forgotPasswordContainer: {
         alignSelf: 'flex-end',
