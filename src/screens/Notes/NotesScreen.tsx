@@ -11,6 +11,7 @@ import {
   TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../services/supabase";
 import { Note } from "../../types/database";
@@ -48,15 +49,15 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     "Action is the foundation, learning is the supplementation",
     "Do not make promises, with yourself or others, you do not intend to keep",
     "As you are now, so once were they, as they are now, so shall you be",
-    "Opportunities don’t happen. You create them. — Chris Grosser",
-    "Hard work beats talent when talent doesn’t work hard. — Tim Notke",
-    "You don’t have to be great to start, but you have to start to be great. — Zig Zigla",
+    "Opportunities don't happen. You create them. — Chris Grosser",
+    "Hard work beats talent when talent doesn't work hard. — Tim Notke",
+    "You don't have to be great to start, but you have to start to be great. — Zig Zigla",
   ];
 
   useFocusEffect(
     React.useCallback(() => {
       loadNotes();
-      setRandomQuote();
+      getDailyQuote();
     }, [])
   );
 
@@ -76,9 +77,46 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
     }
   }, [searchQuery, notes]);
 
-  const setRandomQuote = () => {
-    const randomIndex = Math.floor(Math.random() * quotes.length);
-    setDailyQuote(quotes[randomIndex]);
+  const getDailyQuote = async () => {
+    try {
+      // Get today's date as a string (YYYY-MM-DD format)
+      const today = new Date();
+      const todayString = today.toISOString().split('T')[0]; // Gets YYYY-MM-DD format
+
+      // Check if we have a stored quote for today
+      const storedQuoteData = await AsyncStorage.getItem('daily_quote_data');
+
+      if (storedQuoteData) {
+        const { date, quote } = JSON.parse(storedQuoteData);
+
+        // If the stored quote is for today, use it
+        if (date === todayString) {
+          setDailyQuote(quote);
+          return;
+        }
+      }
+
+      // If no stored quote for today, generate a new one based on today's date
+      // Using the date as a seed ensures the same quote every day
+      const dateHash = todayString.split('-').reduce((sum, part) => sum + parseInt(part), 0);
+      const quoteIndex = dateHash % quotes.length;
+      const todaysQuote = quotes[quoteIndex];
+
+      // Store the quote with today's date
+      await AsyncStorage.setItem('daily_quote_data', JSON.stringify({
+        date: todayString,
+        quote: todaysQuote
+      }));
+
+      setDailyQuote(todaysQuote);
+
+      console.log(`📅 Daily Quote Set: "${todaysQuote}" (Index: ${quoteIndex} for date: ${todayString})`);
+
+    } catch (error) {
+      console.error('Error getting daily quote:', error);
+      // Fallback to first quote if there's an error
+      setDailyQuote(quotes[0]);
+    }
   };
 
   const loadNotes = async () => {
@@ -105,7 +143,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadNotes();
-    setRandomQuote();
+    await getDailyQuote();
     setRefreshing(false);
   };
 
