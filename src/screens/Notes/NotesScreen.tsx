@@ -198,11 +198,13 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
   };
 
   const getPreviewText = (content: string) => {
+
+
     if (!content || content.trim() === "") return "";
     const stripped = content.replace(/\n/g, " ").trim();
     return stripped.length > 60 ? stripped.substring(0, 60) + "..." : stripped;
   };
-
+  // test
   const renderNoteCard = (note: Note) => (
     <TouchableOpacity
       key={note.id}
