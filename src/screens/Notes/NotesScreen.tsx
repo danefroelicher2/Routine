@@ -199,7 +199,7 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
 
   const getPreviewText = (content: string) => {
 
-
+    //x
     if (!content || content.trim() === "") return "";
     const stripped = content.replace(/\n/g, " ").trim();
     return stripped.length > 60 ? stripped.substring(0, 60) + "..." : stripped;
