@@ -246,8 +246,10 @@ export default function NotesScreen({ navigation }: NotesScreenProps) {
 
       <Text style={[styles.noteCardDate, { color: colors.textSecondary }]}>
         {formatDate(note.updated_at)}
-        {getPreviewText(note.content || "") &&
-          ` ${getPreviewText(note.content || "")}`}
+        {note.is_locked
+          ? " "
+          : (getPreviewText(note.content || "") && ` ${getPreviewText(note.content || "")}`)
+        }
       </Text>
     </TouchableOpacity>
   );
