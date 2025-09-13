@@ -167,9 +167,9 @@ const LockModal: React.FC<LockModalProps> = ({
             style={[styles.lockOption, { backgroundColor: colors.card }]}
             onPress={onLockWithFaceID}
           >
-            <Ionicons name="finger-print" size={24} color="#007AFF" />
+            <Ionicons name="phone-portrait" size={24} color="#007AFF" />
             <Text style={[styles.lockOptionText, { color: colors.text }]}>
-              Face ID / Touch ID
+              Phone Password
             </Text>
             <Ionicons
               name="chevron-forward"
