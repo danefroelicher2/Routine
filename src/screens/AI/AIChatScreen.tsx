@@ -1,5 +1,5 @@
 // ============================================
-// AI CHAT SCREEN WITH CLAUDE-LIKE UI + PREMIUM CHECK
+// AI CHAT SCREEN WITH TOKEN LEAK FIXES APPLIED
 // Replace your entire src/screens/AI/AIChatScreen.tsx with this
 // ============================================
 
@@ -42,7 +42,6 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     const { colors } = useTheme();
     const { isPremium, checkPremiumFeature } = usePremium();
 
-
     // State management
     const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
     const [messages, setMessages] = useState<ChatMessageWithLoading[]>([]);
@@ -72,9 +71,11 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     useFocusEffect(
         useCallback(() => {
             const hasAIAccess = checkPremiumFeature("ai_assistant");
-            if (hasAIAccess) { // Only initialize if has AI access
+            if (hasAIAccess) {
                 initializeChat();
-                checkAIConnection();
+                // 🚨 CRITICAL FIX: Don't auto-test connection on every screen focus
+                // This was causing token drain every time user visited AI tab
+                checkAIConnection(); // This now only checks configuration, no API call
             }
         }, [isPremium, checkPremiumFeature])
     );
@@ -128,27 +129,44 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     };
 
     /**
-     * Check AI connection status
+     * 🚨 FIXED: Don't automatically test connection on load
+     * Only check if API key is configured, don't make actual API calls
      */
     const checkAIConnection = async () => {
         try {
-            const connected = await aiService.testConnection();
-            setIsConnected(connected);
+            // 🚨 CRITICAL FIX: Just check if configured, don't test connection automatically
+            // This prevents background token usage every time the screen loads
+            const configured = aiService.isConfigured();
+            setIsConnected(configured);
+
+            if (!configured) {
+                console.log('ℹ️ AI not configured - user needs to set API key in settings');
+            } else {
+                console.log('✅ AI is configured and ready to use');
+            }
         } catch (error) {
-            console.error('Error checking AI connection:', error);
+            console.error('Error checking AI status:', error);
             setIsConnected(false);
         }
     };
 
     /**
-     * Send message to AI
+     * 🚨 IMPROVED: Send message with better error handling and connection management
      */
     const sendMessage = async (messageText?: string) => {
         const textToSend = messageText || inputText.trim();
         if (!textToSend || !currentSession) return;
 
-        if (!isConnected) {
-            Alert.alert('AI Not Connected', 'Please check your API key in settings.');
+        // 🚨 UPDATED: Check configuration instead of connection status
+        if (!aiService.isConfigured()) {
+            Alert.alert(
+                'AI Not Set Up',
+                'Please configure your API key in AI Settings first.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Open Settings', onPress: () => navigation.navigate('AISettings') }
+                ]
+            );
             return;
         }
 
@@ -194,6 +212,11 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
 
             conversationHistory.push({ role: 'user', content: textToSend });
 
+            console.log('🤖 Sending message to AI...', {
+                messageLength: textToSend.length,
+                conversationLength: conversationHistory.length
+            });
+
             const aiResponse = await aiService.sendMessage(
                 conversationHistory,
                 scheduleContext || undefined
@@ -218,16 +241,42 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
                 setCurrentSession(prev => prev ? { ...prev, title } : null);
             }
 
+            // 🚨 NEW: Set connection status to true after successful message
+            setIsConnected(true);
+
         } catch (error) {
-            console.error('Error sending message:', error);
+            console.error('❌ Error sending message:', error);
 
             // Remove loading message
             setMessages(prev => prev.filter(m => m.id !== 'loading'));
 
-            Alert.alert(
-                'Error',
-                'Failed to get response from AI. Please check your connection and try again.'
-            );
+            // 🚨 IMPROVED: Better error handling
+            if (error.message.includes('API key not configured') || error.message.includes('AI not configured')) {
+                Alert.alert(
+                    'AI Not Set Up',
+                    'Please configure your API key in AI Settings.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Open Settings', onPress: () => navigation.navigate('AISettings') }
+                    ]
+                );
+                setIsConnected(false);
+            } else if (error.message.includes('401') || error.message.includes('403')) {
+                Alert.alert(
+                    'Authentication Error',
+                    'Your API key appears to be invalid. Please check it in AI Settings.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Open Settings', onPress: () => navigation.navigate('AISettings') }
+                    ]
+                );
+                setIsConnected(false);
+            } else {
+                Alert.alert(
+                    'Connection Error',
+                    'Failed to get response from AI. Please check your internet connection and try again.'
+                );
+            }
         } finally {
             setIsLoading(false);
 

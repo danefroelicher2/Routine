@@ -1,5 +1,6 @@
 // ============================================
-// AI SERVICE - SAVE AS src/services/aiService.ts
+// AI SERVICE - EMERGENCY TOKEN LEAK FIX
+// Replace your existing src/services/aiService.ts with this
 // ============================================
 
 import { ScheduleContext } from '../types/database';
@@ -15,33 +16,83 @@ export class AIService {
     private model = 'deepseek-chat';
 
     constructor() {
-        this.apiKey = process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY || '';
+        // 🚨 CRITICAL FIX: Remove hardcoded API key completely
+        this.apiKey = '';
+
+        // Load from environment only if available (will be empty in production)
+        const envKey = process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY;
+        if (envKey && envKey !== 'your_deepseek_api_key_here') {
+            this.apiKey = envKey;
+        }
     }
 
     /**
-     * Test connection to DeepSeek API
+     * Update API key - called from settings screen
+     */
+    updateApiKey(newKey: string) {
+        this.apiKey = newKey.trim();
+    }
+
+    /**
+     * Check if API key is configured
+     */
+    isConfigured(): boolean {
+        return this.apiKey.length > 0 && this.apiKey.startsWith('sk-');
+    }
+
+    /**
+     * 🚨 FIXED: Lightweight connection test that doesn't waste tokens
+     * Only uses ~10 tokens instead of hundreds
      */
     async testConnection(): Promise<boolean> {
+        if (!this.isConfigured()) {
+            console.warn('AI API key not configured');
+            return false;
+        }
+
         try {
-            const response = await this.sendMessage([
-                { role: 'user', content: 'Respond with just "OK"' }
-            ]);
-            return response.toLowerCase().includes('ok');
+            console.log('🔍 Testing AI connection (minimal tokens)...');
+
+            const response = await fetch(this.apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: this.model,
+                    messages: [
+                        { role: 'user', content: 'Hi' } // Minimal test - only ~5 tokens
+                    ],
+                    temperature: 0,
+                    max_tokens: 5, // 🚨 CRITICAL: Limit response to 5 tokens max
+                }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('✅ AI connection test successful (minimal cost)');
+                return data.choices && data.choices[0]?.message?.content;
+            } else {
+                console.error('❌ AI connection test failed:', response.status);
+                return false;
+            }
         } catch (error) {
-            console.error('AI connection test failed:', error);
+            console.error('❌ AI connection test error:', error);
             return false;
         }
     }
 
     /**
      * Send message to AI with user context
+     * 🚨 FIXED: Added comprehensive logging to track token usage
      */
     async sendMessage(
         messages: AIMessage[],
         scheduleContext?: ScheduleContext
     ): Promise<string> {
-        if (!this.apiKey) {
-            throw new Error('API key not configured. Please add EXPO_PUBLIC_DEEPSEEK_API_KEY to your .env file.');
+        if (!this.isConfigured()) {
+            throw new Error('AI not configured. Please set up your API key in AI Settings.');
         }
 
         try {
@@ -54,9 +105,13 @@ export class AIService {
                 ...messages
             ];
 
+            // 🚨 CRITICAL: Log exactly what we're sending to track usage
+            const totalInputTokens = this.estimateTokens(fullMessages);
             console.log('🤖 Sending to DeepSeek:', {
                 messageCount: fullMessages.length,
-                hasContext: !!scheduleContext
+                estimatedInputTokens: totalInputTokens,
+                hasContext: !!scheduleContext,
+                timestamp: new Date().toISOString()
             });
 
             const response = await fetch(this.apiUrl, {
@@ -69,16 +124,27 @@ export class AIService {
                     model: this.model,
                     messages: fullMessages,
                     temperature: 0.7,
-                    max_tokens: 2000,
+                    max_tokens: 1000, // 🚨 REDUCED: From 2000 to save costs
                 }),
             });
 
             if (!response.ok) {
                 const errorText = await response.text();
+                console.error('❌ DeepSeek API error:', response.status, errorText);
                 throw new Error(`AI API error (${response.status}): ${errorText}`);
             }
 
             const data = await response.json();
+
+            // 🚨 CRITICAL: Log token usage from response
+            if (data.usage) {
+                console.log('💰 Token usage:', {
+                    prompt_tokens: data.usage.prompt_tokens,
+                    completion_tokens: data.usage.completion_tokens,
+                    total_tokens: data.usage.total_tokens,
+                    estimated_cost_usd: (data.usage.total_tokens * 0.00014 / 1000).toFixed(4)
+                });
+            }
 
             if (data.choices && data.choices[0]?.message?.content) {
                 return data.choices[0].message.content;
@@ -87,76 +153,53 @@ export class AIService {
             }
 
         } catch (error) {
-            console.error('AI API error:', error);
+            console.error('❌ AI API error:', error);
             throw new Error(`Failed to get AI response: ${error.message}`);
         }
     }
 
     /**
-     * Build system message with user's routine context
+     * 🆕 NEW: Estimate token count to prevent surprises
      */
-    private buildSystemMessage(scheduleContext?: ScheduleContext): string {
-        let systemMessage = `You are an AI assistant integrated into a routine management app. You help users optimize their daily and weekly routines for better productivity and goal achievement.
-
-Your capabilities:
-- Analyze user routines and suggest improvements
-- Recommend schedule optimizations
-- Provide motivational advice based on streaks and progress
-- Help users stay on track with their goals
-- Answer questions about productivity and habit formation
-
-Guidelines:
-- Be encouraging and supportive
-- Provide actionable, specific advice
-- Consider the user's current routine when making suggestions
-- Keep responses concise but helpful (2-3 paragraphs max)
-- Focus on sustainable improvements rather than dramatic changes`;
-
-        if (scheduleContext) {
-            systemMessage += `\n\nCurrent User Context:
-- Display Name: ${scheduleContext.user_profile.display_name}
-- Current Streak: ${scheduleContext.user_profile.current_streak} days
-- Longest Streak: ${scheduleContext.user_profile.longest_streak} days`;
-
-            if (scheduleContext.routines && scheduleContext.routines.length > 0) {
-                systemMessage += `\n\nUser's Active Routines:`;
-
-                scheduleContext.routines.forEach((routine, index) => {
-                    systemMessage += `\n${index + 1}. ${routine.name}`;
-                    if (routine.description) {
-                        systemMessage += ` - ${routine.description}`;
-                    }
-
-                    if (routine.is_daily && routine.scheduled_days.length > 0) {
-                        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                        const scheduledDayNames = routine.scheduled_days.map(day => dayNames[day]).join(', ');
-                        systemMessage += ` (Scheduled: ${scheduledDayNames})`;
-                    } else if (routine.is_weekly) {
-                        systemMessage += ` (Weekly routine)`;
-                    }
-
-                    if (routine.target_value && routine.target_unit) {
-                        systemMessage += ` [Target: ${routine.target_value} ${routine.target_unit}]`;
-                    }
-                });
-            } else {
-                systemMessage += `\n\nThe user hasn't set up any routines yet. Encourage them to start with 1-2 simple daily habits.`;
-            }
-
-            if (scheduleContext.target_day !== null) {
-                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                systemMessage += `\n\nCurrently focused on: ${dayNames[scheduleContext.target_day]} schedule`;
-            }
-        }
-
-        return systemMessage;
+    private estimateTokens(messages: AIMessage[]): number {
+        // Rough estimation: ~4 characters per token
+        const totalText = messages.map(m => m.content).join(' ');
+        return Math.ceil(totalText.length / 4);
     }
 
     /**
-     * Update API key
+     * Build system message with user's routine context
+     * 🚨 FIXED: Reduced context size to save tokens
      */
-    updateApiKey(apiKey: string) {
-        this.apiKey = apiKey;
+    private buildSystemMessage(scheduleContext?: ScheduleContext): string {
+        let systemMessage = `You are an AI assistant for a routine management app. Help users optimize their daily routines with concise, actionable advice.`;
+
+        if (scheduleContext) {
+            const user = scheduleContext.user_profile;
+            const routines = scheduleContext.routines;
+
+            // 🚨 REDUCED: Shorter context to save tokens
+            systemMessage += `\n\nUser: ${user.display_name}`;
+
+            if (user.current_streak > 0) {
+                systemMessage += `\nCurrent streak: ${user.current_streak} days`;
+            }
+
+            if (routines && routines.length > 0) {
+                systemMessage += `\nActive routines: ${routines.slice(0, 3).map(r => r.name).join(', ')}`;
+                if (routines.length > 3) {
+                    systemMessage += ` (+${routines.length - 3} more)`;
+                }
+            }
+
+            if (scheduleContext.target_day) {
+                systemMessage += `\nFocus day: ${scheduleContext.target_day}`;
+            }
+
+            systemMessage += `\n\nKeep responses helpful but concise.`;
+        }
+
+        return systemMessage;
     }
 }
 

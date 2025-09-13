@@ -1,5 +1,6 @@
 // ============================================
-// AI SETTINGS SCREEN - SAVE AS src/screens/AI/AISettingsScreen.tsx
+// AI SETTINGS SCREEN - EMERGENCY TOKEN LEAK FIX
+// Replace your existing src/screens/AI/AISettingsScreen.tsx with this
 // ============================================
 
 import React, { useState, useEffect } from 'react';
@@ -33,6 +34,7 @@ const AISettingsScreen: React.FC<AISettingsScreenProps> = ({ navigation }) => {
     const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [testLoading, setTestLoading] = useState(false);
     const [apiKey, setApiKey] = useState('');
 
     useEffect(() => {
@@ -40,20 +42,19 @@ const AISettingsScreen: React.FC<AISettingsScreenProps> = ({ navigation }) => {
     }, []);
 
     /**
-     * Load initial data and settings
+     * 🚨 FIXED: Load data without automatic connection testing
      */
     const loadData = async () => {
         try {
             setLoading(true);
 
-            // Load saved API key from environment
-            const savedApiKey = process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY || '';
-            setApiKey(savedApiKey);
+            // 🚨 CRITICAL FIX: Don't load API key from environment in production
+            // Users must enter it manually to prevent exposure
+            setApiKey('');
 
-            // Test connection if API key exists
-            if (savedApiKey) {
-                await checkConnection();
-            }
+            // 🚨 CRITICAL FIX: Don't automatically test connection on load
+            // This was causing background token usage!
+            setIsConnected(aiService.isConfigured());
 
             // Load chat sessions
             const { data: { user } } = await supabase.auth.getUser();
@@ -70,29 +71,22 @@ const AISettingsScreen: React.FC<AISettingsScreenProps> = ({ navigation }) => {
     };
 
     /**
-     * Check AI connection
-     */
-    const checkConnection = async () => {
-        try {
-            const connected = await aiService.testConnection();
-            setIsConnected(connected);
-        } catch (error) {
-            console.error('Connection check failed:', error);
-            setIsConnected(false);
-        }
-    };
-
-    /**
-     * Test connection with current API key
+     * 🚨 FIXED: Manual connection test only (user must click button)
      */
     const testConnection = async () => {
         if (!apiKey.trim()) {
-            Alert.alert('Error', 'Please enter an API key first.');
+            Alert.alert('Error', 'Please enter your DeepSeek API key first.');
+            return;
+        }
+
+        if (!apiKey.startsWith('sk-')) {
+            Alert.alert('Error', 'Invalid API key format. DeepSeek keys start with "sk-"');
             return;
         }
 
         try {
-            setLoading(true);
+            setTestLoading(true);
+            console.log('🔍 User initiated connection test...');
 
             // Update service with current API key
             aiService.updateApiKey(apiKey);
@@ -100,17 +94,18 @@ const AISettingsScreen: React.FC<AISettingsScreenProps> = ({ navigation }) => {
             const connected = await aiService.testConnection();
 
             if (connected) {
-                Alert.alert('Success!', 'Connected to DeepSeek API successfully!');
+                Alert.alert('✅ Success!', 'Connected to DeepSeek API successfully!\n\nYou can now use the AI assistant.');
                 setIsConnected(true);
             } else {
-                Alert.alert('Connection Failed', 'Could not connect to the API. Please check your API key.');
+                Alert.alert('❌ Connection Failed', 'Could not connect to the API. Please check your API key and try again.');
                 setIsConnected(false);
             }
         } catch (error) {
-            Alert.alert('Error', `Connection test failed: ${error.message}`);
+            console.error('Connection test error:', error);
+            Alert.alert('❌ Error', `Connection test failed: ${error.message}`);
             setIsConnected(false);
         } finally {
-            setLoading(false);
+            setTestLoading(false);
         }
     };
 
@@ -172,212 +167,7 @@ const AISettingsScreen: React.FC<AISettingsScreenProps> = ({ navigation }) => {
         );
     };
 
-    /**
-     * Render header
-     */
-    const renderHeader = () => (
-        <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-            <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => navigation.goBack()}
-            >
-                <Ionicons name="arrow-back" size={24} color="#007AFF" />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-                AI Settings
-            </Text>
-            <View style={styles.headerRight} />
-        </View>
-    );
-
-    /**
-     * Render connection status
-     */
-    const renderConnectionStatus = () => (
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-            <View style={styles.sectionHeader}>
-                <Ionicons name="cloud" size={20} color="#007AFF" />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                    Connection Status
-                </Text>
-            </View>
-
-            <View style={[styles.statusCard, {
-                backgroundColor: isConnected ? '#00FF7F10' : '#FF000010',
-                borderColor: isConnected ? '#00FF7F' : '#FF0000',
-            }]}>
-                <View style={styles.statusHeader}>
-                    <Ionicons
-                        name={isConnected ? "checkmark-circle" : "close-circle"}
-                        size={24}
-                        color={isConnected ? '#00FF7F' : '#FF0000'}
-                    />
-                    <View style={styles.statusTextContainer}>
-                        <Text style={[styles.statusText, { color: colors.text }]}>
-                            {isConnected ? 'Connected to DeepSeek' : 'Not Connected'}
-                        </Text>
-                        <Text style={[styles.statusSubtext, { color: colors.textSecondary }]}>
-                            {isConnected
-                                ? 'AI assistant is ready to use'
-                                : 'Enter API key to connect'
-                            }
-                        </Text>
-                    </View>
-                </View>
-            </View>
-        </View>
-    );
-
-    /**
-     * Render API configuration
-     */
-    const renderConfiguration = () => (
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-            <View style={styles.sectionHeader}>
-                <Ionicons name="key" size={20} color="#007AFF" />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                    API Configuration
-                </Text>
-                <TouchableOpacity onPress={() => Linking.openURL('https://platform.deepseek.com/')}>
-                    <Text style={[styles.getKeyText, { color: '#007AFF' }]}>
-                        Get Key
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.configItem}>
-                <Text style={[styles.configLabel, { color: colors.text }]}>
-                    DeepSeek API Key
-                </Text>
-                <TextInput
-                    style={[styles.configInput, {
-                        backgroundColor: colors.background,
-                        borderColor: colors.border,
-                        color: colors.text,
-                    }]}
-                    value={apiKey}
-                    onChangeText={setApiKey}
-                    placeholder="sk-..."
-                    placeholderTextColor={colors.textSecondary}
-                    secureTextEntry={true}
-                />
-                <Text style={[styles.helpText, { color: colors.textSecondary }]}>
-                    Get your API key from platform.deepseek.com
-                </Text>
-            </View>
-
-            <TouchableOpacity
-                style={[styles.testButton, { backgroundColor: '#007AFF' }]}
-                onPress={testConnection}
-                disabled={loading || !apiKey.trim()}
-            >
-                {loading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                    <>
-                        <Ionicons name="wifi" size={20} color="#FFFFFF" />
-                        <Text style={styles.testButtonText}>Test Connection</Text>
-                    </>
-                )}
-            </TouchableOpacity>
-        </View>
-    );
-
-    /**
-     * Render chat history section
-     */
-    const renderChatHistory = () => (
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-            <View style={styles.sectionHeader}>
-                <Ionicons name="chatbubbles" size={20} color="#007AFF" />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                    Chat History ({chatSessions.length})
-                </Text>
-                {chatSessions.length > 0 && (
-                    <TouchableOpacity onPress={clearAllChats}>
-                        <Text style={[styles.clearAllText, { color: '#FF3B30' }]}>
-                            Clear All
-                        </Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-
-            {chatSessions.length === 0 ? (
-                <View style={styles.emptyChatHistory}>
-                    <Ionicons name="chatbubbles-outline" size={48} color={colors.textSecondary} />
-                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                        No chat history yet
-                    </Text>
-                    <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                        Start a conversation with your AI assistant
-                    </Text>
-                </View>
-            ) : (
-                <View style={styles.chatList}>
-                    {chatSessions.map((session) => (
-                        <View key={session.id} style={[styles.chatItem, { borderBottomColor: colors.border }]}>
-                            <View style={styles.chatInfo}>
-                                <Text style={[styles.chatTitle, { color: colors.text }]} numberOfLines={1}>
-                                    {session.title}
-                                </Text>
-                                <Text style={[styles.chatDate, { color: colors.textSecondary }]}>
-                                    {new Date(session.updated_at).toLocaleDateString()}
-                                </Text>
-                            </View>
-                            <TouchableOpacity
-                                onPress={() => deleteChat(session)}
-                                style={styles.deleteButton}
-                            >
-                                <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                            </TouchableOpacity>
-                        </View>
-                    ))}
-                </View>
-            )}
-        </View>
-    );
-
-    /**
-     * Render setup help
-     */
-    const renderHelp = () => (
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-            <View style={styles.sectionHeader}>
-                <Ionicons name="help-circle" size={20} color="#007AFF" />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                    Setup Guide
-                </Text>
-            </View>
-
-            <View style={styles.helpContent}>
-                <View style={styles.helpStep}>
-                    <Text style={[styles.helpStepNumber, { backgroundColor: '#007AFF' }]}>1</Text>
-                    <Text style={[styles.helpStepText, { color: colors.text }]}>
-                        Visit platform.deepseek.com and create an account
-                    </Text>
-                </View>
-
-                <View style={styles.helpStep}>
-                    <Text style={[styles.helpStepNumber, { backgroundColor: '#007AFF' }]}>2</Text>
-                    <Text style={[styles.helpStepText, { color: colors.text }]}>
-                        Generate an API key from your dashboard
-                    </Text>
-                </View>
-
-                <View style={styles.helpStep}>
-                    <Text style={[styles.helpStepNumber, { backgroundColor: '#007AFF' }]}>3</Text>
-                    <Text style={[styles.helpStepText, { color: colors.text }]}>
-                        Paste the API key above and test the connection
-                    </Text>
-                </View>
-
-                <Text style={[styles.helpNote, { color: colors.textSecondary }]}>
-                    💰 DeepSeek is very affordable at only $0.14 per 1M tokens. Perfect for daily routine advice!
-                </Text>
-            </View>
-        </View>
-    );
-
+    // Loading state
     if (loading) {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -393,17 +183,197 @@ const AISettingsScreen: React.FC<AISettingsScreenProps> = ({ navigation }) => {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-            {renderHeader()}
+            {/* Header */}
+            <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                    <Ionicons name="arrow-back" size={24} color="#007AFF" />
+                </TouchableOpacity>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
+                    AI Settings
+                </Text>
+                <View style={styles.headerRight} />
+            </View>
 
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {renderConnectionStatus()}
-                {renderConfiguration()}
-                {renderChatHistory()}
-                {renderHelp()}
+                {/* Connection Status - 🚨 SIMPLIFIED */}
+                <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                    <View style={styles.sectionHeader}>
+                        <Ionicons name="cloud" size={20} color="#007AFF" />
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                            Status
+                        </Text>
+                    </View>
+
+                    <View style={[
+                        styles.statusCard,
+                        {
+                            backgroundColor: isConnected ? '#00FF7F10' : '#FF000010',
+                            borderColor: isConnected ? '#00FF7F' : '#FF0000'
+                        }
+                    ]}>
+                        <View style={styles.statusHeader}>
+                            <Ionicons
+                                name={isConnected ? "checkmark-circle" : "close-circle"}
+                                size={24}
+                                color={isConnected ? '#00FF7F' : '#FF0000'}
+                            />
+                            <View style={styles.statusTextContainer}>
+                                <Text style={[styles.statusText, { color: colors.text }]}>
+                                    {isConnected ? 'Ready' : 'Not Configured'}
+                                </Text>
+                                <Text style={[styles.statusSubtext, { color: colors.textSecondary }]}>
+                                    {isConnected ? 'AI assistant is ready' : 'Enter API key below'}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
+                {/* API Configuration */}
+                <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                    <View style={styles.sectionHeader}>
+                        <Ionicons name="key" size={20} color="#007AFF" />
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                            API Key
+                        </Text>
+                        <TouchableOpacity onPress={() => Linking.openURL('https://platform.deepseek.com/')}>
+                            <Text style={[styles.getKeyText, { color: '#007AFF' }]}>Get Key</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.configItem}>
+                        <Text style={[styles.configLabel, { color: colors.text }]}>
+                            DeepSeek API Key
+                        </Text>
+                        <TextInput
+                            style={[styles.configInput, {
+                                backgroundColor: colors.background,
+                                borderColor: colors.border,
+                                color: colors.text
+                            }]}
+                            value={apiKey}
+                            onChangeText={setApiKey}
+                            placeholder="sk-..."
+                            placeholderTextColor={colors.textSecondary}
+                            secureTextEntry={true}
+                        />
+                        <Text style={[styles.helpText, { color: colors.textSecondary }]}>
+                            Get your API key from platform.deepseek.com
+                        </Text>
+                    </View>
+
+                    {/* 🚨 FIXED: Manual test button only */}
+                    <TouchableOpacity
+                        style={[styles.testButton, { backgroundColor: '#007AFF' }]}
+                        onPress={testConnection}
+                        disabled={testLoading || !apiKey.trim()}
+                    >
+                        {testLoading ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                            <>
+                                <Ionicons name="wifi" size={20} color="#FFFFFF" />
+                                <Text style={styles.testButtonText}>
+                                    Test Connection
+                                </Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+                </View>
+
+                {/* Chat History */}
+                <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                    <View style={styles.sectionHeader}>
+                        <Ionicons name="chatbubbles" size={20} color="#007AFF" />
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                            Chat History ({chatSessions.length})
+                        </Text>
+                        {chatSessions.length > 0 && (
+                            <TouchableOpacity onPress={clearAllChats}>
+                                <Text style={[styles.clearAllText, { color: '#FF3B30' }]}>
+                                    Clear All
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+
+                    {chatSessions.length === 0 ? (
+                        <View style={styles.emptyChatHistory}>
+                            <Ionicons name="chatbubbles-outline" size={48} color={colors.textSecondary} />
+                            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                No chat history yet
+                            </Text>
+                            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                                Start a conversation with your AI assistant
+                            </Text>
+                        </View>
+                    ) : (
+                        <View style={styles.chatList}>
+                            {chatSessions.map(session => (
+                                <View key={session.id} style={[styles.chatItem, { borderBottomColor: colors.border }]}>
+                                    <View style={styles.chatInfo}>
+                                        <Text
+                                            style={[styles.chatTitle, { color: colors.text }]}
+                                            numberOfLines={1}
+                                        >
+                                            {session.title}
+                                        </Text>
+                                        <Text style={[styles.chatDate, { color: colors.textSecondary }]}>
+                                            {new Date(session.updated_at).toLocaleDateString()}
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={() => deleteChat(session)}
+                                        style={styles.deleteButton}
+                                    >
+                                        <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+                </View>
+
+                {/* 🚨 SIMPLIFIED: Quick setup guide */}
+                <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                    <View style={styles.sectionHeader}>
+                        <Ionicons name="help-circle" size={20} color="#007AFF" />
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                            Quick Setup
+                        </Text>
+                    </View>
+
+                    <View style={styles.helpContent}>
+                        <View style={styles.helpStep}>
+                            <Text style={[styles.helpStepNumber, { backgroundColor: '#007AFF' }]}>1</Text>
+                            <Text style={[styles.helpStepText, { color: colors.text }]}>
+                                Visit platform.deepseek.com and create an account
+                            </Text>
+                        </View>
+
+                        <View style={styles.helpStep}>
+                            <Text style={[styles.helpStepNumber, { backgroundColor: '#007AFF' }]}>2</Text>
+                            <Text style={[styles.helpStepText, { color: colors.text }]}>
+                                Generate an API key from your dashboard
+                            </Text>
+                        </View>
+
+                        <View style={styles.helpStep}>
+                            <Text style={[styles.helpStepNumber, { backgroundColor: '#007AFF' }]}>3</Text>
+                            <Text style={[styles.helpStepText, { color: colors.text }]}>
+                                Paste the key above and test connection
+                            </Text>
+                        </View>
+
+                        <Text style={[styles.helpNote, { color: colors.textSecondary }]}>
+                            💰 DeepSeek costs only ~$0.14 per 1M tokens. Typical chat costs less than $0.001!
+                        </Text>
+                    </View>
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
@@ -417,18 +387,17 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        paddingHorizontal: 20,
     },
     loadingText: {
-        marginTop: 12,
         fontSize: 16,
+        marginTop: 16,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 15,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         borderBottomWidth: 1,
     },
     backButton: {
@@ -436,8 +405,10 @@ const styles = StyleSheet.create({
         marginLeft: -8,
     },
     headerTitle: {
-        fontSize: 18,
+        flex: 1,
+        fontSize: 20,
         fontWeight: '600',
+        textAlign: 'center',
     },
     headerRight: {
         width: 40,
@@ -446,12 +417,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        padding: 20,
+        paddingBottom: 32,
     },
     section: {
+        marginTop: 16,
+        marginHorizontal: 16,
         borderRadius: 12,
         padding: 16,
-        marginBottom: 16,
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -459,22 +431,22 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     sectionTitle: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '600',
         marginLeft: 8,
         flex: 1,
     },
     getKeyText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     clearAllText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     statusCard: {
-        padding: 16,
         borderRadius: 8,
+        padding: 16,
         borderWidth: 1,
     },
     statusHeader: {
@@ -483,46 +455,47 @@ const styles = StyleSheet.create({
     },
     statusTextContainer: {
         marginLeft: 12,
+        flex: 1,
     },
     statusText: {
         fontSize: 16,
-        fontWeight: '500',
+        fontWeight: '600',
+        marginBottom: 4,
     },
     statusSubtext: {
         fontSize: 14,
-        marginTop: 2,
     },
     configItem: {
         marginBottom: 16,
     },
     configLabel: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
         marginBottom: 8,
     },
     configInput: {
         borderWidth: 1,
         borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
+        padding: 12,
         fontSize: 16,
+        marginBottom: 8,
     },
     helpText: {
-        fontSize: 12,
-        marginTop: 4,
+        fontSize: 14,
     },
     testButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 12,
+        paddingHorizontal: 16,
         borderRadius: 8,
         marginTop: 8,
     },
     testButtonText: {
         color: '#FFFFFF',
         fontSize: 16,
-        fontWeight: '500',
+        fontWeight: '600',
         marginLeft: 8,
     },
     emptyChatHistory: {
@@ -532,14 +505,14 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 16,
         fontWeight: '500',
-        marginTop: 12,
+        marginTop: 16,
+        marginBottom: 8,
     },
     emptySubtext: {
         fontSize: 14,
-        marginTop: 4,
     },
     chatList: {
-        marginTop: 8,
+        // Container for chat sessions
     },
     chatItem: {
         flexDirection: 'row',
@@ -562,36 +535,32 @@ const styles = StyleSheet.create({
         padding: 8,
     },
     helpContent: {
-        marginTop: 8,
+        // Container for help steps
     },
     helpStep: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: 12,
+        alignItems: 'center',
+        marginBottom: 16,
     },
     helpStepNumber: {
         width: 24,
         height: 24,
         borderRadius: 12,
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
         marginRight: 12,
-        textAlign: 'center',
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: '600',
-        lineHeight: 24,
     },
     helpStepText: {
         flex: 1,
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
     },
     helpNote: {
         fontSize: 14,
-        lineHeight: 20,
-        marginTop: 16,
         fontStyle: 'italic',
+        marginTop: 8,
+        padding: 12,
+        borderRadius: 8,
+        backgroundColor: 'rgba(0, 122, 255, 0.05)',
     },
 });
 
