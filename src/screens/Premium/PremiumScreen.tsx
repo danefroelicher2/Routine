@@ -201,7 +201,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
 
             // ✅ POST REQUEST TO YOUR LOCAL SERVER
 
-            const response = await fetch('https://routine-payments-v4-7xcdusfaa-dane-froelichers-projects.vercel.app/api/create-checkout', {
+            const response = await fetch('https://routine-payments-v4-m0v469p3g-dane-froelichers-projects.vercel.app/api/create-checkout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -1,6 +1,6 @@
 // ============================================
-// AI SETTINGS SCREEN - EMERGENCY TOKEN LEAK FIX
-// Replace your existing src/screens/AI/AISettingsScreen.tsx with this
+// STREAMLINED AI SETTINGS SCREEN - Chat History + AI Naming
+// Replace your entire src/screens/AI/AISettingsScreen.tsx with this
 // ============================================
 
 import React, { useState, useEffect } from 'react';
@@ -14,13 +14,11 @@ import {
     TextInput,
     Alert,
     ActivityIndicator,
-    Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../ThemeContext';
 import { supabase } from '../../services/supabase';
 import { chatService } from '../../services/chatService';
-import { aiService } from '../../services/aiService';
 import { ChatSession } from '../../types/database';
 
 interface AISettingsScreenProps {
@@ -32,35 +30,38 @@ const AISettingsScreen: React.FC<AISettingsScreenProps> = ({ navigation }) => {
 
     // State
     const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
-    const [isConnected, setIsConnected] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [testLoading, setTestLoading] = useState(false);
-    const [apiKey, setApiKey] = useState('');
+    const [aiName, setAiName] = useState('AI Assistant');
+    const [tempAiName, setTempAiName] = useState('');
+    const [savingName, setSavingName] = useState(false);
 
     useEffect(() => {
         loadData();
     }, []);
 
     /**
-     * 🚨 FIXED: Load data without automatic connection testing
+     * Load chat sessions and AI name preference
      */
     const loadData = async () => {
         try {
             setLoading(true);
 
-            // 🚨 CRITICAL FIX: Don't load API key from environment in production
-            // Users must enter it manually to prevent exposure
-            setApiKey('');
-
-            // 🚨 CRITICAL FIX: Don't automatically test connection on load
-            // This was causing background token usage!
-            setIsConnected(aiService.isConfigured());
-
-            // Load chat sessions
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
+                // Load chat sessions
                 const sessions = await chatService.getChatSessions(user.id);
                 setChatSessions(sessions);
+
+                // Load AI name preference
+                const { data: settings } = await supabase
+                    .from('user_settings')
+                    .select('ai_name')
+                    .eq('user_id', user.id)
+                    .single();
+
+                const savedName = settings?.ai_name || 'AI Assistant';
+                setAiName(savedName);
+                setTempAiName(savedName);
             }
 
         } catch (error) {
@@ -71,41 +72,41 @@ const AISettingsScreen: React.FC<AISettingsScreenProps> = ({ navigation }) => {
     };
 
     /**
-     * 🚨 FIXED: Manual connection test only (user must click button)
+     * Save AI name preference
      */
-    const testConnection = async () => {
-        if (!apiKey.trim()) {
-            Alert.alert('Error', 'Please enter your DeepSeek API key first.');
-            return;
-        }
-
-        if (!apiKey.startsWith('sk-')) {
-            Alert.alert('Error', 'Invalid API key format. DeepSeek keys start with "sk-"');
+    const saveAiName = async () => {
+        if (!tempAiName.trim()) {
+            Alert.alert('Error', 'Please enter a name for your AI assistant.');
             return;
         }
 
         try {
-            setTestLoading(true);
-            console.log('🔍 User initiated connection test...');
+            setSavingName(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
 
-            // Update service with current API key
-            aiService.updateApiKey(apiKey);
+            const trimmedName = tempAiName.trim();
 
-            const connected = await aiService.testConnection();
+            // Upsert AI name preference
+            const { error } = await supabase
+                .from('user_settings')
+                .upsert({
+                    user_id: user.id,
+                    ai_name: trimmedName
+                }, {
+                    onConflict: 'user_id'
+                });
 
-            if (connected) {
-                Alert.alert('✅ Success!', 'Connected to DeepSeek API successfully!\n\nYou can now use the AI assistant.');
-                setIsConnected(true);
-            } else {
-                Alert.alert('❌ Connection Failed', 'Could not connect to the API. Please check your API key and try again.');
-                setIsConnected(false);
-            }
+            if (error) throw error;
+
+            setAiName(trimmedName);
+            Alert.alert('Saved!', `Your AI assistant is now named "${trimmedName}"`);
+
         } catch (error) {
-            console.error('Connection test error:', error);
-            Alert.alert('❌ Error', `Connection test failed: ${error.message}`);
-            setIsConnected(false);
+            console.error('Error saving AI name:', error);
+            Alert.alert('Error', 'Failed to save AI name. Please try again.');
         } finally {
-            setTestLoading(false);
+            setSavingName(false);
         }
     };
 
@@ -199,93 +200,7 @@ const AISettingsScreen: React.FC<AISettingsScreenProps> = ({ navigation }) => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Connection Status - 🚨 SIMPLIFIED */}
-                <View style={[styles.section, { backgroundColor: colors.surface }]}>
-                    <View style={styles.sectionHeader}>
-                        <Ionicons name="cloud" size={20} color="#007AFF" />
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                            Status
-                        </Text>
-                    </View>
-
-                    <View style={[
-                        styles.statusCard,
-                        {
-                            backgroundColor: isConnected ? '#00FF7F10' : '#FF000010',
-                            borderColor: isConnected ? '#00FF7F' : '#FF0000'
-                        }
-                    ]}>
-                        <View style={styles.statusHeader}>
-                            <Ionicons
-                                name={isConnected ? "checkmark-circle" : "close-circle"}
-                                size={24}
-                                color={isConnected ? '#00FF7F' : '#FF0000'}
-                            />
-                            <View style={styles.statusTextContainer}>
-                                <Text style={[styles.statusText, { color: colors.text }]}>
-                                    {isConnected ? 'Ready' : 'Not Configured'}
-                                </Text>
-                                <Text style={[styles.statusSubtext, { color: colors.textSecondary }]}>
-                                    {isConnected ? 'AI assistant is ready' : 'Enter API key below'}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
-                {/* API Configuration */}
-                <View style={[styles.section, { backgroundColor: colors.surface }]}>
-                    <View style={styles.sectionHeader}>
-                        <Ionicons name="key" size={20} color="#007AFF" />
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                            API Key
-                        </Text>
-                        <TouchableOpacity onPress={() => Linking.openURL('https://platform.deepseek.com/')}>
-                            <Text style={[styles.getKeyText, { color: '#007AFF' }]}>Get Key</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.configItem}>
-                        <Text style={[styles.configLabel, { color: colors.text }]}>
-                            DeepSeek API Key
-                        </Text>
-                        <TextInput
-                            style={[styles.configInput, {
-                                backgroundColor: colors.background,
-                                borderColor: colors.border,
-                                color: colors.text
-                            }]}
-                            value={apiKey}
-                            onChangeText={setApiKey}
-                            placeholder="sk-..."
-                            placeholderTextColor={colors.textSecondary}
-                            secureTextEntry={true}
-                        />
-                        <Text style={[styles.helpText, { color: colors.textSecondary }]}>
-                            Get your API key from platform.deepseek.com
-                        </Text>
-                    </View>
-
-                    {/* 🚨 FIXED: Manual test button only */}
-                    <TouchableOpacity
-                        style={[styles.testButton, { backgroundColor: '#007AFF' }]}
-                        onPress={testConnection}
-                        disabled={testLoading || !apiKey.trim()}
-                    >
-                        {testLoading ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                            <>
-                                <Ionicons name="wifi" size={20} color="#FFFFFF" />
-                                <Text style={styles.testButtonText}>
-                                    Test Connection
-                                </Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
-                </View>
-
-                {/* Chat History */}
+                {/* Chat History Section */}
                 <View style={[styles.section, { backgroundColor: colors.surface }]}>
                     <View style={styles.sectionHeader}>
                         <Ionicons name="chatbubbles" size={20} color="#007AFF" />
@@ -308,7 +223,7 @@ const AISettingsScreen: React.FC<AISettingsScreenProps> = ({ navigation }) => {
                                 No chat history yet
                             </Text>
                             <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                                Start a conversation with your AI assistant
+                                Start a conversation with {aiName}
                             </Text>
                         </View>
                     ) : (
@@ -338,40 +253,49 @@ const AISettingsScreen: React.FC<AISettingsScreenProps> = ({ navigation }) => {
                     )}
                 </View>
 
-                {/* 🚨 SIMPLIFIED: Quick setup guide */}
+                {/* AI Name Customization */}
                 <View style={[styles.section, { backgroundColor: colors.surface }]}>
                     <View style={styles.sectionHeader}>
-                        <Ionicons name="help-circle" size={20} color="#007AFF" />
+                        <Ionicons name="person-circle" size={20} color="#007AFF" />
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                            Quick Setup
+                            Name Your AI Assistant
                         </Text>
                     </View>
 
-                    <View style={styles.helpContent}>
-                        <View style={styles.helpStep}>
-                            <Text style={[styles.helpStepNumber, { backgroundColor: '#007AFF' }]}>1</Text>
-                            <Text style={[styles.helpStepText, { color: colors.text }]}>
-                                Visit platform.deepseek.com and create an account
-                            </Text>
-                        </View>
+                    <View style={styles.nameCustomization}>
 
-                        <View style={styles.helpStep}>
-                            <Text style={[styles.helpStepNumber, { backgroundColor: '#007AFF' }]}>2</Text>
-                            <Text style={[styles.helpStepText, { color: colors.text }]}>
-                                Generate an API key from your dashboard
-                            </Text>
-                        </View>
 
-                        <View style={styles.helpStep}>
-                            <Text style={[styles.helpStepNumber, { backgroundColor: '#007AFF' }]}>3</Text>
-                            <Text style={[styles.helpStepText, { color: colors.text }]}>
-                                Paste the key above and test connection
-                            </Text>
-                        </View>
+                        <TextInput
+                            style={[styles.nameInput, {
+                                backgroundColor: colors.background,
+                                borderColor: colors.border,
+                                color: colors.text
+                            }]}
+                            value={tempAiName}
+                            onChangeText={setTempAiName}
+                            placeholder="Enter a name for your AI..."
+                            placeholderTextColor={colors.textSecondary}
+                            maxLength={30}
+                        />
 
-                        <Text style={[styles.helpNote, { color: colors.textSecondary }]}>
-                            💰 DeepSeek costs only ~$0.14 per 1M tokens. Typical chat costs less than $0.001!
-                        </Text>
+                        <TouchableOpacity
+                            style={[styles.saveButton, {
+                                backgroundColor: tempAiName.trim() && tempAiName.trim() !== aiName ? '#007AFF' : colors.border
+                            }]}
+                            onPress={saveAiName}
+                            disabled={savingName || !tempAiName.trim() || tempAiName.trim() === aiName}
+                        >
+                            {savingName ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <>
+                                    <Ionicons name="save" size={20} color="#FFFFFF" />
+                                    <Text style={styles.saveButtonText}>
+                                        Save Name
+                                    </Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
                     </View>
                 </View>
             </ScrollView>
@@ -436,67 +360,9 @@ const styles = StyleSheet.create({
         marginLeft: 8,
         flex: 1,
     },
-    getKeyText: {
-        fontSize: 16,
-        fontWeight: '500',
-    },
     clearAllText: {
         fontSize: 16,
         fontWeight: '500',
-    },
-    statusCard: {
-        borderRadius: 8,
-        padding: 16,
-        borderWidth: 1,
-    },
-    statusHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    statusTextContainer: {
-        marginLeft: 12,
-        flex: 1,
-    },
-    statusText: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    statusSubtext: {
-        fontSize: 14,
-    },
-    configItem: {
-        marginBottom: 16,
-    },
-    configLabel: {
-        fontSize: 16,
-        fontWeight: '500',
-        marginBottom: 8,
-    },
-    configInput: {
-        borderWidth: 1,
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-        marginBottom: 8,
-    },
-    helpText: {
-        fontSize: 14,
-    },
-    testButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        marginTop: 8,
-    },
-    testButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-        marginLeft: 8,
     },
     emptyChatHistory: {
         alignItems: 'center',
@@ -534,33 +400,53 @@ const styles = StyleSheet.create({
     deleteButton: {
         padding: 8,
     },
-    helpContent: {
-        // Container for help steps
+    nameCustomization: {
+        // Container for AI name customization
     },
-    helpStep: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    currentNameLabel: {
+        fontSize: 14,
+        marginBottom: 12,
+        fontStyle: 'italic',
+    },
+    nameInput: {
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
         marginBottom: 16,
     },
-    helpStepNumber: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+    saveButton: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
-    },
-    helpStepText: {
-        flex: 1,
-        fontSize: 16,
-    },
-    helpNote: {
-        fontSize: 14,
-        fontStyle: 'italic',
-        marginTop: 8,
-        padding: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
         borderRadius: 8,
-        backgroundColor: 'rgba(0, 122, 255, 0.05)',
+        marginBottom: 12,
+    },
+    saveButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    nameHelpText: {
+        fontSize: 14,
+        lineHeight: 20,
+        textAlign: 'center',
+    },
+    premiumNote: {
+        alignItems: 'center',
+        paddingVertical: 16,
+    },
+    premiumText: {
+        fontSize: 16,
+        fontWeight: '500',
+        marginBottom: 8,
+    },
+    premiumSubtext: {
+        fontSize: 14,
+        textAlign: 'center',
     },
 });
 

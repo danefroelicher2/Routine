@@ -130,7 +130,7 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         try {
             console.log(`🔍 Checking Stripe subscription for user: ${userId}`);
 
-            const url = `https://routine-payments-v4-7xcdusfaa-dane-froelichers-projects.vercel.app/api/subscription-status?userId=${userId}`;
+            const url = `https://routine-payments-v4-m0v469p3g-dane-froelichers-projects.vercel.app/api/subscription-status?userId=${userId}`;
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {

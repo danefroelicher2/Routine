@@ -1,5 +1,5 @@
 // ============================================
-// AI CHAT SCREEN WITH TOKEN LEAK FIXES APPLIED
+// AI CHAT SCREEN WITH PREMIUM BACKEND INTEGRATION + CUSTOM AI NAME
 // Replace your entire src/screens/AI/AIChatScreen.tsx with this
 // ============================================
 
@@ -50,6 +50,7 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     const [isConnected, setIsConnected] = useState(false);
     const [scheduleContext, setScheduleContext] = useState<ScheduleContext | null>(null);
     const [showQuickActions, setShowQuickActions] = useState(true);
+    const [aiName, setAiName] = useState('AI Assistant');
 
     // Refs
     const flatListRef = useRef<FlatList>(null);
@@ -73,9 +74,8 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
             const hasAIAccess = checkPremiumFeature("ai_assistant");
             if (hasAIAccess) {
                 initializeChat();
-                // 🚨 CRITICAL FIX: Don't auto-test connection on every screen focus
-                // This was causing token drain every time user visited AI tab
-                checkAIConnection(); // This now only checks configuration, no API call
+                // For premium users, AI should always be "connected" 
+                checkAIConnection();
             }
         }, [isPremium, checkPremiumFeature])
     );
@@ -95,6 +95,16 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
             const context = await chatService.getUserScheduleContext(user.id);
             setScheduleContext(context);
 
+            // Load custom AI name
+            const { data: settings } = await supabase
+                .from('user_settings')
+                .select('ai_name')
+                .eq('user_id', user.id)
+                .single();
+
+            const customAiName = settings?.ai_name || 'AI Assistant';
+            setAiName(customAiName);
+
             // Get or create current chat session
             const sessions = await chatService.getChatSessions(user.id);
 
@@ -108,16 +118,16 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
                 setMessages(sessionMessages);
             } else {
                 // Create new session
-                const newSession = await chatService.createChatSession(user.id, 'AI Assistant');
+                const newSession = await chatService.createChatSession(user.id, customAiName);
                 setCurrentSession(newSession);
                 setMessages([]);
 
-                // Add welcome message
+                // Add welcome message with custom name
                 const welcomeMessage = await chatService.addMessage(
                     newSession.id,
                     user.id,
                     'assistant',
-                    `Hello ${context.user_profile.display_name}! 🤖 I'm your AI routine assistant. I can help you optimize your schedule, analyze your routines, and provide personalized productivity advice.\n\nWhat would you like to work on today?`
+                    `Hello ${context.user_profile.display_name}! 🤖 I'm ${customAiName}, your AI routine assistant. I can help you optimize your schedule, analyze your routines, and provide personalized productivity advice.\n\nWhat would you like to work on today?`
                 );
                 setMessages([welcomeMessage]);
             }
@@ -129,20 +139,25 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     };
 
     /**
-     * 🚨 FIXED: Don't automatically test connection on load
-     * Only check if API key is configured, don't make actual API calls
+     * Check AI connection status - for premium users, always connected
      */
     const checkAIConnection = async () => {
         try {
-            // 🚨 CRITICAL FIX: Just check if configured, don't test connection automatically
-            // This prevents background token usage every time the screen loads
-            const configured = aiService.isConfigured();
-            setIsConnected(configured);
-
-            if (!configured) {
-                console.log('ℹ️ AI not configured - user needs to set API key in settings');
+            const hasAIAccess = checkPremiumFeature("ai_assistant");
+            if (hasAIAccess) {
+                // Premium users are always connected through backend
+                setIsConnected(true);
+                console.log('✅ Premium AI service ready');
             } else {
-                console.log('✅ AI is configured and ready to use');
+                // Non-premium users need manual API key
+                const configured = aiService.isConfigured();
+                setIsConnected(configured);
+
+                if (!configured) {
+                    console.log('ℹ️ AI not configured - user needs to set API key in settings');
+                } else {
+                    console.log('✅ AI is configured and ready to use');
+                }
             }
         } catch (error) {
             console.error('Error checking AI status:', error);
@@ -151,20 +166,22 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     };
 
     /**
-     * 🚨 IMPROVED: Send message with better error handling and connection management
+     * Send message with premium backend integration
      */
     const sendMessage = async (messageText?: string) => {
         const textToSend = messageText || inputText.trim();
         if (!textToSend || !currentSession) return;
 
-        // 🚨 UPDATED: Check configuration instead of connection status
-        if (!aiService.isConfigured()) {
+        const hasAIAccess = checkPremiumFeature("ai_assistant");
+
+        // Check premium access first
+        if (!hasAIAccess) {
             Alert.alert(
-                'AI Not Set Up',
-                'Please configure your API key in AI Settings first.',
+                'Premium Required',
+                'AI Assistant requires a premium subscription.',
                 [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Open Settings', onPress: () => navigation.navigate('AISettings') }
+                    { text: 'Upgrade', onPress: () => navigation.navigate('Premium') }
                 ]
             );
             return;
@@ -214,12 +231,15 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
 
             console.log('🤖 Sending message to AI...', {
                 messageLength: textToSend.length,
-                conversationLength: conversationHistory.length
+                conversationLength: conversationHistory.length,
+                isPremium: hasAIAccess
             });
 
+            // Call AI service with user ID to trigger backend for premium users
             const aiResponse = await aiService.sendMessage(
                 conversationHistory,
-                scheduleContext || undefined
+                scheduleContext || undefined,
+                user.id  // This triggers the backend call for premium users
             );
 
             // Remove loading message and add real AI response
@@ -241,7 +261,7 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
                 setCurrentSession(prev => prev ? { ...prev, title } : null);
             }
 
-            // 🚨 NEW: Set connection status to true after successful message
+            // Set connection status to true after successful message
             setIsConnected(true);
 
         } catch (error) {
@@ -250,21 +270,25 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
             // Remove loading message
             setMessages(prev => prev.filter(m => m.id !== 'loading'));
 
-            // 🚨 IMPROVED: Better error handling
-            if (error.message.includes('API key not configured') || error.message.includes('AI not configured')) {
+            // Enhanced error handling
+            if (error.message.includes('Premium subscription required')) {
+                Alert.alert(
+                    'Premium Required',
+                    'AI Assistant requires a premium subscription to continue.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Upgrade Now', onPress: () => navigation.navigate('Premium') }
+                    ]
+                );
+            } else if (error.message.includes('Backend AI service failed')) {
+                Alert.alert(
+                    'Service Temporarily Unavailable',
+                    'Our AI service is temporarily unavailable. Please try again in a moment.'
+                );
+            } else if (error.message.includes('API key not configured')) {
                 Alert.alert(
                     'AI Not Set Up',
                     'Please configure your API key in AI Settings.',
-                    [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Open Settings', onPress: () => navigation.navigate('AISettings') }
-                    ]
-                );
-                setIsConnected(false);
-            } else if (error.message.includes('401') || error.message.includes('403')) {
-                Alert.alert(
-                    'Authentication Error',
-                    'Your API key appears to be invalid. Please check it in AI Settings.',
                     [
                         { text: 'Cancel', style: 'cancel' },
                         { text: 'Open Settings', onPress: () => navigation.navigate('AISettings') }
@@ -354,7 +378,7 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
                             <View style={styles.loadingContainer}>
                                 <ActivityIndicator size="small" color="#007AFF" />
                                 <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-                                    AI is thinking...
+                                    {aiName} is thinking...
                                 </Text>
                             </View>
                         ) : (
@@ -524,10 +548,10 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
                         </View>
                         <View>
                             <Text style={[styles.headerTitle, { color: colors.text }]}>
-                                AI Assistant
+                                {aiName}
                             </Text>
                             <Text style={[styles.headerSubtitle, { color: isConnected ? '#34C759' : '#FF3B30' }]}>
-                                {isConnected ? 'Connected' : 'Disconnected'}
+                                {isConnected ? 'Ready' : 'Disconnected'}
                             </Text>
                         </View>
                     </View>
@@ -572,7 +596,7 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
                                 color: colors.text,
                             },
                         ]}
-                        placeholder="Ask about your routines, schedule, or productivity..."
+                        placeholder={`Ask ${aiName} about your routines, schedule, or productivity...`}
                         placeholderTextColor={colors.textSecondary}
                         value={inputText}
                         onChangeText={setInputText}
@@ -681,7 +705,7 @@ const styles = StyleSheet.create({
     },
     messageContent: {
         flex: 1,
-        maxWidth: width * 0.8, // Reasonable max width like Claude
+        maxWidth: width * 0.8,
     },
     userMessageContent: {
         alignItems: 'flex-end',
@@ -694,7 +718,6 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 18,
         borderWidth: 1,
-        // No fixed width - let content determine size within maxWidth
     },
     loadingContainer: {
         flexDirection: 'row',
@@ -763,7 +786,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    // 🔒 Premium loading styles
     premiumLoadingContainer: {
         flex: 1,
         justifyContent: 'center',

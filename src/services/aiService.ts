@@ -83,16 +83,43 @@ export class AIService {
         }
     }
 
-    /**
-     * Send message to AI with user context
-     * 🚨 FIXED: Added comprehensive logging to track token usage
-     */
     async sendMessage(
         messages: AIMessage[],
-        scheduleContext?: ScheduleContext
+        scheduleContext?: ScheduleContext,
+        userId?: string
     ): Promise<string> {
+        // For premium users, use backend proxy
+        if (userId) {
+            try {
+                const response = await fetch('https://routine-payments-v4-m0v469p3g-dane-froelichers-projects.vercel.app/api/ai-chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        messages,
+                        scheduleContext
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Backend AI service failed');
+                }
+
+                const data = await response.json();
+                return data.message;
+            } catch (error) {
+                console.error('❌ Backend AI error:', error);
+                // Fallback to direct API if backend fails
+                console.log('🔄 Falling back to direct API...');
+            }
+        }
+
+        // Fallback to direct DeepSeek API (for users with their own keys)
         if (!this.isConfigured()) {
-            throw new Error('AI not configured. Please set up your API key in AI Settings.');
+            throw new Error('AI not configured. Please set up your API key in AI Settings or upgrade to Premium.');
         }
 
         try {
@@ -107,7 +134,7 @@ export class AIService {
 
             // 🚨 CRITICAL: Log exactly what we're sending to track usage
             const totalInputTokens = this.estimateTokens(fullMessages);
-            console.log('🤖 Sending to DeepSeek:', {
+            console.log('🤖 Sending to DeepSeek (direct):', {
                 messageCount: fullMessages.length,
                 estimatedInputTokens: totalInputTokens,
                 hasContext: !!scheduleContext,
@@ -124,7 +151,7 @@ export class AIService {
                     model: this.model,
                     messages: fullMessages,
                     temperature: 0.7,
-                    max_tokens: 1000, // 🚨 REDUCED: From 2000 to save costs
+                    max_tokens: 1000,
                 }),
             });
 
@@ -157,7 +184,6 @@ export class AIService {
             throw new Error(`Failed to get AI response: ${error.message}`);
         }
     }
-
     /**
      * 🆕 NEW: Estimate token count to prevent surprises
      */
