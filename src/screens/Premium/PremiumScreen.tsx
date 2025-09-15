@@ -220,7 +220,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                 console.error('❌ Create-payment error response:', errorText);
                 throw new Error('Failed to create checkout session');
             }
-
+            //test
             const data = await response.json();
             console.log('✅ Payment response:', data);
 
