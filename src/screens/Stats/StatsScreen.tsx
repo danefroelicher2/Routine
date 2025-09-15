@@ -598,136 +598,37 @@ export default function StatsScreen() {
 
   const calculateAchievements = useCallback(async (userId: string) => {
     try {
-      // Get fresh data for achievements
-      const [completionsResult, userRoutinesResult, dayRoutinesResult] =
-        await Promise.all([
-          supabase
-            .from("routine_completions")
-            .select("completion_date, routine_id")
-            .eq("user_id", userId),
-          supabase
-            .from("user_routines")
-            .select("id, is_weekly, is_active")
-            .eq("user_id", userId),
-          supabase
-            .from("user_day_routines")
-            .select("routine_id, day_of_week")
-            .eq("user_id", userId),
-        ]);
+      console.log("📊 STATS: Calculating achievements using current streak data");
 
-      if (
-        completionsResult.error ||
-        userRoutinesResult.error ||
-        dayRoutinesResult.error
-      ) {
-        throw new Error("Failed to fetch achievement data");
-      }
+      // Use the already calculated streak data instead of recalculating
+      const currentLongestStreak = longestStreak.length;
 
-      const completions = completionsResult.data || [];
-      const userRoutines = userRoutinesResult.data || [];
-      const dayAssignments = dayRoutinesResult.data || [];
-
-      const dayRoutineMap: Record<number, string[]> = {};
-      dayAssignments.forEach((assignment) => {
-        if (!dayRoutineMap[assignment.day_of_week]) {
-          dayRoutineMap[assignment.day_of_week] = [];
-        }
-        dayRoutineMap[assignment.day_of_week].push(assignment.routine_id);
+      // Create achievements based on the longest streak we've already calculated
+      const newAchievements: Achievement[] = ACHIEVEMENT_LEVELS.map((achievement) => {
+        const isUnlocked = currentLongestStreak >= achievement.days;
+        return {
+          id: `streak_${achievement.days}`,
+          name: achievement.name,
+          target: achievement.days,
+          unlocked: isUnlocked,
+          unlockedDate: isUnlocked ? longestStreak.endDate : undefined,
+          icon: achievement.icon,
+          level: achievement.level,
+          color: achievement.color,
+        };
       });
 
-      const successDays = new Set<string>();
-      const completionsByDate = new Map<string, string[]>();
-
-      completions.forEach((completion) => {
-        const date = completion.completion_date;
-        if (!completionsByDate.has(date)) {
-          completionsByDate.set(date, []);
-        }
-        completionsByDate.get(date)!.push(completion.routine_id);
+      console.log("📊 STATS: Achievements calculated:", {
+        longestStreak: currentLongestStreak,
+        unlockedCount: newAchievements.filter(a => a.unlocked).length,
+        totalCount: newAchievements.length
       });
-
-      completionsByDate.forEach((completedRoutineIds, date) => {
-        // ✅ CRITICAL FIX: Parse date string back to Date for day calculation
-        const dateParts = date.split("-");
-        const checkDate = new Date(
-          parseInt(dateParts[0]),
-          parseInt(dateParts[1]) - 1,
-          parseInt(dateParts[2])
-        );
-        const dayOfWeek = checkDate.getDay();
-
-        // ✅ FIXED: Use the same completion logic as Home page
-        const allCompleted = checkDailyCompletionStatusForStats(
-          userId,
-          date,
-          dayOfWeek,
-          userRoutines,
-          completedRoutineIds,
-          dayRoutineMap
-        );
-
-        if (allCompleted) {
-          successDays.add(date);
-        }
-      });
-
-      // Find all streak periods
-      const sortedSuccessDays = Array.from(successDays).sort();
-      const streakPeriods: { length: number; endDate: string }[] = [];
-
-      if (sortedSuccessDays.length > 0) {
-        let currentStreakLength = 1;
-        let currentStreakEnd = sortedSuccessDays[0];
-
-        for (let i = 1; i < sortedSuccessDays.length; i++) {
-          const prevDate = new Date(sortedSuccessDays[i - 1]);
-          const currDate = new Date(sortedSuccessDays[i]);
-
-          const dayDiff = Math.floor(
-            (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24)
-          );
-
-          if (dayDiff === 1) {
-            currentStreakLength++;
-            currentStreakEnd = sortedSuccessDays[i];
-          } else {
-            streakPeriods.push({
-              length: currentStreakLength,
-              endDate: currentStreakEnd,
-            });
-            currentStreakLength = 1;
-            currentStreakEnd = sortedSuccessDays[i];
-          }
-        }
-
-        // Add the final streak
-        streakPeriods.push({
-          length: currentStreakLength,
-          endDate: currentStreakEnd,
-        });
-      }
-
-      const newAchievements: Achievement[] = ACHIEVEMENT_LEVELS.map(
-        (achievement) => {
-          const unlockedStreak = streakPeriods.find((s) => s.length >= achievement.days);
-          return {
-            id: `streak_${achievement.days}`,
-            name: achievement.name,
-            target: achievement.days,
-            unlocked: !!unlockedStreak,
-            unlockedDate: unlockedStreak?.endDate,
-            icon: achievement.icon,
-            level: achievement.level,
-            color: achievement.color,
-          };
-        }
-      );
 
       setAchievements(newAchievements);
     } catch (error) {
       console.error("Error calculating achievements:", error);
     }
-  }, []);
+  }, [longestStreak]);
 
   const formatStreakDate = (dateStr: string) => {
     const dateParts = dateStr.split("-");

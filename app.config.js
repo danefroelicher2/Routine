@@ -15,19 +15,12 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.routine.app",
-      // UPDATED: Enhanced info.plist for Apple IAP and security
+      // FIXED: Add Face ID usage description
       infoPlist: {
-        NSFaceIDUsageDescription: "This app uses Face ID to secure your private notes.",
-        ITSAppUsesNonExemptEncryption: false,
-        // ✅ ADD THESE FOR APPLE IAP SUPPORT
-        NSCameraUsageDescription: "Upload profile photos",
-        NSPhotoLibraryUsageDescription: "Select profile photos from library"
+        NSFaceIDUsageDescription:
+          "This app uses Face ID to secure your private notes.",
+        ITSAppUsesNonExemptEncryption: false
       },
-      // ✅ CRITICAL: Apple IAP Configuration
-      usesAppleSignIn: false, // Set to true if you want Apple Sign In
-      config: {
-        usesNonExemptEncryption: false
-      }
     },
     android: {
       adaptiveIcon: {
@@ -41,32 +34,19 @@ export default {
     },
     plugins: [
       "expo-secure-store",
-      // ✅ ADD EXPO-STORE-KIT for Apple IAP
-      "expo-store-kit",
+      // FIXED: Proper expo-local-authentication plugin configuration
       [
         "expo-local-authentication",
         {
-          faceIDPermission: "Allow Routine to use Face ID to secure your notes.",
+          faceIDPermission:
+            "Allow Routine to use Face ID to secure your notes.",
         },
       ],
     ],
-    // EAS Configuration
+    // ADD THIS SECTION: EAS Configuration
     extra: {
       eas: {
         projectId: "c5578321-6c96-4f53-80f8-46cf2bc3bbcd"
-      }
-    },
-    // ✅ CRITICAL: Deep linking configuration for payment flows
-    scheme: "routineapp",
-    // ✅ URL schemes for payment handling
-    linking: {
-      schemes: ["routineapp"],
-      config: {
-        screens: {
-          // Handle payment success/failure redirects
-          Premium: "premium-success",
-          PremiumCancel: "premium-cancel"
-        }
       }
     }
   },

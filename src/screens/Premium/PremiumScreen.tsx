@@ -1,6 +1,6 @@
 // ============================================
 // src/screens/Premium/PremiumScreen.tsx
-// Main Premium Screen Component - DIRECT PAYMENT ON CARD CLICK
+// UPDATED: Premium Screen with Apple IAP + Stripe Choice
 // ============================================
 
 import React, { useState } from "react";
@@ -21,7 +21,9 @@ import { useTheme } from "../../../ThemeContext";
 import { Linking } from 'react-native';
 import { supabase } from "../../services/supabase";
 import { usePremium } from "../../contexts/PremiumContext";
-
+// ✅ NEW IMPORTS FOR PAYMENT CHOICE
+import PaymentChoiceModal from '../../components/PaymentChoiceModal';
+import { appleIAPService } from '../../services/appleIAPService';
 
 const { width } = Dimensions.get("window");
 
@@ -50,16 +52,20 @@ interface PricingPlan {
     savings?: string;
     popular?: boolean;
     features: string[];
-    tier: 'free' | 'premium' | 'premiumAI';  // ✅ ADD THIS LINE
-    hasAI: boolean;                           // ✅ ADD THIS LINE
+    tier: 'free' | 'premium' | 'premiumAI';
+    hasAI: boolean;
 }
 
 const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
     const { colors } = useTheme();
     const { refreshSubscriptionStatus } = usePremium();
-    const [isProcessing, setIsProcessing] = useState<string | null>(null); // Track which plan is processing
+    const [isProcessing, setIsProcessing] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const source = route?.params?.source || "unknown";
+
+    // ✅ NEW STATE: Payment choice modal
+    const [showPaymentChoice, setShowPaymentChoice] = useState(false);
+    const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
 
     // Auto-refresh premium status when app becomes active
     React.useEffect(() => {
@@ -88,7 +94,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
         };
     }, [refreshSubscriptionStatus]);
 
-    // ✅ UPDATED: Premium features data - NEW ORDER    // ✅ UPDATED: Premium features data - NEW ORDER
+    // Premium features data - keeping your existing design
     const premiumFeatures: PremiumFeature[] = [
         {
             icon: "sparkles",
@@ -122,7 +128,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
         },
     ];
 
-    // ✅ NEW: 4-Tier Pricing Structure
+    // Pricing plans - keeping your existing structure
     const pricingPlans: PricingPlan[] = [
         {
             id: "monthly",
@@ -185,21 +191,85 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             ]
         },
     ];
-    const handleDirectPurchase = async (planId: string) => {
-        setIsProcessing(planId);
-        console.log(`🚀 Direct purchase for plan: ${planId} from source: ${source}`);
 
+    // ✅ UPDATED: Replace handleDirectPurchase with payment choice flow
+    const handlePlanSelection = async (planId: string) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
                 Alert.alert("Error", "Please sign in to continue");
-                setIsProcessing(null);
                 return;
             }
 
-            console.log('🚀 Starting Stripe checkout for plan:', planId);
+            console.log(`🛒 Plan selected: ${planId} from source: ${source}`);
 
-            // ✅ POST REQUEST TO YOUR LOCAL SERVER
+            // Find the selected plan
+            const plan = pricingPlans.find(p => p.id === planId);
+            if (!plan) {
+                Alert.alert("Error", "Plan not found");
+                return;
+            }
+
+            // Set selected plan and show payment choice modal
+            setSelectedPlan(plan);
+            setShowPaymentChoice(true);
+
+        } catch (error) {
+            console.error('Plan selection error:', error);
+            Alert.alert("Error", "Please try again");
+        }
+    };
+
+    // ✅ NEW: Handle Apple IAP purchase
+    const handleApplePurchase = async (productId: string) => {
+        try {
+            setIsProcessing('apple');
+            console.log(`🍎 Starting Apple IAP purchase: ${productId}`);
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                Alert.alert("Error", "Please sign in to continue");
+                return;
+            }
+
+            const result = await appleIAPService.purchaseProduct(productId, user.id);
+
+            if (result.success) {
+                Alert.alert(
+                    "🎉 Purchase Successful!",
+                    "Welcome to Premium! Your subscription is now active.",
+                    [{
+                        text: "OK",
+                        onPress: async () => {
+                            // Refresh subscription status
+                            await refreshSubscriptionStatus();
+                            navigation.goBack();
+                        }
+                    }]
+                );
+            } else {
+                Alert.alert("Purchase Failed", result.error || "Something went wrong");
+            }
+
+        } catch (error) {
+            console.error('Apple IAP purchase error:', error);
+            Alert.alert("Purchase Failed", "Please try again or contact support");
+        } finally {
+            setIsProcessing(null);
+        }
+    };
+
+    // ✅ UPDATED: Keep your existing Stripe implementation
+    const handleStripePurchase = async (planId: string) => {
+        try {
+            setIsProcessing('stripe');
+            console.log(`💳 Starting Stripe purchase: ${planId}`);
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                Alert.alert("Error", "Please sign in to continue");
+                return;
+            }
 
             const response = await fetch('https://routine-payments-v4-m0v469p3g-dane-froelichers-projects.vercel.app/api/create-checkout', {
                 method: 'POST',
@@ -213,27 +283,21 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                 }),
             });
 
-            console.log('📊 Create-payment response status:', response.status);
-
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('❌ Create-payment error response:', errorText);
+                console.error('❌ Create-checkout error response:', errorText);
                 throw new Error('Failed to create checkout session');
             }
-            //test
+
             const data = await response.json();
             console.log('✅ Payment response:', data);
 
-            if (data.url) {  // Remove data.success check since your backend doesn't send it
-                // Open the REAL Stripe checkout URL
-                console.log(`💳 Opening Stripe checkout: ${data.url}`);
-
+            if (data.url) {
                 const supported = await Linking.canOpenURL(data.url);
                 if (supported) {
                     await Linking.openURL(data.url);
                     console.log("🌐 Opened Stripe checkout in browser");
 
-                    // Show helpful message
                     Alert.alert(
                         "Payment in Progress",
                         "After completing your purchase, return to the app. Your premium status will update automatically!",
@@ -246,12 +310,13 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                 throw new Error('No checkout URL received from server');
             }
         } catch (error) {
-            console.error(`❌ Purchase error for ${planId}:`, error);
+            console.error(`❌ Stripe purchase error for ${planId}:`, error);
             Alert.alert("Error", "Failed to start purchase. Please try again.");
         } finally {
             setIsProcessing(null);
         }
     };
+
     const renderFeature = (feature: PremiumFeature, index: number) => (
         <View key={index} style={[styles.featureItem, { backgroundColor: colors.surface }]}>
             <View style={[styles.featureIcon, { backgroundColor: feature.color }]}>
@@ -269,7 +334,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
     );
 
     const renderPricingPlan = (plan: PricingPlan) => {
-        const isCurrentlyProcessing = isProcessing === plan.id;
+        const isCurrentlyProcessing = isProcessing !== null;
 
         return (
             <TouchableOpacity
@@ -278,14 +343,15 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                     styles.pricingCard,
                     {
                         backgroundColor: colors.surface,
-                        borderColor: "#007AFF", // ✅ PERMANENT BLUE BORDER
-                        borderWidth: 2, // Make sure border is visible
+                        borderColor: "#007AFF",
+                        borderWidth: 2,
                     },
                     plan.popular && styles.popularCard,
                     isCurrentlyProcessing && styles.processingCard,
                 ]}
-                onPress={() => handleDirectPurchase(plan.id)}
-                disabled={isProcessing !== null} // Disable all cards when any is processing
+                // ✅ UPDATED: Use handlePlanSelection instead of handleDirectPurchase
+                onPress={() => handlePlanSelection(plan.id)}
+                disabled={isCurrentlyProcessing}
             >
                 {plan.popular && (
                     <View style={styles.popularBadge}>
@@ -323,7 +389,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                     ))}
                 </View>
 
-                {/* ✅ PROCESSING INDICATOR */}
+                {/* Processing indicator */}
                 {isCurrentlyProcessing && (
                     <View style={styles.processingOverlay}>
                         <Text style={styles.processingText}>Opening payment...</Text>
@@ -335,7 +401,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-            {/* Header */}
+            {/* Header - keeping your design */}
             <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Ionicons name="close" size={24} color={colors.text} />
@@ -345,7 +411,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             </View>
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                {/* Hero Section */}
+                {/* Hero Section - keeping your design */}
                 <View style={styles.heroSection}>
                     <Text style={[styles.heroTitle, { color: colors.text }]}>
                         Unlock Your Full Potential
@@ -355,7 +421,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                     </Text>
                 </View>
 
-                {/* Features Section */}
+                {/* Features Section - keeping your design */}
                 <View style={styles.featuresSection}>
                     <Text style={[styles.sectionTitle, { color: colors.text }]}>
                         Premium Features
@@ -363,28 +429,36 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
                     {premiumFeatures.map((feature, index) => renderFeature(feature, index))}
                 </View>
 
-                {/* Pricing Section */}
+                {/* Pricing Section - keeping your design */}
                 <View style={styles.pricingSection}>
                     <Text style={[styles.sectionTitle, { color: colors.text }]}>
                         Choose Your Plan
                     </Text>
-
                     {pricingPlans.map(renderPricingPlan)}
                 </View>
 
-                {/* ✅ REMOVED: Purchase Button Section - No longer needed! */}
-
-                {/* Footer */}
+                {/* Footer - keeping your design */}
                 <View style={styles.footerSection}>
                     <Text style={[styles.disclaimer, { color: colors.textTertiary }]}>
                         Cancel anytime. No commitments.
                     </Text>
                 </View>
             </ScrollView>
+
+            {/* ✅ NEW: Payment Choice Modal */}
+            <PaymentChoiceModal
+                visible={showPaymentChoice}
+                onClose={() => setShowPaymentChoice(false)}
+                planId={selectedPlan?.id || ''}
+                planName={selectedPlan?.name || ''}
+                onApplePurchase={handleApplePurchase}
+                onStripePurchase={handleStripePurchase}
+            />
         </SafeAreaView>
     );
 };
 
+// Keeping all your existing styles
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -468,7 +542,6 @@ const styles = StyleSheet.create({
         padding: 20,
         marginBottom: 16,
         position: "relative",
-        // ✅ Enhanced visual feedback for clickable cards
         shadowColor: "#007AFF",
         shadowOffset: {
             width: 0,
