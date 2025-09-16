@@ -8,10 +8,10 @@ import { supabase } from './supabase';
 
 // ✅ APPLE IAP PRODUCT IDs - YOU'LL CONFIGURE THESE IN APP STORE CONNECT
 export const APPLE_PRODUCT_IDS = {
-    premium_monthly: 'com.routine.app.premium.monthly',     // $2.94/month
-    premium_yearly: 'com.routine.app.premium.yearly',       // $27.99/year  
-    premiumAI_monthly: 'com.routine.app.premiumai.monthly', // $7.99/month
-    premiumAI_yearly: 'com.routine.app.premiumai.yearly',   // $74.99/year
+    premium_monthly: 'com.routine.dailyhabits.premium.monthly',     // $2.94/month
+    premium_yearly: 'com.routine.dailyhabits.premium.yearly',       // $27.99/year  
+    premiumAI_monthly: 'com.routine.dailyhabits.premiumai.monthly', // $7.99/month
+    premiumAI_yearly: 'com.routine.dailyhabits.premiumai.yearly',   // $74.99/year
 };
 
 // Map Apple product IDs to your plan types
