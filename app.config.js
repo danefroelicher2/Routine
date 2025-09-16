@@ -14,7 +14,7 @@ export default {
     assetBundlePatterns: ["**/*"],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.routine.app",
+      bundleIdentifier: "com.routine.dailyhabits",
       // FIXED: Add Face ID usage description
       infoPlist: {
         NSFaceIDUsageDescription:
