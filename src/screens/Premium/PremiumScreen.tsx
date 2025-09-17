@@ -22,7 +22,7 @@ import { Linking } from 'react-native';
 import { supabase } from "../../services/supabase";
 import { usePremium } from "../../contexts/PremiumContext";
 // ✅ NEW IMPORTS FOR PAYMENT CHOICE
-import PaymentChoiceModal from '../../components/PaymentChoiceModal';
+// import PaymentChoiceModal from '../../components/PaymentChoiceModal';
 import { appleIAPService } from '../../services/appleIAPService';
 
 const { width } = Dimensions.get("window");
@@ -64,8 +64,8 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
     const source = route?.params?.source || "unknown";
 
     // ✅ NEW STATE: Payment choice modal
-    const [showPaymentChoice, setShowPaymentChoice] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
+    // const [showPaymentChoice, setShowPaymentChoice] = useState(false);
+    // const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
 
     // Auto-refresh premium status when app becomes active
     React.useEffect(() => {
@@ -192,7 +192,6 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
         },
     ];
 
-    // ✅ UPDATED: Replace handleDirectPurchase with payment choice flow
     const handlePlanSelection = async (planId: string) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -203,60 +202,21 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
 
             console.log(`🛒 Plan selected: ${planId} from source: ${source}`);
 
-            // Find the selected plan
-            const plan = pricingPlans.find(p => p.id === planId);
-            if (!plan) {
-                Alert.alert("Error", "Plan not found");
-                return;
-            }
-
-            // Set selected plan and show payment choice modal
-            setSelectedPlan(plan);
-            setShowPaymentChoice(true);
+            // SECURITY FIX: Skip payment choice modal, go directly to Stripe
+            await handleStripePurchase(planId);
 
         } catch (error) {
             console.error('Plan selection error:', error);
             Alert.alert("Error", "Please try again");
         }
     };
-
-    // ✅ NEW: Handle Apple IAP purchase
+    // ✅ SECURITY FIX: Disable Apple IAP until properly implemented
     const handleApplePurchase = async (productId: string) => {
-        try {
-            setIsProcessing('apple');
-            console.log(`🍎 Starting Apple IAP purchase: ${productId}`);
-
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                Alert.alert("Error", "Please sign in to continue");
-                return;
-            }
-
-            const result = await appleIAPService.purchaseProduct(productId, user.id);
-
-            if (result.success) {
-                Alert.alert(
-                    "🎉 Purchase Successful!",
-                    "Welcome to Premium! Your subscription is now active.",
-                    [{
-                        text: "OK",
-                        onPress: async () => {
-                            // Refresh subscription status
-                            await refreshSubscriptionStatus();
-                            navigation.goBack();
-                        }
-                    }]
-                );
-            } else {
-                Alert.alert("Purchase Failed", result.error || "Something went wrong");
-            }
-
-        } catch (error) {
-            console.error('Apple IAP purchase error:', error);
-            Alert.alert("Purchase Failed", "Please try again or contact support");
-        } finally {
-            setIsProcessing(null);
-        }
+        Alert.alert(
+            "Apple In-App Purchase Temporarily Unavailable",
+            "Please use Credit Card payment instead. Apple In-App Purchase will be available in a future update.",
+            [{ text: "OK" }]
+        );
     };
 
     // ✅ UPDATED: Keep your existing Stripe implementation
@@ -446,14 +406,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation, route }) => {
             </ScrollView>
 
             {/* ✅ NEW: Payment Choice Modal */}
-            <PaymentChoiceModal
-                visible={showPaymentChoice}
-                onClose={() => setShowPaymentChoice(false)}
-                planId={selectedPlan?.id || ''}
-                planName={selectedPlan?.name || ''}
-                onApplePurchase={handleApplePurchase}
-                onStripePurchase={handleStripePurchase}
-            />
+            {/* Payment Choice Modal DISABLED - Apple IAP temporarily disabled */}
         </SafeAreaView>
     );
 };

@@ -521,9 +521,15 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
   };
 
   const handleConfirmRoutineWithTime = async (routine: RoutineTemplate, timeSlot: number) => {
+    if (isCreating) return; // Prevent multiple calls
+
+    setIsCreating(true);
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
+
+      console.log("📅 Creating scheduled routine:", routine.name, "at", timeSlot);
 
       // Create the routine first
       const { data: newRoutine, error: routineError } = await supabase
@@ -543,31 +549,46 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
 
       if (routineError) throw routineError;
 
+      console.log("✅ Routine created, now scheduling to time slot");
+
       // Schedule it to the time slot
       await scheduleRoutineToTimeSlot(newRoutine.id, timeSlot);
+
+      console.log("✅ Routine scheduled successfully");
 
       Alert.alert(
         "Success",
         `${routine.name} scheduled for ${formatTime(timeSlot)} on ${dayNames[selectedDay]}!`
       );
 
+      // Reset states before navigation
       setPendingRoutine(null);
+      setShowTimePickerModal(false);
       navigation.goBack();
+
     } catch (error) {
-      console.error("Error creating scheduled routine:", error);
+      console.error("❌ Error creating scheduled routine:", error);
       Alert.alert("Error", "Failed to create routine. Please try again.");
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const handleCreateCustomWithTime = async (timeSlot: number) => {
+    if (isCreating) return; // Prevent multiple calls
+
     if (!customTitle.trim()) {
       Alert.alert("Error", "Please enter a title for your routine");
       return;
     }
 
+    setIsCreating(true);
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
+
+      console.log("📅 Creating custom scheduled routine:", customTitle.trim());
 
       // Create the routine
       const { data: newRoutine, error: routineError } = await supabase
@@ -587,21 +608,31 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
 
       if (routineError) throw routineError;
 
+      console.log("✅ Custom routine created, now scheduling");
+
       // Schedule it to the time slot
       await scheduleRoutineToTimeSlot(newRoutine.id, timeSlot);
+
+      console.log("✅ Custom routine scheduled successfully");
 
       Alert.alert(
         "Success",
         `${customTitle} scheduled for ${formatTime(timeSlot)} on ${dayNames[selectedDay]}!`
       );
 
+      // Reset all states before navigation
       setShowCreateModal(false);
+      setShowTimePickerModal(false);
       setCustomTitle("");
       setCustomDescription("");
+      setSelectedTimeSlot(null);
       navigation.goBack();
+
     } catch (error) {
-      console.error("Error creating custom scheduled routine:", error);
+      console.error("❌ Error creating custom scheduled routine:", error);
       Alert.alert("Error", "Failed to create routine. Please try again.");
+    } finally {
+      setIsCreating(false);
     }
   };
 
