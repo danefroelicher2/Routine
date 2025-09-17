@@ -751,7 +751,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     let isActive = true;
 
     if (isCalendarView) {
-      loadScheduledRoutines();
+      // Add a small delay to prevent rapid fire updates
+      const timeoutId = setTimeout(() => {
+        if (isActive) {
+          loadScheduledRoutines();
+        }
+      }, 50);
+
+      return () => {
+        isActive = false;
+        clearTimeout(timeoutId);
+      };
     } else if (isActive) {
       // When switching back to list view, reload user schedules for next time
       loadUserDaySchedules().then(schedules => {
