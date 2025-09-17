@@ -731,7 +731,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       console.error("Error loading data:", error);
       Alert.alert("Error", "Failed to load routines");
     }
-  }, [selectedDay, isCalendarView, userDaySchedules]);
+  }, [selectedDay, isCalendarView]);
 
   // ✅ ENHANCED: Initialize and reload effects
   useEffect(() => {
