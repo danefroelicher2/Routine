@@ -267,7 +267,7 @@ class AppleIAPService {
      * Check if Apple IAP is available
      */
     isAvailable(): boolean {
-        return Platform.OS === 'ios' && this.isInitialized;
+        return false; // Temporarily disable
     }
 }
 
