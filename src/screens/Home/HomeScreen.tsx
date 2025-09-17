@@ -77,7 +77,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   // EXISTING: Calendar toggle state
   const [isCalendarView, setIsCalendarView] = useState(false);
-  console.log("🔍 isCalendarView state:", isCalendarView);
   const [dailyRoutines, setDailyRoutines] = useState<RoutineWithCompletion[]>([]);
   const [weeklyRoutines, setWeeklyRoutines] = useState<RoutineWithCompletion[]>([]);
   const [refreshing, setRefreshing] = useState(false);
