@@ -27,8 +27,7 @@ import { chatService } from '../../services/chatService';
 import { aiService } from '../../services/aiService';
 import { ChatSession, ChatMessage, ScheduleContext } from '../../types/database';
 import { usePremium } from '../../contexts/PremiumContext';
-import AIPremiumPaywall from './AIPremiumPaywall';
-
+import PremiumScreen from '../Premium/PremiumScreen';
 const { width } = Dimensions.get('window');
 
 interface AIChatScreenProps {
@@ -524,9 +523,8 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
         );
     };
 
-    // Show paywall if user doesn't have AI access
     if (showPaywall) {
-        return <AIPremiumPaywall navigation={navigation} />;
+        return <PremiumScreen navigation={navigation} route={{ params: { source: 'ai_tab' } }} />;
     }
 
     return (
