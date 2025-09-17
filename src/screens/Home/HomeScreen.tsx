@@ -722,16 +722,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setWeekTimeRemaining(`${hoursLeft}h left`);
       }
 
-      // ✅ NEW: Load scheduled routines if in calendar view
-      if (isCalendarView) {
-        await loadScheduledRoutines();
-      }
+      // ✅ REMOVED: This was causing circular dependency - calendar data loaded separately now
 
     } catch (error) {
       console.error("Error loading data:", error);
       Alert.alert("Error", "Failed to load routines");
     }
-  }, [selectedDay, isCalendarView]);
+  }, [selectedDay]);
 
   // ✅ ENHANCED: Initialize and reload effects
   useEffect(() => {
@@ -745,35 +742,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setIsCalendarView(defaultToCalendarView);
     }
   }, [defaultToCalendarView, homeViewLoading, isPremium]);
-  // ✅ MODIFIED: Reload scheduled routines when day or view changes, and refresh time slots with user's schedule
+  // ✅ FIXED: Handle calendar view switching without circular dependency
   useEffect(() => {
-    let isActive = true;
-
     if (isCalendarView) {
-      // Add a small delay to prevent rapid fire updates
-      const timeoutId = setTimeout(() => {
-        if (isActive) {
-          loadScheduledRoutines();
-        }
-      }, 50);
-
-      return () => {
-        isActive = false;
-        clearTimeout(timeoutId);
-      };
-    } else if (isActive) {
+      // Load calendar data when switching to calendar view
+      loadScheduledRoutines();
+    } else {
       // When switching back to list view, reload user schedules for next time
       loadUserDaySchedules().then(schedules => {
-        if (isActive) {
-          setUserDaySchedules(schedules);
-        }
+        setUserDaySchedules(schedules);
       });
     }
+  }, [isCalendarView]);
 
-    return () => {
-      isActive = false;
-    };
-  }, [selectedDay, isCalendarView]);
+  // ✅ NEW: Separate effect to reload calendar data when day changes
+  useEffect(() => {
+    if (isCalendarView) {
+      loadScheduledRoutines();
+    }
+  }, [selectedDay]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
