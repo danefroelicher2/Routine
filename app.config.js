@@ -33,7 +33,7 @@ export default {
       favicon: "./assets/favicon.png",
     },
     plugins: [
-      "expo-secure-store",
+
       // FIXED: Proper expo-local-authentication plugin configuration
       [
         "expo-local-authentication",
