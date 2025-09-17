@@ -521,17 +521,17 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
   };
 
   const handleConfirmRoutineWithTime = async (routine: RoutineTemplate, timeSlot: number) => {
-    if (isCreating) return; // Prevent multiple calls
-
-    setIsCreating(true);
+    if (isCreating) return;
 
     try {
+      setIsCreating(true);
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
       console.log("📅 Creating scheduled routine:", routine.name, "at", timeSlot);
 
-      // Create the routine first
+      // Create the routine
       const { data: newRoutine, error: routineError } = await supabase
         .from("user_routines")
         .insert({
@@ -539,7 +539,7 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
           name: routine.name,
           description: routine.description,
           icon: routine.icon,
-          is_daily: true,  // Calendar mode is daily
+          is_daily: true,
           is_weekly: false,
           is_active: true,
           sort_order: 0,
@@ -556,33 +556,19 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
 
       console.log("✅ Routine scheduled successfully");
 
-      // Reset states before navigation
+      // Clean up states and navigate back immediately
       setPendingRoutine(null);
       setShowTimePickerModal(false);
+      setIsCreating(false);
 
-      // Use Alert.alert with callback to ensure proper navigation timing
-      Alert.alert(
-        "Success",
-        `${routine.name} scheduled for ${formatTime(timeSlot)} on ${dayNames[selectedDay]}!`,
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              // Navigate only after alert is dismissed
-              navigation.goBack();
-            }
-          }
-        ]
-      );
+      navigation.goBack();
 
     } catch (error) {
       console.error("❌ Error creating scheduled routine:", error);
+      setIsCreating(false);
+      setPendingRoutine(null);
+      setShowTimePickerModal(false);
       Alert.alert("Error", "Failed to create routine. Please try again.");
-    } finally {
-      // Only reset creating state if we haven't navigated yet
-      if (pendingRoutine) {
-        setIsCreating(false);
-      }
     }
   };
 
