@@ -741,21 +741,29 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   }, [selectedDay]);
   useEffect(() => {
     // Set the initial view based on user's preference when component loads
-    if (!homeViewLoading && isPremium) {
-      setIsCalendarView(defaultToCalendarView);
+    if (!homeViewLoading && isPremium && isCalendarView !== defaultToCalendarView) {
       console.log(`🗓️ Setting initial view to: ${defaultToCalendarView ? 'Calendar' : 'Daily'}`);
+      setIsCalendarView(defaultToCalendarView);
     }
   }, [defaultToCalendarView, homeViewLoading, isPremium]);
   // ✅ MODIFIED: Reload scheduled routines when day or view changes, and refresh time slots with user's schedule
   useEffect(() => {
+    let isActive = true;
+
     if (isCalendarView) {
       loadScheduledRoutines();
-    } else {
+    } else if (isActive) {
       // When switching back to list view, reload user schedules for next time
       loadUserDaySchedules().then(schedules => {
-        setUserDaySchedules(schedules);
+        if (isActive) {
+          setUserDaySchedules(schedules);
+        }
       });
     }
+
+    return () => {
+      isActive = false;
+    };
   }, [selectedDay, isCalendarView]);
 
   useEffect(() => {
@@ -1709,6 +1717,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Switch
                 value={isCalendarView}
                 onValueChange={(newValue) => {
+                  // Prevent multiple rapid calls
+                  if (newValue === isCalendarView) return;
+
                   console.log("🔄 Toggle changed to:", newValue);
 
                   // 🔒 PREMIUM CHECK - Block calendar view for non-premium users
