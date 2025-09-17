@@ -410,7 +410,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       const completionMap = new Map(
         (completions || []).map(c => [c.routine_id, { isCompleted: true, completionId: c.id }])
       );
-
+      //test
       // Convert to scheduled routines format
       const scheduledRoutines: ScheduledRoutine[] = (scheduledData || [])
         .filter(item => item.user_routines) // Filter out items where user_routines is null
