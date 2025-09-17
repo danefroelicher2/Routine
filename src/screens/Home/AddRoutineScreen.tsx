@@ -521,17 +521,23 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
   };
 
   const handleConfirmRoutineWithTime = async (routine: RoutineTemplate, timeSlot: number) => {
-    if (isCreating) return;
+    console.log("🚀 FREEZE DEBUG: handleConfirmRoutineWithTime called");
+    console.log("🚀 FREEZE DEBUG: isCreating =", isCreating);
+
+    if (isCreating) {
+      console.log("🚀 FREEZE DEBUG: Already creating, returning early");
+      return;
+    }
 
     try {
+      console.log("🚀 FREEZE DEBUG: Setting isCreating to true");
       setIsCreating(true);
 
+      console.log("🚀 FREEZE DEBUG: Getting user");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      console.log("📅 Creating scheduled routine:", routine.name, "at", timeSlot);
-
-      // Create the routine
+      console.log("🚀 FREEZE DEBUG: Creating routine in database");
       const { data: newRoutine, error: routineError } = await supabase
         .from("user_routines")
         .insert({
@@ -548,30 +554,34 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
         .single();
 
       if (routineError) throw routineError;
+      console.log("🚀 FREEZE DEBUG: Routine created successfully");
 
-      console.log("✅ Routine created, now scheduling to time slot");
-
-      // Schedule it to the time slot
+      console.log("🚀 FREEZE DEBUG: Scheduling to time slot");
       await scheduleRoutineToTimeSlot(newRoutine.id, timeSlot);
+      console.log("🚀 FREEZE DEBUG: Scheduled successfully");
 
-      console.log("✅ Routine scheduled successfully");
-
-      // Clean up states and navigate back immediately
+      console.log("🚀 FREEZE DEBUG: Cleaning up states");
       setPendingRoutine(null);
-      setShowTimePickerModal(false);
-      setIsCreating(false);
+      console.log("🚀 FREEZE DEBUG: setPendingRoutine(null) complete");
 
+      setShowTimePickerModal(false);
+      console.log("🚀 FREEZE DEBUG: setShowTimePickerModal(false) complete");
+
+      setIsCreating(false);
+      console.log("🚀 FREEZE DEBUG: setIsCreating(false) complete");
+
+      console.log("🚀 FREEZE DEBUG: About to call navigation.goBack()");
       navigation.goBack();
+      console.log("🚀 FREEZE DEBUG: navigation.goBack() called - THIS SHOULD BE THE LAST LOG");
 
     } catch (error) {
-      console.error("❌ Error creating scheduled routine:", error);
+      console.error("🚀 FREEZE DEBUG: Error occurred:", error);
       setIsCreating(false);
       setPendingRoutine(null);
       setShowTimePickerModal(false);
       Alert.alert("Error", "Failed to create routine. Please try again.");
     }
   };
-
   const handleCreateCustomWithTime = async (timeSlot: number) => {
     if (isCreating) return; // Prevent multiple calls
 
