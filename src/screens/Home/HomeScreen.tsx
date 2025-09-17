@@ -779,19 +779,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return unsubscribe;
   }, [navigation, loadData]);
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", () => {
-      console.log("HomeScreen focused - reloading data");
-      loadData();
-      // ✅ NEW: Also reload user schedules when screen focuses (in case user changed settings)
-      loadUserDaySchedules().then(schedules => {
-        setUserDaySchedules(schedules);
-      });
-    });
-
-    return unsubscribe;
-  }, [navigation, loadData]);
-
   // ADD THIS NEW useEffect HERE:
   useEffect(() => {
     let lastCheckedDate = getLocalDateString(new Date());
