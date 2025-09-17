@@ -27,6 +27,7 @@ import { chatService } from '../../services/chatService';
 import { aiService } from '../../services/aiService';
 import { ChatSession, ChatMessage, ScheduleContext } from '../../types/database';
 import { usePremium } from '../../contexts/PremiumContext';
+import AIPremiumPaywall from './AIPremiumPaywall';
 
 const { width } = Dimensions.get('window');
 
@@ -51,21 +52,21 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
     const [scheduleContext, setScheduleContext] = useState<ScheduleContext | null>(null);
     const [showQuickActions, setShowQuickActions] = useState(true);
     const [aiName, setAiName] = useState('AI Assistant');
+    const [showPaywall, setShowPaywall] = useState(false);
+
 
     // Refs
     const flatListRef = useRef<FlatList>(null);
 
-    // 🔒 AI ACCESS CHECK - Redirect users without AI access
+    // 🔒 AI ACCESS CHECK - Show paywall within AI tab
     useEffect(() => {
         const hasAIAccess = checkPremiumFeature("ai_assistant");
         if (!hasAIAccess) {
-            console.log('🚫 User without AI access - redirecting to paywall');
-            navigation.navigate('Profile', {
-                screen: 'Premium',
-                params: { source: 'ai_tab' }
-            });
+            console.log('🚫 User without AI access - showing paywall');
+            setShowPaywall(true);
             return;
         }
+        setShowPaywall(false);
     }, [isPremium, navigation, checkPremiumFeature]);
 
     // Load data when screen focuses
@@ -523,18 +524,9 @@ const AIChatScreen: React.FC<AIChatScreenProps> = ({ navigation }) => {
         );
     };
 
-    // 🔒 Show loading screen while redirecting users without AI access
-    if (!checkPremiumFeature("ai_assistant")) {
-        return (
-            <View style={[styles.container, { backgroundColor: colors.background }]}>
-                <View style={styles.premiumLoadingContainer}>
-                    <ActivityIndicator size="large" color="#007AFF" />
-                    <Text style={[styles.premiumLoadingText, { color: colors.text }]}>
-                        Loading AI...
-                    </Text>
-                </View>
-            </View>
-        );
+    // Show paywall if user doesn't have AI access
+    if (showPaywall) {
+        return <AIPremiumPaywall navigation={navigation} />;
     }
 
     return (
