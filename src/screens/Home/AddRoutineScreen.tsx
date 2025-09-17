@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../services/supabase";
-import { useTheme } from "../../../ThemeContext"; // ✅ ADDED: Import useTheme hook
+import { useTheme } from "../../../ThemeContext";
 
 interface RoutineTemplate {
   id: string;
@@ -29,7 +29,8 @@ interface AddRoutineScreenProps {
     params?: {
       selectedDay?: number;
       isWeekly?: boolean;
-      isCalendarMode?: boolean;  // ✅ NEW
+      isCalendarMode?: boolean;
+      skipPresets?: boolean; // NEW: Skip presets parameter
     };
   };
 }
@@ -38,22 +39,20 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
   navigation,
   route,
 }) => {
-  // ✅ ADDED: Use theme colors
   const { colors } = useTheme();
 
+  // NEW: State to control which screen to show
+  const [currentScreen, setCurrentScreen] = useState<'templates' | 'custom'>('templates');
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredRoutines, setFilteredRoutines] = useState<RoutineTemplate[]>(
-    []
-  );
+  const [filteredRoutines, setFilteredRoutines] = useState<RoutineTemplate[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
   const [customDescription, setCustomDescription] = useState("");
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set()
-  );
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [isCreating, setIsCreating] = useState(false);
 
-  // ✅ NEW: Calendar mode state
+  // Calendar mode state
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<number | null>(null);
   const [pendingRoutine, setPendingRoutine] = useState<RoutineTemplate | null>(null);
@@ -61,16 +60,19 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
   // Get parameters from navigation
   const selectedDay = route?.params?.selectedDay;
   const isWeekly = route?.params?.isWeekly;
-  const isCalendarMode = route?.params?.isCalendarMode; // ✅ NEW
+  const isCalendarMode = route?.params?.isCalendarMode;
+  const skipPresets = route?.params?.skipPresets; // NEW: Extract skipPresets parameter
+
   const dayNames = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
+    "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
   ];
+
+  // NEW: Set initial screen based on skipPresets parameter
+  useEffect(() => {
+    if (skipPresets) {
+      setCurrentScreen('custom');
+    }
+  }, [skipPresets]);
 
   // Organized routine templates by category
   const routineTemplates: RoutineTemplate[] = [
@@ -493,7 +495,7 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
     }
   }, [searchQuery]);
 
-  // ✅ NEW: Helper functions for calendar mode
+  // Helper functions for calendar mode
   const formatTime = (hour: number) => {
     const period = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
@@ -521,23 +523,13 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
   };
 
   const handleConfirmRoutineWithTime = async (routine: RoutineTemplate, timeSlot: number) => {
-    console.log("🚀 FREEZE DEBUG: handleConfirmRoutineWithTime called");
-    console.log("🚀 FREEZE DEBUG: isCreating =", isCreating);
-
-    if (isCreating) {
-      console.log("🚀 FREEZE DEBUG: Already creating, returning early");
-      return;
-    }
+    if (isCreating) return;
 
     try {
-      console.log("🚀 FREEZE DEBUG: Setting isCreating to true");
       setIsCreating(true);
-
-      console.log("🚀 FREEZE DEBUG: Getting user");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      console.log("🚀 FREEZE DEBUG: Creating routine in database");
       const { data: newRoutine, error: routineError } = await supabase
         .from("user_routines")
         .insert({
@@ -554,39 +546,28 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
         .single();
 
       if (routineError) throw routineError;
-      console.log("🚀 FREEZE DEBUG: Routine created successfully");
 
-      console.log("🚀 FREEZE DEBUG: Scheduling to time slot");
       await scheduleRoutineToTimeSlot(newRoutine.id, timeSlot);
-      console.log("🚀 FREEZE DEBUG: Scheduled successfully");
 
-      console.log("🚀 FREEZE DEBUG: Cleaning up states");
       setPendingRoutine(null);
-      console.log("🚀 FREEZE DEBUG: setPendingRoutine(null) complete");
-
       setShowTimePickerModal(false);
-      console.log("🚀 FREEZE DEBUG: setShowTimePickerModal(false) complete");
-
       setIsCreating(false);
-      console.log("🚀 FREEZE DEBUG: setIsCreating(false) complete");
-
-      console.log("🚀 FREEZE DEBUG: About to call navigation.goBack()");
       navigation.goBack();
-      console.log("🚀 FREEZE DEBUG: navigation.goBack() called - THIS SHOULD BE THE LAST LOG");
 
     } catch (error) {
-      console.error("🚀 FREEZE DEBUG: Error occurred:", error);
+      console.error("Error creating routine:", error);
       setIsCreating(false);
       setPendingRoutine(null);
       setShowTimePickerModal(false);
       Alert.alert("Error", "Failed to create routine. Please try again.");
     }
   };
-  const handleCreateCustomWithTime = async (timeSlot: number) => {
-    if (isCreating) return; // Prevent multiple calls
 
-    if (!customTitle.trim()) {
-      Alert.alert("Error", "Please enter a title for your routine");
+  const handleCreateCustomWithTime = async (timeSlot: number) => {
+    if (isCreating || !customTitle.trim()) {
+      if (!customTitle.trim()) {
+        Alert.alert("Error", "Please enter a title for your routine");
+      }
       return;
     }
 
@@ -596,9 +577,6 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      console.log("📅 Creating custom scheduled routine:", customTitle.trim());
-
-      // Create the routine
       const { data: newRoutine, error: routineError } = await supabase
         .from("user_routines")
         .insert({
@@ -606,7 +584,7 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
           name: customTitle.trim(),
           description: customDescription.trim() || null,
           icon: "checkmark-circle",
-          is_daily: true,  // Calendar mode is daily
+          is_daily: true,
           is_weekly: false,
           is_active: true,
           sort_order: 0,
@@ -616,19 +594,13 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
 
       if (routineError) throw routineError;
 
-      console.log("✅ Custom routine created, now scheduling");
-
-      // Schedule it to the time slot
       await scheduleRoutineToTimeSlot(newRoutine.id, timeSlot);
-
-      console.log("✅ Custom routine scheduled successfully");
 
       Alert.alert(
         "Success",
         `${customTitle} scheduled for ${formatTime(timeSlot)} on ${dayNames[selectedDay]}!`
       );
 
-      // Reset all states before navigation
       setShowCreateModal(false);
       setShowTimePickerModal(false);
       setCustomTitle("");
@@ -637,16 +609,16 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
       navigation.goBack();
 
     } catch (error) {
-      console.error("❌ Error creating custom scheduled routine:", error);
+      console.error("Error creating custom routine:", error);
       Alert.alert("Error", "Failed to create routine. Please try again.");
     } finally {
       setIsCreating(false);
     }
   };
 
-  // ✅ NEW: Time slot picker modal component
+  // Time slot picker modal component
   const TimeSlotPickerModal = () => {
-    const timeSlots = Array.from({ length: 16 }, (_, i) => i + 6); // 6 AM to 9 PM
+    const timeSlots = Array.from({ length: 16 }, (_, i) => i + 6);
 
     return (
       <Modal
@@ -676,10 +648,8 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                   onPress={() => {
                     setSelectedTimeSlot(hour);
                     if (pendingRoutine) {
-                      // For pre-loaded routines - create and schedule immediately
                       handleConfirmRoutineWithTime(pendingRoutine, hour);
                     } else {
-                      // For custom creation - just close modal and update form
                       setShowTimePickerModal(false);
                     }
                   }}
@@ -700,16 +670,14 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
     );
   };
 
-  // ✅ UPDATED: Handle routine selection with calendar mode support
+  // Handle routine selection with calendar mode support
   const handleSelectRoutine = async (routine: RoutineTemplate) => {
-    if (isCreating) return; // Prevent multiple clicks
+    if (isCreating) return;
 
     if (isCalendarMode) {
-      // ✅ NEW: In calendar mode, show time picker first
       setPendingRoutine(routine);
       setShowTimePickerModal(true);
     } else {
-      // ✅ EXISTING: Direct creation for daily/weekly modes
       setIsCreating(true);
       try {
         await createRoutineDirectly(routine);
@@ -723,18 +691,9 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
 
   const createRoutineDirectly = async (routine: RoutineTemplate) => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      console.log("=== STARTING ROUTINE CREATION ===");
-      console.log("User ID:", user.id);
-      console.log("Selected day:", selectedDay);
-      console.log("Is weekly:", isWeekly);
-      console.log("Routine name:", routine.name);
-
-      // Get next sort order
       const { data: existingRoutines } = await supabase
         .from("user_routines")
         .select("sort_order")
@@ -742,12 +701,8 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
         .order("sort_order", { ascending: false })
         .limit(1);
 
-      const nextSortOrder =
-        existingRoutines && existingRoutines.length > 0
-          ? existingRoutines[0].sort_order + 1
-          : 1;
-
-      console.log("Creating routine with sort order:", nextSortOrder);
+      const nextSortOrder = existingRoutines && existingRoutines.length > 0
+        ? existingRoutines[0].sort_order + 1 : 1;
 
       const { data: newRoutine, error: routineError } = await supabase
         .from("user_routines")
@@ -756,153 +711,17 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
           name: routine.name,
           description: routine.description,
           icon: routine.icon,
-          is_daily: selectedDay !== undefined, // Daily if has selectedDay
-          is_weekly: isWeekly || false, // Weekly if isWeekly flag is true
+          is_daily: selectedDay !== undefined,
+          is_weekly: isWeekly || false,
           is_active: true,
           sort_order: nextSortOrder,
         })
         .select("id")
         .single();
 
-      if (routineError) {
-        console.error("Routine creation error:", routineError);
-        throw routineError;
-      }
+      if (routineError) throw routineError;
 
-      console.log("Routine created successfully:", newRoutine);
-
-      // If we have a selected day, assign it to that day (daily routine)
       if (selectedDay !== undefined && newRoutine) {
-        console.log("Assigning routine to day:", selectedDay);
-
-        const { data: dayAssignment, error: dayError } = await supabase
-          .from("user_day_routines")
-          .insert({
-            user_id: user.id,
-            routine_id: newRoutine.id,
-            day_of_week: selectedDay,
-          })
-          .select();
-
-        if (dayError) {
-          console.error("Day assignment error:", dayError);
-          throw dayError;
-        }
-
-        console.log("Day assignment created successfully:", dayAssignment);
-        Alert.alert(
-          "Success",
-          `${routine.name} added to your ${dayNames[selectedDay]} routine!`
-        );
-      } else if (isWeekly) {
-        console.log("Weekly routine created without day assignment");
-        Alert.alert("Success", `${routine.name} added to your weekly goals!`);
-      } else {
-        console.log("No selected day - routine created without day assignment");
-        Alert.alert("Success", `${routine.name} added to your routines!`);
-      }
-
-      console.log("=== ROUTINE CREATION COMPLETED ===");
-      navigation.goBack();
-    } catch (error) {
-      console.error("=== ERROR IN ROUTINE CREATION ===");
-      console.error("Full error:", error);
-      console.error("Error message:", error.message);
-      Alert.alert("Error", `Failed to add routine: ${error.message}`);
-    }
-  };
-
-  // ✅ UPDATED: Handle custom creation with calendar mode support
-  const handleCreateCustom = async () => {
-    if (isCalendarMode) {
-      // ✅ NEW: In calendar mode, check if time slot is selected first
-      if (!selectedTimeSlot) {
-        Alert.alert("Error", "Please select a time slot for your routine");
-        return;
-      }
-      // Create and schedule with selected time slot
-      await handleCreateCustomWithTime(selectedTimeSlot);
-    } else {
-      // ✅ EXISTING: Direct creation for daily/weekly modes  
-      await createCustomDirectly();
-    }
-  };
-
-  const createCustomDirectly = async () => {
-    if (isCreating) return; // Prevent double execution
-
-    if (!customTitle.trim()) {
-      Alert.alert("Error", "Please enter a title for your routine");
-      return;
-    }
-
-    setIsCreating(true);
-
-    if (customTitle.length > 20) {
-      Alert.alert("Error", "Title must be 20 characters or less");
-      return;
-    }
-
-    if (customDescription.length > 20) {
-      Alert.alert("Error", "Description must be 20 characters or less");
-      return;
-    }
-
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user found");
-
-      console.log("=== CREATING CUSTOM ROUTINE ===");
-      console.log("User ID:", user.id);
-      console.log("Selected day:", selectedDay);
-      console.log("Is weekly:", isWeekly);
-      console.log("Custom title:", customTitle.trim());
-
-      // Get next sort order
-      const { data: existingRoutines } = await supabase
-        .from("user_routines")
-        .select("sort_order")
-        .eq("user_id", user.id)
-        .order("sort_order", { ascending: false })
-        .limit(1);
-
-      const nextSortOrder =
-        existingRoutines && existingRoutines.length > 0
-          ? existingRoutines[0].sort_order + 1
-          : 1;
-
-      const routineData = {
-        user_id: user.id,
-        name: customTitle.trim(),
-        description: customDescription.trim() || null,
-        icon: "checkmark-circle",
-        is_daily: selectedDay !== undefined && !isWeekly, // Explicit logic
-        is_weekly: isWeekly === true, // Explicit boolean
-        is_active: true,
-        sort_order: nextSortOrder,
-      };
-
-      console.log("Routine data to insert:", routineData);
-
-      const { data: newRoutine, error } = await supabase
-        .from("user_routines")
-        .insert(routineData)
-        .select("id")
-        .single();
-
-      if (error) {
-        console.error("Database error:", error);
-        throw error;
-      }
-
-      console.log("New routine created:", newRoutine);
-
-      // If we have a selected day, assign it to that day (daily routine only)
-      if (selectedDay !== undefined && !isWeekly) {
-        console.log("Assigning routine to specific day:", selectedDay);
-
         const { error: dayError } = await supabase
           .from("user_day_routines")
           .insert({
@@ -911,41 +730,113 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
             day_of_week: selectedDay,
           });
 
-        if (dayError) {
-          console.error("Day assignment error:", dayError);
-          throw dayError;
-        }
+        if (dayError) throw dayError;
 
-        Alert.alert(
-          "Success",
-          `${customTitle} added to your ${dayNames[selectedDay]} routine!`
-        );
+        Alert.alert("Success", `${routine.name} added to your ${dayNames[selectedDay]} routine!`);
       } else if (isWeekly) {
-        console.log("Weekly routine created - no day assignment needed");
-        Alert.alert("Success", `${customTitle} added to your weekly goals!`);
+        Alert.alert("Success", `${routine.name} added to your weekly goals!`);
       } else {
-        console.log("Generic routine created");
-        Alert.alert("Success", `${customTitle} added to your routines!`);
+        Alert.alert("Success", `${routine.name} added to your routines!`);
       }
 
-      console.log("=== CUSTOM ROUTINE CREATION COMPLETED ===");
+      navigation.goBack();
+    } catch (error) {
+      console.error("Error creating routine:", error);
+      Alert.alert("Error", `Failed to add routine: ${error.message}`);
+    }
+  };
+
+  // Handle custom creation with calendar mode support
+  const handleCreateCustom = async () => {
+    if (isCalendarMode) {
+      if (!selectedTimeSlot) {
+        Alert.alert("Error", "Please select a time slot for your routine");
+        return;
+      }
+      await handleCreateCustomWithTime(selectedTimeSlot);
+    } else {
+      await createCustomDirectly();
+    }
+  };
+
+  const createCustomDirectly = async () => {
+    if (isCreating || !customTitle.trim()) {
+      if (!customTitle.trim()) {
+        Alert.alert("Error", "Please enter a title for your routine");
+      }
+      return;
+    }
+
+    if (customTitle.length > 20 || customDescription.length > 20) {
+      Alert.alert("Error", "Title and description must be 20 characters or less");
+      return;
+    }
+
+    setIsCreating(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      const { data: existingRoutines } = await supabase
+        .from("user_routines")
+        .select("sort_order")
+        .eq("user_id", user.id)
+        .order("sort_order", { ascending: false })
+        .limit(1);
+
+      const nextSortOrder = existingRoutines && existingRoutines.length > 0
+        ? existingRoutines[0].sort_order + 1 : 1;
+
+      const routineData = {
+        user_id: user.id,
+        name: customTitle.trim(),
+        description: customDescription.trim() || null,
+        icon: "checkmark-circle",
+        is_daily: selectedDay !== undefined && !isWeekly,
+        is_weekly: isWeekly === true,
+        is_active: true,
+        sort_order: nextSortOrder,
+      };
+
+      const { data: newRoutine, error } = await supabase
+        .from("user_routines")
+        .insert(routineData)
+        .select("id")
+        .single();
+
+      if (error) throw error;
+
+      if (selectedDay !== undefined && !isWeekly) {
+        const { error: dayError } = await supabase
+          .from("user_day_routines")
+          .insert({
+            user_id: user.id,
+            routine_id: newRoutine.id,
+            day_of_week: selectedDay,
+          });
+
+        if (dayError) throw dayError;
+        Alert.alert("Success", `${customTitle} added to your ${dayNames[selectedDay]} routine!`);
+      } else if (isWeekly) {
+        Alert.alert("Success", `${customTitle} added to your weekly goals!`);
+      } else {
+        Alert.alert("Success", `${customTitle} added to your routines!`);
+      }
 
       setShowCreateModal(false);
       setCustomTitle("");
       setCustomDescription("");
       navigation.goBack();
     } catch (error) {
-      console.error("=== ERROR IN CUSTOM ROUTINE CREATION ===");
-      console.error("Full error:", error);
+      console.error("Error creating custom routine:", error);
       Alert.alert("Error", "Failed to create routine. Please try again.");
     } finally {
       setIsCreating(false);
     }
   };
-  const renderCategorySection = (
-    category: string,
-    routines: RoutineTemplate[]
-  ) => {
+
+  const renderCategorySection = (category: string, routines: RoutineTemplate[]) => {
     const isExpanded = expandedCategories.has(category);
 
     return (
@@ -979,11 +870,7 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
                 disabled={isCreating}
               >
                 <View style={[styles.routineIcon, { backgroundColor: colors.background }]}>
-                  <Ionicons
-                    name={routine.icon as any}
-                    size={20}
-                    color="#007AFF"
-                  />
+                  <Ionicons name={routine.icon as any} size={20} color="#007AFF" />
                 </View>
                 <View style={styles.routineInfo}>
                   <Text style={[styles.routineName, { color: colors.text }]}>{routine.name}</Text>
@@ -1002,8 +889,13 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
     );
   };
 
+  // NEW: Dynamic header title based on context
   const getHeaderTitle = () => {
-    if (isWeekly) {
+    if (skipPresets) {
+      return `Create Routine for ${dayNames[selectedDay || 0]}`;
+    } else if (currentScreen === 'custom') {
+      return "Create Custom Routine";
+    } else if (isWeekly) {
       return "Add Weekly Goal";
     } else if (selectedDay !== undefined) {
       return `Add ${dayNames[selectedDay]} Routine`;
@@ -1012,207 +904,196 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
     }
   };
 
+  // NEW: Handle back button based on current state
+  const handleBackButton = () => {
+    if (skipPresets || currentScreen === 'templates') {
+      navigation.goBack();
+    } else {
+      setCurrentScreen('templates');
+    }
+  };
+
+  // NEW: Custom creation screen component
+  const renderCustomCreationScreen = () => (
+    <View style={[styles.customContainer, { backgroundColor: colors.background }]}>
+      <View style={styles.inputGroup}>
+        <Text style={[styles.inputLabel, { color: colors.text }]}>Title *</Text>
+        <TextInput
+          style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+          placeholder="Enter routine title..."
+          placeholderTextColor={colors.placeholder}
+          value={customTitle}
+          onChangeText={setCustomTitle}
+          maxLength={20}
+        />
+        <Text style={[styles.charCount, { color: colors.textSecondary }]}>{customTitle.length}/20</Text>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={[styles.inputLabel, { color: colors.text }]}>Description (Optional)</Text>
+        <TextInput
+          style={[styles.textInput, styles.textArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+          placeholder="Enter description..."
+          placeholderTextColor={colors.placeholder}
+          value={customDescription}
+          onChangeText={setCustomDescription}
+          maxLength={20}
+          multiline
+          numberOfLines={3}
+        />
+        <Text style={[styles.charCount, { color: colors.textSecondary }]}>
+          {customDescription.length}/20
+        </Text>
+      </View>
+
+      {/* Time slot selector for calendar mode */}
+      {isCalendarMode && (
+        <View style={styles.inputGroup}>
+          <Text style={[styles.inputLabel, { color: colors.text }]}>Time Slot *</Text>
+          <TouchableOpacity
+            style={[
+              styles.timeSlotSelector,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              !selectedTimeSlot && styles.timeSlotSelectorEmpty
+            ]}
+            onPress={() => setShowTimePickerModal(true)}
+          >
+            <Text style={[
+              styles.timeSlotSelectorText,
+              { color: colors.text },
+              !selectedTimeSlot && [styles.timeSlotSelectorTextEmpty, { color: colors.placeholder }]
+            ]}>
+              {selectedTimeSlot ? formatTime(selectedTimeSlot) : "Select time slot..."}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={[
+          styles.createSubmitButton,
+          {
+            backgroundColor: (!customTitle.trim() || (isCalendarMode && !selectedTimeSlot)) ? colors.border : "#007AFF",
+            opacity: (!customTitle.trim() || (isCalendarMode && !selectedTimeSlot)) ? 0.6 : 1
+          }
+        ]}
+        onPress={handleCreateCustom}
+        disabled={!customTitle.trim() || (isCalendarMode && !selectedTimeSlot) || isCreating}
+      >
+        <Text style={[
+          styles.createSubmitButtonText,
+          { color: (!customTitle.trim() || (isCalendarMode && !selectedTimeSlot)) ? colors.textTertiary : "white" }
+        ]}>
+          {isCreating ? "Creating..." : "Create Routine"}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{getHeaderTitle()}</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      <View style={[styles.searchContainer, { backgroundColor: colors.surface }]}>
-        <View style={[styles.searchBar, { backgroundColor: colors.background, borderColor: colors.border }]}>
-          <Ionicons name="search" size={20} color={colors.textSecondary} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search routines..."
-            placeholderTextColor={colors.placeholder}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
         <TouchableOpacity
-          style={[styles.createButton, { backgroundColor: colors.background, borderColor: "#007AFF" }]}
-          onPress={() => setShowCreateModal(true)}
+          style={styles.headerButton}
+          onPress={handleBackButton}
         >
-          <Ionicons name="add" size={20} color="#007AFF" />
-          <Text style={styles.createButtonText}>Create</Text>
+          <Ionicons
+            name={skipPresets || currentScreen === 'templates' ? "close" : "arrow-back"}
+            size={24}
+            color="#007AFF"
+          />
         </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          {getHeaderTitle()}
+        </Text>
+        {/* NEW: Show create button only when in templates view and not skipPresets */}
+        {!skipPresets && currentScreen === 'templates' ? (
+          <TouchableOpacity
+            style={styles.headerCreateButton}
+            onPress={() => setCurrentScreen('custom')}
+          >
+            <Text style={styles.headerCreateText}>Create</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 60 }} />
+        )}
       </View>
 
-      <ScrollView style={[styles.content, { backgroundColor: colors.background }]}>
-        {searchQuery.trim() ? (
-          // Show search results
-          <>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Search Results ({filteredRoutines.length})
-            </Text>
-            <FlatList
-              data={filteredRoutines}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[styles.routineItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  onPress={() => handleSelectRoutine(item)}
-                >
-                  <View style={[styles.routineIcon, { backgroundColor: colors.background }]}>
-                    <Ionicons
-                      name={item.icon as any}
-                      size={24}
-                      color="#007AFF"
-                    />
-                  </View>
-                  <View style={styles.routineInfo}>
-                    <Text style={[styles.routineName, { color: colors.text }]}>{item.name}</Text>
-                    {item.description && (
-                      <Text style={[styles.routineDescription, { color: colors.textSecondary }]}>
-                        {item.description}
-                      </Text>
-                    )}
-                    <Text style={styles.routineCategory}>{item.category}</Text>
-                  </View>
-                  <Ionicons name="add-circle" size={24} color="#007AFF" />
-                </TouchableOpacity>
-              )}
-              keyExtractor={(item) => item.id}
-              style={styles.routinesList}
-              showsVerticalScrollIndicator={false}
-            />
-          </>
-        ) : (
-          // Show categorized routines
-          <>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Browse by Category</Text>
-            <ScrollView
-              style={styles.categoriesContainer}
-              showsVerticalScrollIndicator={false}
-            >
-              {Object.entries(routinesByCategory).map(([category, routines]) =>
-                renderCategorySection(category, routines)
-              )}
-            </ScrollView>
-          </>
-        )}
-      </ScrollView>
-
-      {/* ✅ NEW: Time Slot Picker Modal - Only for pre-loaded routines */}
-      {showTimePickerModal && pendingRoutine && <TimeSlotPickerModal />}
-
-      {/* Create Custom Routine Modal */}
-      <Modal
-        visible={showCreateModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setShowCreateModal(false)}>
-              <Text style={[styles.modalCancelButton, { color: colors.textSecondary }]}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Create Custom Routine</Text>
-            <TouchableOpacity
-              onPress={handleCreateCustom}
-              disabled={isCreating}
-              style={{ opacity: isCreating ? 0.6 : 1 }}
-            >
-              <Text style={styles.modalSaveButton}>
-                {isCreating ? "Creating..." : "Save"}
-              </Text>
-            </TouchableOpacity>
+      {/* Content based on current screen */}
+      {skipPresets || currentScreen === 'custom' ? (
+        renderCustomCreationScreen()
+      ) : (
+        <>
+          {/* Search Container */}
+          <View style={[styles.searchContainer, { backgroundColor: colors.surface }]}>
+            <View style={[styles.searchBar, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Ionicons name="search" size={20} color={colors.textSecondary} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder="Search routines..."
+                placeholderTextColor={colors.placeholder}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
           </View>
 
-          <View style={styles.modalContent}>
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Title *</Text>
-              <TextInput
-                style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-                placeholder="Enter routine title..."
-                placeholderTextColor={colors.placeholder}
-                value={customTitle}
-                onChangeText={setCustomTitle}
-                maxLength={20}
-              />
-              <Text style={[styles.charCount, { color: colors.textSecondary }]}>{customTitle.length}/20</Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Description (Optional)</Text>
-              <TextInput
-                style={[styles.textInput, styles.textArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-                placeholder="Enter description..."
-                placeholderTextColor={colors.placeholder}
-                value={customDescription}
-                onChangeText={setCustomDescription}
-                maxLength={20}
-                multiline
-                numberOfLines={3}
-              />
-              <Text style={[styles.charCount, { color: colors.textSecondary }]}>
-                {customDescription.length}/20
-              </Text>
-            </View>
-
-            {/* ✅ NEW: Time slot selector for calendar mode */}
-            {isCalendarMode && (
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Time Slot *</Text>
-                <TouchableOpacity
-                  style={[
-                    styles.timeSlotSelector,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
-                    !selectedTimeSlot && styles.timeSlotSelectorEmpty
-                  ]}
-                  onPress={() => {
-                    console.log("Time slot dropdown clicked"); // Debug log
-                    setShowTimePickerModal(true);
-                  }}
-                >
-                  <Text style={[
-                    styles.timeSlotSelectorText,
-                    { color: colors.text },
-                    !selectedTimeSlot && [styles.timeSlotSelectorTextEmpty, { color: colors.placeholder }]
-                  ]}>
-                    {selectedTimeSlot ? formatTime(selectedTimeSlot) : "Select time slot..."}
-                  </Text>
-                  <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-
-                {/* ✅ NEW: Inline time slots dropdown */}
-                {showTimePickerModal && !pendingRoutine && (
-                  <View style={[styles.inlineTimeSlots, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <ScrollView style={styles.inlineTimeSlotsList} showsVerticalScrollIndicator={false}>
-                      {Array.from({ length: 16 }, (_, i) => i + 6).map((hour) => (
-                        <TouchableOpacity
-                          key={hour}
-                          style={[
-                            styles.inlineTimeSlotOption,
-                            { borderBottomColor: colors.separator },
-                            selectedTimeSlot === hour && [styles.inlineTimeSlotOptionSelected, { backgroundColor: "#007AFF" }]
-                          ]}
-                          onPress={() => {
-                            console.log("Time selected:", hour); // Debug log
-                            setSelectedTimeSlot(hour);
-                            setShowTimePickerModal(false);
-                          }}
-                        >
-                          <Text style={[
-                            styles.inlineTimeSlotText,
-                            { color: colors.text },
-                            selectedTimeSlot === hour && styles.inlineTimeSlotTextSelected
-                          ]}>
-                            {formatTime(hour)}
+          {/* Templates Content */}
+          <ScrollView style={[styles.content, { backgroundColor: colors.background }]}>
+            {searchQuery.trim() ? (
+              <>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Search Results ({filteredRoutines.length})
+                </Text>
+                <FlatList
+                  data={filteredRoutines}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[styles.routineItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                      onPress={() => handleSelectRoutine(item)}
+                      disabled={isCreating}
+                    >
+                      <View style={[styles.routineIcon, { backgroundColor: colors.background }]}>
+                        <Ionicons name={item.icon as any} size={24} color="#007AFF" />
+                      </View>
+                      <View style={styles.routineInfo}>
+                        <Text style={[styles.routineName, { color: colors.text }]}>{item.name}</Text>
+                        {item.description && (
+                          <Text style={[styles.routineDescription, { color: colors.textSecondary }]}>
+                            {item.description}
                           </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
-              </View>
+                        )}
+                        <Text style={styles.routineCategory}>{item.category}</Text>
+                      </View>
+                      <Ionicons name="add-circle" size={24} color="#007AFF" />
+                    </TouchableOpacity>
+                  )}
+                  keyExtractor={(item) => item.id}
+                  style={styles.routinesList}
+                  showsVerticalScrollIndicator={false}
+                />
+              </>
+            ) : (
+              <>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Browse by Category</Text>
+                <ScrollView
+                  style={styles.categoriesContainer}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {Object.entries(routinesByCategory).map(([category, routines]) =>
+                    renderCategorySection(category, routines)
+                  )}
+                </ScrollView>
+              </>
             )}
-          </View>
-        </SafeAreaView>
-      </Modal>
+          </ScrollView>
+        </>
+      )}
+
+      {/* Time Slot Picker Modal */}
+      {showTimePickerModal && <TimeSlotPickerModal />}
     </SafeAreaView>
   );
 };
@@ -1220,7 +1101,6 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // ✅ REMOVED: backgroundColor: "#f5f5f5", - NOW USES THEME
   },
   header: {
     flexDirection: "row",
@@ -1228,64 +1108,52 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderBottomWidth: 1,
-    // ✅ REMOVED: borderBottomColor: "#e9ecef", - NOW USES THEME
+  },
+  headerButton: {
+    padding: 4,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    // ✅ REMOVED: color: "#333", - NOW USES THEME
+    flex: 1,
+    textAlign: "center",
+  },
+  headerCreateButton: {
+    padding: 8,
+  },
+  headerCreateText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#007AFF",
   },
   searchContainer: {
     flexDirection: "row",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     gap: 12,
   },
   searchBar: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    // ✅ REMOVED: backgroundColor: "#f8f9fa", - NOW USES THEME
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     gap: 8,
     borderWidth: 1,
-    // ✅ REMOVED: borderColor: "#e9ecef", - NOW USES THEME
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    // ✅ REMOVED: color: "#333", - NOW USES THEME
-  },
-  createButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    // ✅ REMOVED: backgroundColor: "#f0f8ff", - NOW USES THEME
-    borderRadius: 8,
-    gap: 4,
-    borderWidth: 1,
-    // ✅ REMOVED: borderColor: "#007AFF", - KEPT AS IS
-  },
-  createButtonText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#007AFF",
   },
   content: {
     flex: 1,
     paddingHorizontal: 16,
-    // ✅ REMOVED: backgroundColor: "#f5f5f5", - NOW USES THEME
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "600",
-    // ✅ REMOVED: color: "#333", - NOW USES THEME
     marginVertical: 16,
   },
   categoriesContainer: {
@@ -1293,7 +1161,6 @@ const styles = StyleSheet.create({
   },
   categorySection: {
     marginBottom: 16,
-    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderRadius: 12,
     overflow: "hidden",
   },
@@ -1303,9 +1170,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    // ✅ REMOVED: backgroundColor: "#f8f9fa", - NOW USES THEME
     borderBottomWidth: 1,
-    // ✅ REMOVED: borderBottomColor: "#f0f0f0", - NOW USES THEME
   },
   categoryHeaderLeft: {
     flexDirection: "row",
@@ -1315,11 +1180,9 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: 16,
     fontWeight: "600",
-    // ✅ REMOVED: color: "#333", - NOW USES THEME
   },
   categoryCount: {
     fontSize: 14,
-    // ✅ REMOVED: color: "#666", - NOW USES THEME
   },
   categoryContent: {
     padding: 8,
@@ -1329,7 +1192,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 10,
-    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderRadius: 8,
     marginBottom: 4,
     gap: 12,
@@ -1342,18 +1204,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderRadius: 12,
     marginBottom: 8,
     gap: 12,
     borderWidth: 1,
-    // ✅ REMOVED: borderColor: "#e9ecef", - NOW USES THEME
   },
   routineIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    // ✅ REMOVED: backgroundColor: "#f0f8ff", - NOW USES THEME
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1363,12 +1222,10 @@ const styles = StyleSheet.create({
   routineName: {
     fontSize: 16,
     fontWeight: "500",
-    // ✅ REMOVED: color: "#333", - NOW USES THEME
     marginBottom: 2,
   },
   routineDescription: {
     fontSize: 14,
-    // ✅ REMOVED: color: "#666", - NOW USES THEME
   },
   routineCategory: {
     fontSize: 12,
@@ -1376,72 +1233,8 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginTop: 2,
   },
-  // ✅ NEW: Time Picker Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  timePickerModal: {
-    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: "70%",
-    width: "100%",
-  },
-  timeSlotsList: {
-    maxHeight: 400,
-    paddingBottom: 20,
-  },
-  timeSlotOption: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    // ✅ REMOVED: borderBottomColor: "#f0f0f0", - NOW USES THEME
-    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
-  },
-  timeSlotOptionSelected: {
-    // backgroundColor: "#007AFF", - KEPT AS IS (blue selection)
-  },
-  timeSlotText: {
-    fontSize: 16,
-    // ✅ REMOVED: color: "#333", - NOW USES THEME
-    textAlign: "center",
-  },
-  timeSlotTextSelected: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  // Modal Styles
-  modalContainer: {
-    flex: 1,
-    // ✅ REMOVED: backgroundColor: "#f5f5f5", - NOW USES THEME
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
-    borderBottomWidth: 1,
-    // ✅ REMOVED: borderBottomColor: "#e9ecef", - NOW USES THEME
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    // ✅ REMOVED: color: "#333", - NOW USES THEME
-  },
-  modalCancelButton: {
-    fontSize: 16,
-    // ✅ REMOVED: color: "#666", - NOW USES THEME
-  },
-  modalSaveButton: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#007AFF",
-  },
-  modalContent: {
+  // Custom creation screen styles
+  customContainer: {
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 20,
@@ -1452,18 +1245,14 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: "500",
-    // ✅ REMOVED: color: "#333", - NOW USES THEME
     marginBottom: 8,
   },
   textInput: {
-    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderWidth: 1,
-    // ✅ REMOVED: borderColor: "#e9ecef", - NOW USES THEME
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
-    // ✅ REMOVED: color: "#333", - NOW USES THEME
   },
   textArea: {
     height: 80,
@@ -1471,65 +1260,73 @@ const styles = StyleSheet.create({
   },
   charCount: {
     fontSize: 12,
-    // ✅ REMOVED: color: "#666", - NOW USES THEME
     textAlign: "right",
     marginTop: 4,
   },
-  // ✅ NEW: Time slot selector styles
   timeSlotSelector: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
     borderWidth: 1,
-    // ✅ REMOVED: borderColor: "#e9ecef", - NOW USES THEME
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
     minHeight: 44,
   },
-  timeSlotSelectorEmpty: {
-    // ✅ REMOVED: borderColor: "#ddd", - NOW USES THEME (inherits from timeSlotSelector)
-  },
+  timeSlotSelectorEmpty: {},
   timeSlotSelectorText: {
     fontSize: 16,
-    // ✅ REMOVED: color: "#333", - NOW USES THEME
   },
-  timeSlotSelectorTextEmpty: {
-    // ✅ REMOVED: color: "#999", - NOW USES THEME
-  },
-  // ✅ NEW: Inline time slots dropdown styles
-  inlineTimeSlots: {
-    marginTop: 8,
-    // ✅ REMOVED: backgroundColor: "#fff", - NOW USES THEME
-    borderWidth: 1,
-    // ✅ REMOVED: borderColor: "#e9ecef", - NOW USES THEME
+  timeSlotSelectorTextEmpty: {},
+  createSubmitButton: {
+    paddingVertical: 14,
     borderRadius: 8,
-    maxHeight: 200,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    alignItems: "center",
+    marginTop: 20,
   },
-  inlineTimeSlotsList: {
-    maxHeight: 200,
+  createSubmitButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
-  inlineTimeSlotOption: {
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  timePickerModal: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "70%",
+    width: "100%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    // ✅ REMOVED: borderBottomColor: "#f0f0f0", - NOW USES THEME
   },
-  inlineTimeSlotOptionSelected: {
-    // backgroundColor: "#007AFF", - KEPT AS IS (blue selection)
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
   },
-  inlineTimeSlotText: {
+  timeSlotsList: {
+    maxHeight: 400,
+    paddingBottom: 20,
+  },
+  timeSlotOption: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  timeSlotOptionSelected: {},
+  timeSlotText: {
     fontSize: 16,
-    // ✅ REMOVED: color: "#333", - NOW USES THEME
     textAlign: "center",
   },
-  inlineTimeSlotTextSelected: {
+  timeSlotTextSelected: {
     color: "#fff",
     fontWeight: "600",
   },

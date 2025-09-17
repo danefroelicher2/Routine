@@ -539,17 +539,48 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   // ✅ EXISTING: Remove scheduled routine function
-  const removeRoutineFromTimeSlot = async (scheduledId: string) => {
+  const removeRoutineFromTimeSlot = async (scheduledId: string, routineId: string, routineName: string) => {
     try {
-      const { error } = await supabase
+      console.log("🗑️ Removing routine:", routineName);
+      console.log("  - Scheduled ID:", scheduledId);
+      console.log("  - Routine ID:", routineId);
+
+      // First remove from schedule
+      const { error: scheduleError } = await supabase
         .from("routine_schedule")
         .delete()
         .eq("id", scheduledId);
 
-      if (error) throw error;
-      await loadData();
+      if (scheduleError) {
+        console.error("Error removing from schedule:", scheduleError);
+        throw scheduleError;
+      }
+
+      console.log("✅ Removed from routine_schedule");
+
+      // Then deactivate the routine entirely
+      const { error: routineError } = await supabase
+        .from("user_routines")
+        .update({ is_active: false })
+        .eq("id", routineId);
+
+      if (routineError) {
+        console.error("Error deactivating routine:", routineError);
+        throw routineError;
+      }
+
+      console.log("✅ Deactivated user_routine");
+
+      // Force immediate reload of both data sets
+      await Promise.all([
+        loadData(),
+        loadScheduledRoutines()
+      ]);
+
+      console.log("✅ Routine removal completed");
+
     } catch (error) {
-      console.error("Error removing scheduled routine:", error);
+      console.error("Error removing routine:", error);
       Alert.alert("Error", "Failed to remove routine from schedule");
     }
   };
@@ -742,39 +773,43 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setIsCalendarView(defaultToCalendarView);
     }
   }, [defaultToCalendarView, homeViewLoading, isPremium]);
-  // ✅ FIXED: Handle calendar view switching without circular dependency
+  // ✅ FIXED: Handle calendar view switching and day changes without circular dependency
   useEffect(() => {
     if (isCalendarView) {
-      // Load calendar data when switching to calendar view
-      loadScheduledRoutines();
+      // Add a delay to prevent rapid fire calls
+      const timeoutId = setTimeout(() => {
+        loadScheduledRoutines();
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
     } else {
       // When switching back to list view, reload user schedules for next time
       loadUserDaySchedules().then(schedules => {
         setUserDaySchedules(schedules);
       });
     }
-  }, [isCalendarView]);
-
-  // ✅ NEW: Separate effect to reload calendar data when day changes
-  useEffect(() => {
-    if (isCalendarView) {
-      loadScheduledRoutines();
-    }
-  }, [selectedDay]);
+  }, [isCalendarView, selectedDay]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
       console.log("HomeScreen focused - reloading data");
+
+      // Force immediate reload without delay
       loadData();
-      // ✅ NEW: Also reload user schedules when screen focuses (in case user changed settings)
+
+      if (isCalendarView) {
+        // Also reload calendar data immediately
+        loadScheduledRoutines();
+      }
+
+      // Reload user schedules in background
       loadUserDaySchedules().then(schedules => {
         setUserDaySchedules(schedules);
       });
     });
 
     return unsubscribe;
-  }, [navigation, loadData]);
-
+  }, [navigation, loadData, isCalendarView, loadScheduledRoutines]);
   // ADD THIS NEW useEffect HERE:
   useEffect(() => {
     let lastCheckedDate = getLocalDateString(new Date());
@@ -1772,7 +1807,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 style={[styles.createButton, styles.createButtonShortened, { backgroundColor: "#007AFF" }]}
                 onPress={() => navigation.navigate("AddRoutine", {
                   selectedDay,
-                  isCalendarMode: true
+                  isCalendarMode: true,
+                  skipPresets: true  // This will tell AddRoutine to go straight to manual creation
                 })}
               >
                 <Ionicons name="add" size={24} color="white" />
@@ -1897,13 +1933,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                                     if (routine.scheduled_id) {
                                       Alert.alert(
                                         "Remove Routine",
-                                        `Remove "${routine.name}" from this time slot?`,
+                                        `Remove "${routine.name}" from your schedule?`,
                                         [
                                           { text: "Cancel", style: "cancel" },
                                           {
                                             text: "Remove",
                                             style: "destructive",
-                                            onPress: () => removeRoutineFromTimeSlot(routine.scheduled_id!)
+                                            onPress: () => removeRoutineFromTimeSlot(
+                                              routine.scheduled_id!,
+                                              routine.id,
+                                              routine.name
+                                            )
                                           }
                                         ]
                                       );
