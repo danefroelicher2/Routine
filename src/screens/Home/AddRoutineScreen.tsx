@@ -51,6 +51,7 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set()
   );
+  const [isCreating, setIsCreating] = useState(false);
 
   // ✅ NEW: Calendar mode state
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
@@ -662,13 +663,22 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
 
   // ✅ UPDATED: Handle routine selection with calendar mode support
   const handleSelectRoutine = async (routine: RoutineTemplate) => {
+    if (isCreating) return; // Prevent multiple clicks
+
     if (isCalendarMode) {
       // ✅ NEW: In calendar mode, show time picker first
       setPendingRoutine(routine);
       setShowTimePickerModal(true);
     } else {
       // ✅ EXISTING: Direct creation for daily/weekly modes
-      await createRoutineDirectly(routine);
+      setIsCreating(true);
+      try {
+        await createRoutineDirectly(routine);
+      } catch (error) {
+        console.error("Error in handleSelectRoutine:", error);
+      } finally {
+        setIsCreating(false);
+      }
     }
   };
 
@@ -780,10 +790,14 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
   };
 
   const createCustomDirectly = async () => {
+    if (isCreating) return; // Prevent double execution
+
     if (!customTitle.trim()) {
       Alert.alert("Error", "Please enter a title for your routine");
       return;
     }
+
+    setIsCreating(true);
 
     if (customTitle.length > 20) {
       Alert.alert("Error", "Title must be 20 characters or less");
@@ -885,6 +899,8 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
       console.error("=== ERROR IN CUSTOM ROUTINE CREATION ===");
       console.error("Full error:", error);
       Alert.alert("Error", "Failed to create routine. Please try again.");
+    } finally {
+      setIsCreating(false);
     }
   };
   const renderCategorySection = (
@@ -915,8 +931,13 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
             {routines.map((routine) => (
               <TouchableOpacity
                 key={routine.id}
-                style={[styles.routineItemInCategory, { backgroundColor: colors.surface }]}
+                style={[
+                  styles.routineItemInCategory,
+                  { backgroundColor: colors.surface },
+                  isCreating && { opacity: 0.6 }
+                ]}
                 onPress={() => handleSelectRoutine(routine)}
+                disabled={isCreating}
               >
                 <View style={[styles.routineIcon, { backgroundColor: colors.background }]}>
                   <Ionicons
@@ -1051,8 +1072,14 @@ const AddRoutineScreen: React.FC<AddRoutineScreenProps> = ({
               <Text style={[styles.modalCancelButton, { color: colors.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Create Custom Routine</Text>
-            <TouchableOpacity onPress={handleCreateCustom}>
-              <Text style={styles.modalSaveButton}>Save</Text>
+            <TouchableOpacity
+              onPress={handleCreateCustom}
+              disabled={isCreating}
+              style={{ opacity: isCreating ? 0.6 : 1 }}
+            >
+              <Text style={styles.modalSaveButton}>
+                {isCreating ? "Creating..." : "Save"}
+              </Text>
             </TouchableOpacity>
           </View>
 
