@@ -1,6 +1,6 @@
 // App.tsx - MINIMAL FIXES TO YOUR EXISTING CODE
 import React, { useEffect, useState, useRef, ErrorInfo } from 'react';
-import { ActivityIndicator, View, StyleSheet, StatusBar, Alert, Linking, Text } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, StatusBar, Alert, Linking, Text, Dimensions, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -41,6 +41,12 @@ import AboutScreen from './src/screens/Profile/AboutScreen';
 import PrivacyScreen from './src/screens/Profile/PrivacyScreen';
 import TermsScreen from './src/screens/Profile/TermsScreen';
 
+// IPAD FIX: Add device detection
+const { width, height } = Dimensions.get('window');
+const isTablet = Platform.OS === 'ios' && (width > 1000 || height > 1000);
+
+console.log(`📱 Device: ${isTablet ? 'iPad' : 'iPhone'} (${width}×${height})`);
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
@@ -73,6 +79,9 @@ class ErrorBoundary extends React.Component<
           </Text>
           <Text style={styles.errorDetails}>
             Please restart the app. If this persists, contact support.
+          </Text>
+          <Text style={styles.deviceInfo}>
+            Device: {isTablet ? 'iPad' : 'iPhone'} ({width}×{height})
           </Text>
         </View>
       );
@@ -147,6 +156,10 @@ function MainTabs() {
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
             let iconName: any;
+
+            // IPAD FIX: Larger icons on iPad
+            const iconSize = isTablet ? Math.max(size * 1.2, 28) : size;
+
             if (route.name === 'Home') {
               iconName = focused ? 'home' : 'home-outline';
             } else if (route.name === 'Stats') {
@@ -160,7 +173,7 @@ function MainTabs() {
             } else {
               iconName = 'help-outline';
             }
-            return <Ionicons name={iconName} size={size} color={color} />;
+            return <Ionicons name={iconName} size={iconSize} color={color} />;
           },
           tabBarActiveTintColor: '#007AFF',
           tabBarInactiveTintColor: colors.textSecondary,
@@ -168,12 +181,12 @@ function MainTabs() {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
             borderTopWidth: 1,
-            paddingBottom: 8,
-            paddingTop: 8,
-            height: 88,
+            paddingBottom: isTablet ? 12 : 8, // IPAD FIX: More padding on iPad
+            paddingTop: isTablet ? 12 : 8,
+            height: isTablet ? 100 : 88, // IPAD FIX: Taller tab bar on iPad
           },
           tabBarLabelStyle: {
-            fontSize: 12,
+            fontSize: isTablet ? 14 : 12, // IPAD FIX: Larger text on iPad
             fontWeight: '500',
             marginTop: 4,
           },
@@ -214,24 +227,41 @@ function AppContent() {
   const [initError, setInitError] = useState<string | null>(null);
   const { colors } = useTheme();
   const { refreshSubscriptionStatus } = usePremium();
+
+  // FIX: Initialize useRef with null to fix TypeScript error
   const navigationRef = useRef<any>(null);
 
   useEffect(() => {
-    console.log('🚀 AppContent initializing...');
+    console.log(`🚀 AppContent initializing on ${isTablet ? 'iPad' : 'iPhone'}...`);
 
     const initializeAuth = async () => {
       try {
         console.log('📱 Getting initial session...');
-        const { data: { session }, error } = await supabase.auth.getSession();
+
+        // IPAD FIX: Add timeout for iPad sessions to prevent hanging
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Session timeout')), isTablet ? 15000 : 10000)
+        );
+
+        const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        const { data: { session }, error } = result;
 
         if (error) {
           console.error('❌ Session error:', error);
-          setInitError(`Session Error: ${error.message}`);
+
+          // IPAD FIX: On iPad, continue without session instead of failing
+          if (isTablet && error.message.includes('network')) {
+            console.log('🔄 iPad network error - continuing without session');
+            setSession(null);
+          } else {
+            setInitError(`Session Error: ${error.message}`);
+          }
           setIsLoading(false);
           return;
         }
 
-        console.log('✅ Initial session:', session ? 'EXISTS' : 'NULL');
+        console.log(`✅ Initial session (${isTablet ? 'iPad' : 'iPhone'}):`, session ? 'EXISTS' : 'NULL');
 
         // Only set session if it's not a password reset session
         if (session && !pendingPasswordReset) {
@@ -239,9 +269,17 @@ function AppContent() {
         }
         setIsLoading(false);
       } catch (error) {
-        console.error('❌ Auth initialization error:', error);
-        setInitError(`Auth Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        setIsLoading(false);
+        console.error(`❌ Auth initialization error on ${isTablet ? 'iPad' : 'iPhone'}:`, error);
+
+        // IPAD FIX: More lenient error handling on iPad
+        if (isTablet && error instanceof Error && error.message.includes('timeout')) {
+          console.log('🔄 iPad timeout - continuing without auth');
+          setSession(null);
+          setIsLoading(false);
+        } else {
+          setInitError(`Auth Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          setIsLoading(false);
+        }
       }
     };
 
@@ -251,7 +289,7 @@ function AppContent() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('🔄 Auth state change:', _event, session ? 'SESSION_EXISTS' : 'NO_SESSION');
+      console.log(`🔄 Auth state change (${isTablet ? 'iPad' : 'iPhone'}):`, _event, session ? 'SESSION_EXISTS' : 'NO_SESSION');
 
       // Only set session if it's not a password reset flow
       if (!pendingPasswordReset) {
@@ -398,6 +436,9 @@ function AppContent() {
         <Text style={[styles.errorDetails, { color: colors.textSecondary }]}>
           Please restart the app. If this continues, check your internet connection.
         </Text>
+        <Text style={[styles.deviceInfo, { color: colors.textSecondary }]}>
+          Device: {isTablet ? 'iPad' : 'iPhone'} ({width}×{height})
+        </Text>
       </View>
     );
   }
@@ -406,14 +447,26 @@ function AppContent() {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={[styles.loadingText, { color: colors.text }]}>Loading...</Text>
+        <Text style={[styles.loadingText, { color: colors.text }]}>
+          Loading{isTablet ? ' on iPad' : ''}...
+        </Text>
       </View>
     );
   }
 
   return (
     <ErrorBoundary>
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer
+        ref={navigationRef}
+        linking={{
+          prefixes: ['routine://', 'https://routine-app.com'],
+          config: {
+            screens: {
+              Premium: 'premium',
+            },
+          },
+        }}
+      >
         <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
         {session && !pendingPasswordReset ? <MainTabs /> : <AuthStack />}
       </NavigationContainer>
@@ -423,7 +476,7 @@ function AppContent() {
 
 // CRITICAL FIX 6: Wrap root component with error boundary
 export default function App() {
-  console.log('🎯 App component rendering...');
+  console.log(`🎯 App component rendering on ${isTablet ? 'iPad' : 'iPhone'}...`);
 
   return (
     <ErrorBoundary>
@@ -443,10 +496,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: isTablet ? 40 : 20, // IPAD FIX: More padding on iPad
   },
   loadingText: {
     marginTop: 16,
-    fontSize: 16,
+    fontSize: isTablet ? 20 : 16, // IPAD FIX: Larger text on iPad
   },
   errorContainer: {
     flex: 1,
@@ -455,20 +509,26 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorTitle: {
-    fontSize: 20,
+    fontSize: isTablet ? 24 : 20, // IPAD FIX: Larger text on iPad
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
   },
   errorMessage: {
-    fontSize: 16,
+    fontSize: isTablet ? 18 : 16, // IPAD FIX: Larger text on iPad
     marginBottom: 16,
     textAlign: 'center',
     lineHeight: 24,
   },
   errorDetails: {
-    fontSize: 14,
+    fontSize: isTablet ? 16 : 14, // IPAD FIX: Larger text on iPad
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 12,
+  },
+  deviceInfo: {
+    fontSize: isTablet ? 14 : 12, // IPAD FIX: Show device info for debugging
+    textAlign: 'center',
+    opacity: 0.7,
   },
 });
