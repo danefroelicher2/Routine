@@ -1,4 +1,4 @@
-// App.tsx - MINIMAL FIXES TO YOUR EXISTING CODE
+// App.tsx - COMPLETE FILE WITH iPad BLANK SCREEN FIXES
 import React, { useEffect, useState, useRef, ErrorInfo } from 'react';
 import { ActivityIndicator, View, StyleSheet, StatusBar, Alert, Linking, Text, Dimensions, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -236,23 +236,35 @@ function AppContent() {
 
     const initializeAuth = async () => {
       try {
-        console.log('📱 Getting initial session...');
+        console.log(`📱 Getting initial session on ${isTablet ? 'iPad' : 'iPhone'}...`);
 
-        // IPAD FIX: Add timeout for iPad sessions to prevent hanging
+        // CRITICAL iPad FIX: Add timeout to prevent hanging
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Session timeout')), isTablet ? 15000 : 10000)
+          setTimeout(() => reject(new Error('Session timeout')), isTablet ? 8000 : 5000)
         );
 
-        const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
-        const { data: { session }, error } = result;
+        let sessionResult;
+        let sessionError = null;
+
+        try {
+          sessionResult = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        } catch (timeoutError) {
+          console.warn(`⚠️ Session timeout on ${isTablet ? 'iPad' : 'iPhone'} - continuing without auth`);
+          // On timeout, continue with null session instead of failing
+          setSession(null);
+          setIsLoading(false);
+          return;
+        }
+
+        const { data: { session }, error } = sessionResult;
 
         if (error) {
           console.error('❌ Session error:', error);
 
-          // IPAD FIX: On iPad, continue without session instead of failing
-          if (isTablet && error.message.includes('network')) {
-            console.log('🔄 iPad network error - continuing without session');
+          // CRITICAL iPad FIX: On iPad, continue without session instead of showing error
+          if (isTablet) {
+            console.log('🔄 iPad session error - continuing without session to prevent blank screen');
             setSession(null);
           } else {
             setInitError(`Session Error: ${error.message}`);
@@ -271,15 +283,14 @@ function AppContent() {
       } catch (error) {
         console.error(`❌ Auth initialization error on ${isTablet ? 'iPad' : 'iPhone'}:`, error);
 
-        // IPAD FIX: More lenient error handling on iPad
-        if (isTablet && error instanceof Error && error.message.includes('timeout')) {
-          console.log('🔄 iPad timeout - continuing without auth');
+        // CRITICAL iPad FIX: On iPad, always continue with null session instead of showing errors
+        if (isTablet) {
+          console.log('🔄 iPad initialization error - continuing without auth to prevent blank screen');
           setSession(null);
-          setIsLoading(false);
         } else {
           setInitError(`Auth Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          setIsLoading(false);
         }
+        setIsLoading(false);
       }
     };
 
@@ -427,8 +438,8 @@ function AppContent() {
   (global as any).completePasswordReset = completePasswordReset;
   (global as any).resetTokens = resetTokens;
 
-  // CRITICAL FIX 5: Show initialization errors instead of blank screen
-  if (initError) {
+  // CRITICAL FIX 5: On iPad, never show initialization errors - always continue with app
+  if (initError && !isTablet) {
     return (
       <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
         <Text style={[styles.errorTitle, { color: colors.text }]}>Initialization Error</Text>
