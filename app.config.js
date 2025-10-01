@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "Routine",
     slug: "routine-app",
-    version: "1.0.0",
+    version: "1.0.1",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
@@ -15,7 +15,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.routine.dailyhabits",
-      // FIXED: Add Face ID usage description
+      buildNumber: "2",  // ADD THIS LINE
       infoPlist: {
         NSFaceIDUsageDescription:
           "This app uses Face ID to secure your private notes.",
