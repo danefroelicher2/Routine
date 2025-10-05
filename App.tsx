@@ -1,4 +1,45 @@
-// App.tsx - COMPLETE FILE WITH iPad BLANK SCREEN FIXES
+// App.tsx - COMPLETE FILE WITH SENTRY CRASH REPORTING
+
+// CRITICAL: Initialize Sentry FIRST, before any other imports
+import * as Sentry from '@sentry/react-native';
+
+// TODO: Replace this placeholder DSN with your actual Sentry project DSN
+// Get your DSN from: https://sentry.io/settings/projects/your-project/keys/
+const SENTRY_DSN = 'https://22e6c820397dea486faed51f986836b82e04510123339677696.ingest.us.sentry.io/4510123340988416'
+
+// Initialize Sentry with debug mode enabled
+Sentry.init({
+  dsn: SENTRY_DSN,
+  debug: true, // Enable debug mode for development
+  enableAutoSessionTracking: true,
+  sessionTrackingIntervalMillis: 30000,
+  enableNative: true,
+  enableNativeCrashHandling: true,
+  tracesSampleRate: 1.0, // Capture 100% of transactions for performance monitoring
+  beforeSend(event, hint) {
+    // Log all events to console for debugging
+    console.log('📊 Sentry Event:', event);
+    return event;
+  },
+  beforeBreadcrumb(breadcrumb, hint) {
+    // Log all breadcrumbs to console for debugging
+    console.log('🍞 Sentry Breadcrumb:', breadcrumb);
+    return breadcrumb;
+  },
+});
+
+// Add initial breadcrumb to track app start
+Sentry.addBreadcrumb({
+  category: 'app.lifecycle',
+  message: 'App.tsx loaded - Sentry initialized',
+  level: 'info',
+  data: {
+    timestamp: new Date().toISOString(),
+  },
+});
+
+console.log('✅ Sentry initialized with DSN:', SENTRY_DSN === 'https://22e6c820397dea486faed51f986836b82e04510123339677696.ingest.us.sentry.io/4510123340988416' ? 'PLACEHOLDER (needs to be replaced)' : 'configured');
+
 import React, { useEffect, useState, useRef, ErrorInfo } from 'react';
 import { ActivityIndicator, View, StyleSheet, StatusBar, Alert, Linking, Text, Dimensions, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -7,16 +48,37 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Session } from './src/services/supabase';
 
-// CRITICAL FIX 1: Add URL polyfill - THIS IS LIKELY THE MAIN ISSUE
+// Add URL polyfill
 import 'react-native-url-polyfill/auto';
+
+// Add breadcrumb after URL polyfill import
+Sentry.addBreadcrumb({
+  category: 'app.lifecycle',
+  message: 'URL polyfill loaded',
+  level: 'info',
+});
 
 // Services
 import { supabase } from './src/services/supabase';
+
+// Add breadcrumb after supabase import
+Sentry.addBreadcrumb({
+  category: 'app.lifecycle',
+  message: 'Supabase service imported',
+  level: 'info',
+});
 
 // Context Providers
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { PremiumProvider, usePremium } from './src/contexts/PremiumContext';
 import { HomeViewProvider } from './src/contexts/HomeViewContext';
+
+// Add breadcrumb after context providers import
+Sentry.addBreadcrumb({
+  category: 'app.lifecycle',
+  message: 'Context providers imported (Theme, Premium, HomeView)',
+  level: 'info',
+});
 
 // Auth Screens
 import LoginScreen from './src/screens/Auth/LoginScreen';
@@ -41,36 +103,95 @@ import AboutScreen from './src/screens/Profile/AboutScreen';
 import PrivacyScreen from './src/screens/Profile/PrivacyScreen';
 import TermsScreen from './src/screens/Profile/TermsScreen';
 
-// IPAD FIX: Add device detection
+// Device detection for Sentry
 const { width, height } = Dimensions.get('window');
-const isTablet = Platform.OS === 'ios' && (width > 1000 || height > 1000);
 
-console.log(`📱 Device: ${isTablet ? 'iPad' : 'iPhone'} (${width}×${height})`);
+console.log(`📱 Device: iPhone (${width}×${height})`);
+
+// Send device detection info to Sentry
+Sentry.addBreadcrumb({
+  category: 'device.detection',
+  message: 'Device detected: iPhone',
+  level: 'info',
+  data: {
+    width,
+    height,
+    platform: Platform.OS,
+  },
+});
+
+// Set Sentry context for device info
+Sentry.setContext('device', {
+  type: 'iPhone',
+  width,
+  height,
+  platform: Platform.OS,
+});
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// CRITICAL FIX 2: Add Error Boundary Component
+// SAFETY ENHANCEMENT: Enhanced Error Boundary Component with provider-specific fallbacks
 class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
+  { children: React.ReactNode; fallbackComponent?: React.ComponentType },
   { hasError: boolean; error?: Error }
 > {
-  constructor(props: { children: React.ReactNode }) {
+  constructor(props: { children: React.ReactNode; fallbackComponent?: React.ComponentType }) {
     super(props);
     this.state = { hasError: false };
   }
 
   static getDerivedStateFromError(error: Error) {
     console.error('ErrorBoundary caught error:', error);
+
+    // Send error to Sentry
+    Sentry.captureException(error, {
+      tags: {
+        errorBoundary: 'true',
+        component: 'ErrorBoundary',
+      },
+    });
+
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('App Error Boundary:', error, errorInfo);
+
+    // Enhanced logging for provider failures
+    if (error.message.includes('Context') || error.message.includes('Provider')) {
+      console.error('🚨 Context Provider Error - attempting graceful recovery');
+
+      // Send context provider errors to Sentry with extra context
+      Sentry.captureException(error, {
+        tags: {
+          errorType: 'contextProvider',
+          errorBoundary: 'true',
+        },
+        extra: {
+          errorInfo,
+          componentStack: errorInfo.componentStack,
+        },
+      });
+    } else {
+      // Send other errors to Sentry
+      Sentry.captureException(error, {
+        extra: {
+          errorInfo,
+          componentStack: errorInfo.componentStack,
+        },
+      });
+    }
   }
 
   render() {
     if (this.state.hasError) {
+      // Use custom fallback if provided, otherwise default error UI
+      if (this.props.fallbackComponent) {
+        const FallbackComponent = this.props.fallbackComponent;
+        return <FallbackComponent />;
+      }
+
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>App Error</Text>
@@ -81,7 +202,10 @@ class ErrorBoundary extends React.Component<
             Please restart the app. If this persists, contact support.
           </Text>
           <Text style={styles.deviceInfo}>
-            Device: {isTablet ? 'iPad' : 'iPhone'} ({width}×{height})
+            Device: iPhone ({width}×{height})
+          </Text>
+          <Text style={styles.errorRecovery}>
+            The app will attempt to recover automatically.
           </Text>
         </View>
       );
@@ -90,7 +214,7 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-// CRITICAL FIX 3: Add error boundaries to stack navigators
+// Stack navigators with error boundaries
 function HomeStack() {
   return (
     <ErrorBoundary>
@@ -157,9 +281,6 @@ function MainTabs() {
           tabBarIcon: ({ focused, color, size }) => {
             let iconName: any;
 
-            // IPAD FIX: Larger icons on iPad
-            const iconSize = isTablet ? Math.max(size * 1.2, 28) : size;
-
             if (route.name === 'Home') {
               iconName = focused ? 'home' : 'home-outline';
             } else if (route.name === 'Stats') {
@@ -173,7 +294,7 @@ function MainTabs() {
             } else {
               iconName = 'help-outline';
             }
-            return <Ionicons name={iconName} size={iconSize} color={color} />;
+            return <Ionicons name={iconName} size={size} color={color} />;
           },
           tabBarActiveTintColor: '#007AFF',
           tabBarInactiveTintColor: colors.textSecondary,
@@ -181,12 +302,12 @@ function MainTabs() {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
             borderTopWidth: 1,
-            paddingBottom: isTablet ? 12 : 8, // IPAD FIX: More padding on iPad
-            paddingTop: isTablet ? 12 : 8,
-            height: isTablet ? 100 : 88, // IPAD FIX: Taller tab bar on iPad
+            paddingBottom: 8,
+            paddingTop: 8,
+            height: 88,
           },
           tabBarLabelStyle: {
-            fontSize: isTablet ? 14 : 12, // IPAD FIX: Larger text on iPad
+            fontSize: 12,
             fontWeight: '500',
             marginTop: 4,
           },
@@ -218,7 +339,7 @@ function AuthStack() {
   );
 }
 
-// CRITICAL FIX 4: Add better error handling to AppContent
+// AppContent with error handling
 function AppContent() {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -228,29 +349,66 @@ function AppContent() {
   const { colors } = useTheme();
   const { refreshSubscriptionStatus } = usePremium();
 
-  // FIX: Initialize useRef with null to fix TypeScript error
   const navigationRef = useRef<any>(null);
 
   useEffect(() => {
-    console.log(`🚀 AppContent initializing on ${isTablet ? 'iPad' : 'iPhone'}...`);
+    console.log('🚀 AppContent initializing...');
+
+    // Add breadcrumb for AppContent initialization
+    Sentry.addBreadcrumb({
+      category: 'app.lifecycle',
+      message: 'AppContent component initializing',
+      level: 'info',
+    });
 
     const initializeAuth = async () => {
       try {
-        console.log(`📱 Getting initial session on ${isTablet ? 'iPad' : 'iPhone'}...`);
+        console.log('📱 Getting initial session...');
 
-        // CRITICAL iPad FIX: Add timeout to prevent hanging
+        // Add breadcrumb for auth initialization start
+        Sentry.addBreadcrumb({
+          category: 'auth.init',
+          message: 'Starting auth initialization',
+          level: 'info',
+        });
+
+        // Add timeout to prevent hanging
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Session timeout')), isTablet ? 8000 : 5000)
+          setTimeout(() => reject(new Error('Session timeout')), 5000)
         );
 
         let sessionResult;
-        let sessionError = null;
 
         try {
           sessionResult = await Promise.race([sessionPromise, timeoutPromise]) as any;
+
+          // Add breadcrumb for successful session fetch
+          Sentry.addBreadcrumb({
+            category: 'auth.session',
+            message: 'Session fetched successfully (no timeout)',
+            level: 'info',
+          });
         } catch (timeoutError) {
-          console.warn(`⚠️ Session timeout on ${isTablet ? 'iPad' : 'iPhone'} - continuing without auth`);
+          console.warn('⚠️ Session timeout - continuing without auth');
+
+          // Add breadcrumb for session timeout
+          Sentry.addBreadcrumb({
+            category: 'auth.session',
+            message: 'Session fetch timed out',
+            level: 'warning',
+            data: {
+              timeout: 5000,
+            },
+          });
+
+          // Capture timeout as an error in Sentry
+          Sentry.captureException(new Error('Session timeout'), {
+            tags: {
+              errorType: 'sessionTimeout',
+            },
+          });
+
           // On timeout, continue with null session instead of failing
           setSession(null);
           setIsLoading(false);
@@ -262,34 +420,73 @@ function AppContent() {
         if (error) {
           console.error('❌ Session error:', error);
 
-          // CRITICAL iPad FIX: On iPad, continue without session instead of showing error
-          if (isTablet) {
-            console.log('🔄 iPad session error - continuing without session to prevent blank screen');
-            setSession(null);
-          } else {
-            setInitError(`Session Error: ${error.message}`);
-          }
+          // Add breadcrumb for session error
+          Sentry.addBreadcrumb({
+            category: 'auth.session',
+            message: 'Session error occurred',
+            level: 'error',
+            data: {
+              errorMessage: error.message,
+            },
+          });
+
+          // Capture session error
+          Sentry.captureException(error, {
+            tags: {
+              errorType: 'sessionError',
+            },
+          });
+
+          setInitError(`Session Error: ${error.message}`);
           setIsLoading(false);
           return;
         }
 
-        console.log(`✅ Initial session (${isTablet ? 'iPad' : 'iPhone'}):`, session ? 'EXISTS' : 'NULL');
+        console.log('✅ Initial session:', session ? 'EXISTS' : 'NULL');
+
+        // Add breadcrumb for session state
+        Sentry.addBreadcrumb({
+          category: 'auth.session',
+          message: session ? 'Session exists' : 'No session found',
+          level: 'info',
+          data: {
+            hasSession: !!session,
+          },
+        });
 
         // Only set session if it's not a password reset session
         if (session && !pendingPasswordReset) {
           setSession(session);
         }
         setIsLoading(false);
-      } catch (error) {
-        console.error(`❌ Auth initialization error on ${isTablet ? 'iPad' : 'iPhone'}:`, error);
 
-        // CRITICAL iPad FIX: On iPad, always continue with null session instead of showing errors
-        if (isTablet) {
-          console.log('🔄 iPad initialization error - continuing without auth to prevent blank screen');
-          setSession(null);
-        } else {
-          setInitError(`Auth Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+        // Add breadcrumb for successful auth initialization
+        Sentry.addBreadcrumb({
+          category: 'auth.init',
+          message: 'Auth initialization completed successfully',
+          level: 'info',
+        });
+      } catch (error) {
+        console.error('❌ Auth initialization error:', error);
+
+        // Add breadcrumb for initialization error
+        Sentry.addBreadcrumb({
+          category: 'auth.init',
+          message: 'Auth initialization failed',
+          level: 'error',
+          data: {
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+          },
+        });
+
+        // Capture initialization error
+        Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+          tags: {
+            errorType: 'authInitialization',
+          },
+        });
+
+        setInitError(`Auth Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         setIsLoading(false);
       }
     };
@@ -300,7 +497,7 @@ function AppContent() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log(`🔄 Auth state change (${isTablet ? 'iPad' : 'iPhone'}):`, _event, session ? 'SESSION_EXISTS' : 'NO_SESSION');
+      console.log('🔄 Auth state change:', _event, session ? 'SESSION_EXISTS' : 'NO_SESSION');
 
       // Only set session if it's not a password reset flow
       if (!pendingPasswordReset) {
@@ -438,8 +635,7 @@ function AppContent() {
   (global as any).completePasswordReset = completePasswordReset;
   (global as any).resetTokens = resetTokens;
 
-  // CRITICAL FIX 5: On iPad, never show initialization errors - always continue with app
-  if (initError && !isTablet) {
+  if (initError) {
     return (
       <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
         <Text style={[styles.errorTitle, { color: colors.text }]}>Initialization Error</Text>
@@ -448,7 +644,7 @@ function AppContent() {
           Please restart the app. If this continues, check your internet connection.
         </Text>
         <Text style={[styles.deviceInfo, { color: colors.textSecondary }]}>
-          Device: {isTablet ? 'iPad' : 'iPhone'} ({width}×{height})
+          Device: iPhone ({width}×{height})
         </Text>
       </View>
     );
@@ -459,11 +655,23 @@ function AppContent() {
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color="#007AFF" />
         <Text style={[styles.loadingText, { color: colors.text }]}>
-          Loading{isTablet ? ' on iPad' : ''}...
+          Loading...
         </Text>
       </View>
     );
   }
+
+  // Add breadcrumb before rendering navigation
+  Sentry.addBreadcrumb({
+    category: 'navigation.render',
+    message: 'Rendering NavigationContainer',
+    level: 'info',
+    data: {
+      hasSession: !!session,
+      pendingPasswordReset,
+      screen: session && !pendingPasswordReset ? 'MainTabs' : 'AuthStack',
+    },
+  });
 
   return (
     <ErrorBoundary>
@@ -477,6 +685,25 @@ function AppContent() {
             },
           },
         }}
+        onReady={() => {
+          console.log('✅ NavigationContainer ready');
+          Sentry.addBreadcrumb({
+            category: 'navigation.lifecycle',
+            message: 'NavigationContainer mounted and ready',
+            level: 'info',
+          });
+        }}
+        onStateChange={(state) => {
+          console.log('🔄 Navigation state changed:', state);
+          Sentry.addBreadcrumb({
+            category: 'navigation.stateChange',
+            message: 'Navigation state changed',
+            level: 'info',
+            data: {
+              state: JSON.stringify(state),
+            },
+          });
+        }}
       >
         <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
         {session && !pendingPasswordReset ? <MainTabs /> : <AuthStack />}
@@ -485,33 +712,49 @@ function AppContent() {
   );
 }
 
-// CRITICAL FIX 6: Wrap root component with error boundary
-export default function App() {
-  console.log(`🎯 App component rendering on ${isTablet ? 'iPad' : 'iPhone'}...`);
+// SAFETY ENHANCEMENT: Enhanced error boundary protection for context providers
+// Wrap entire app with Sentry ErrorBoundary
+const SentryApp = Sentry.wrap(function App() {
+  console.log('🎯 App component rendering...');
+
+  // Add breadcrumb for App component render
+  Sentry.addBreadcrumb({
+    category: 'app.lifecycle',
+    message: 'App component rendering',
+    level: 'info',
+  });
 
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <PremiumProvider>
-          <HomeViewProvider>
-            <AppContent />
-          </HomeViewProvider>
-        </PremiumProvider>
-      </ThemeProvider>
+      <ErrorBoundary>
+        <ThemeProvider>
+          <ErrorBoundary>
+            <PremiumProvider>
+              <ErrorBoundary>
+                <HomeViewProvider>
+                  <AppContent />
+                </HomeViewProvider>
+              </ErrorBoundary>
+            </PremiumProvider>
+          </ErrorBoundary>
+        </ThemeProvider>
+      </ErrorBoundary>
     </ErrorBoundary>
   );
-}
+});
+
+export default SentryApp;
 
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: isTablet ? 40 : 20, // IPAD FIX: More padding on iPad
+    padding: 20,
   },
   loadingText: {
     marginTop: 16,
-    fontSize: isTablet ? 20 : 16, // IPAD FIX: Larger text on iPad
+    fontSize: 16,
   },
   errorContainer: {
     flex: 1,
@@ -520,26 +763,33 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorTitle: {
-    fontSize: isTablet ? 24 : 20, // IPAD FIX: Larger text on iPad
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
   },
   errorMessage: {
-    fontSize: isTablet ? 18 : 16, // IPAD FIX: Larger text on iPad
+    fontSize: 16,
     marginBottom: 16,
     textAlign: 'center',
     lineHeight: 24,
   },
   errorDetails: {
-    fontSize: isTablet ? 16 : 14, // IPAD FIX: Larger text on iPad
+    fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 12,
   },
   deviceInfo: {
-    fontSize: isTablet ? 14 : 12, // IPAD FIX: Show device info for debugging
+    fontSize: 12,
     textAlign: 'center',
     opacity: 0.7,
+  },
+  errorRecovery: {
+    fontSize: 12,
+    textAlign: 'center',
+    opacity: 0.8,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 });

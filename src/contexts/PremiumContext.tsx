@@ -171,20 +171,23 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
         }
     };
 
-    // Load premium data on app start
+    // CRITICAL FIX: Non-blocking initialization for iPad compatibility
     useEffect(() => {
-        loadPremiumData();
+        loadPremiumDataNonBlocking();
     }, []);
 
-    const loadPremiumData = async () => {
+    const loadPremiumDataNonBlocking = async () => {
         try {
-            setIsLoading(true);
+            console.log("🚀 Starting non-blocking premium data load...");
 
-            // Load cached premium status
+            // STEP 1: Load cached data synchronously (non-blocking)
             const cachedPremiumStatus = await AsyncStorage.getItem("@premium_status");
             const cachedTier = await AsyncStorage.getItem("@premium_tier");
             const cachedAIAccess = await AsyncStorage.getItem("@ai_access");
+            const usageData = await AsyncStorage.getItem("@usage_data");
+            const cacheData = await AsyncStorage.getItem("@usage_count_cache");
 
+            // Apply cached data immediately
             if (cachedPremiumStatus !== null) {
                 setIsPremium(JSON.parse(cachedPremiumStatus));
             }
@@ -194,50 +197,86 @@ export const PremiumProvider: React.FC<PremiumProviderProps> = ({ children }) =>
             if (cachedAIAccess !== null) {
                 setHasAIAccess(JSON.parse(cachedAIAccess));
             }
-
-            // Check with Stripe for real-time status
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const stripeStatus = await checkStripeSubscriptionStatus(user.id);
-
-                // Update if status changed
-                const oldStatus = JSON.parse(cachedPremiumStatus || 'false');
-                const oldTier = cachedTier || 'free';
-                const oldAIAccess = JSON.parse(cachedAIAccess || 'false');
-
-                if (stripeStatus.isPremium !== oldStatus ||
-                    stripeStatus.tier !== oldTier ||
-                    stripeStatus.hasAIAccess !== oldAIAccess) {
-
-                    setIsPremium(stripeStatus.isPremium);
-                    setPremiumTier(stripeStatus.tier);
-                    setHasAIAccess(stripeStatus.hasAIAccess);
-
-                    await AsyncStorage.setItem("@premium_status", JSON.stringify(stripeStatus.isPremium));
-                    await AsyncStorage.setItem("@premium_tier", stripeStatus.tier);
-                    await AsyncStorage.setItem("@ai_access", JSON.stringify(stripeStatus.hasAIAccess));
-
-                    console.log(`✅ Premium status updated from Stripe:`, stripeStatus);
-                }
-            }
-
-            // Load usage data
-            const usageData = await AsyncStorage.getItem("@usage_data");
             if (usageData !== null) {
                 setCurrentUsage(JSON.parse(usageData));
             }
-
-            // Load usage count cache
-            const cacheData = await AsyncStorage.getItem("@usage_count_cache");
             if (cacheData !== null) {
                 setUsageCountCache(JSON.parse(cacheData));
             }
 
-            console.log("✅ Premium data loaded successfully");
-        } catch (error) {
-            console.error("❌ Error loading premium data:", error);
-        } finally {
+            // CRITICAL: Set loading to false immediately - app can now render
             setIsLoading(false);
+            console.log("✅ App ready to render with cached premium data");
+
+            // STEP 2: Background subscription check (deferred, non-blocking)
+            setTimeout(() => {
+                checkSubscriptionInBackground();
+            }, 100); // Small delay to ensure UI is mounted first
+
+        } catch (error) {
+            console.error("❌ Error loading cached premium data:", error);
+            // Even on error, allow app to render
+            setIsLoading(false);
+        }
+    };
+
+    const checkSubscriptionInBackground = async () => {
+        try {
+            console.log("🔄 Starting background subscription check...");
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                console.log("❌ No user found for subscription check");
+                return;
+            }
+
+            // Add 5-second timeout to prevent hanging
+            const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Subscription check timeout')), 5000)
+            );
+
+            const subscriptionPromise = checkStripeSubscriptionStatus(user.id);
+
+            let stripeStatus;
+            try {
+                stripeStatus = await Promise.race([subscriptionPromise, timeoutPromise]);
+            } catch (timeoutError) {
+                console.warn("⚠️ Subscription check timed out after 5 seconds - using cached data");
+                return;
+            }
+
+            // Get current cached values for comparison
+            const cachedPremiumStatus = await AsyncStorage.getItem("@premium_status");
+            const cachedTier = await AsyncStorage.getItem("@premium_tier");
+            const cachedAIAccess = await AsyncStorage.getItem("@ai_access");
+
+            const oldStatus = JSON.parse(cachedPremiumStatus || 'false');
+            const oldTier = cachedTier || 'free';
+            const oldAIAccess = JSON.parse(cachedAIAccess || 'false');
+
+            // Only update if status actually changed
+            if (stripeStatus.isPremium !== oldStatus ||
+                stripeStatus.tier !== oldTier ||
+                stripeStatus.hasAIAccess !== oldAIAccess) {
+
+                console.log("🔄 Premium status changed, updating...");
+
+                setIsPremium(stripeStatus.isPremium);
+                setPremiumTier(stripeStatus.tier);
+                setHasAIAccess(stripeStatus.hasAIAccess);
+
+                await AsyncStorage.setItem("@premium_status", JSON.stringify(stripeStatus.isPremium));
+                await AsyncStorage.setItem("@premium_tier", stripeStatus.tier);
+                await AsyncStorage.setItem("@ai_access", JSON.stringify(stripeStatus.hasAIAccess));
+
+                console.log(`✅ Premium status updated from background check:`, stripeStatus);
+            } else {
+                console.log("✅ Premium status unchanged from background check");
+            }
+
+        } catch (error) {
+            console.error("❌ Background subscription check failed (gracefully):", error);
+            // Graceful failure - app continues with cached data
         }
     };
 
